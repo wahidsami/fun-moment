@@ -1,0 +1,21 @@
+{
+  "custom": [
+    {
+      "filename" : "composer.json",
+      "path" : "@core"
+    },
+    {
+      "filename" : "composer.lock",
+      "path" : "@core"
+    },
+    {
+      "filename" : "package.json",
+      "path" : "@core"
+    },
+    {
+      "filename" : "webpack.mix.js",
+      "path" : "@core"
+    }
+  ],
+  "version": "1.5.0"
+}

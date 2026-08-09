@@ -1,0 +1,179 @@
+/*---------------------------------------
+    ## Button
+---------------------------------------*/
+
+.btn-wrapper {
+    display: block;
+}
+
+.cmn-btn {
+    color: var(--paragraph-color);
+    font-size: 16px;
+    font-weight: 500;
+    font-family: var(--new-body-font);
+    display: inline-block;
+    text-transform: capitalize;
+    text-align: center;
+    cursor: pointer;
+    line-height: 20px;
+    padding: 13px 25px;
+    transition: all .3s;
+    @include transition($transition);
+    @include responsive(xs) {
+        padding: 10px 20px;
+        font-size: 15px;
+    }
+    @include responsive(vxxs) {
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+    &.btn-bg-1 {
+        background: var(--new-main-color-one);
+        color: $white;
+        border: 1px solid var(--new-main-color-one);
+        &:hover {
+            background: none;
+            color: var(--new-main-color-one);
+        }
+    }
+    &.btn-bg-2 {
+        background: var(--new-main-color-two);
+        color: $white;
+        border: 1px solid var(--new-main-color-two);
+        &:hover {
+            background: none;
+            color: var(--new-main-color-two);
+        }
+    }
+    &.btn-bg-3 {
+        background: var(--new-main-color-three);
+        color: $white;
+        border: 1px solid var(--new-main-color-three);
+        &:hover {
+            background: none;
+            color: var(--new-main-color-three);
+        }
+    }
+    &.btn-outline-1 {
+        border: 1px solid var(--new-main-color-one);
+        color: var(--new-main-color-one);
+        &:hover {
+            background: var(--new-main-color-one);
+            color: $white;
+        }
+    }
+    &.btn-outline-2 {
+        border: 1px solid var(--new-main-color-two);
+        color: var(--new-main-color-two);
+        &:hover {
+            background: var(--new-main-color-two);
+            color: $white;
+        }
+    }
+    &.btn-outline-3 {
+        border: 1px solid var(--new-main-color-three);
+        color: var(--new-main-color-three);
+        &:hover {
+            color: $white;
+            background: var(--new-main-color-three);
+        }
+    }
+    &.btn-outline-border {
+        border: 1px solid var(--new-body-color);
+        color: var(--new-paragraph-color);
+        &:hover {
+            color: var(--white);
+            background: var(--new-main-color-three);
+            border-color: var(--new-main-color-one);
+        }
+    }
+    &.btn-hover-danger {
+        &:hover {
+            background-color: var(--delete-color);
+            border-color: var(--delete-color);
+            color: var(--white);
+        }
+    }
+    &.btn-small {
+        padding: 9px 12px;
+        font-size: 15px;
+    }
+    &.btn-medium {
+        padding: 11px 25px;
+        font-size: 15px;
+    }
+    &.btn-small-height {
+        padding: 3px 35px;
+    }
+    &.pending {
+        background: rgba(#FFB307, .1);
+        color: #FFB307;
+        text-align: center;
+        border-radius: 5px;
+        &:hover {
+            background: #FFB307;
+            color: $white;
+        }
+    }
+    &.completed {
+        background: rgba(#1DBF73, .1);
+        color: #1DBF73;
+        text-align: center;
+        border-radius: 5px;
+        &:hover {
+            background: #1DBF73;
+            color: $white;
+        }
+    }
+    &.canceled {
+        background: rgba(#FF1747, .1);
+        color: #FF1747;
+        text-align: center;
+        border-radius: 5px;
+        &:hover {
+            background: #FF1747;
+            color: $white;
+        }
+    }
+}
+
+.submit-btn {
+    font-size: 16px;
+    outline: none;
+    border: none;
+    background: var(--new-main-color-one);
+    color: $white;
+    padding: 10px 30px;
+    cursor: pointer;
+    -webkit-transition: all .3s;
+    -o-transition: all .3s;
+    transition: all .3s;
+    &:focus {
+        outline: none;
+    }
+}
+
+.new_exploreBtn {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--new-main-color-one);
+    -webkit-transition: all .3s;
+    -o-transition: all .3s;
+    transition: all .3s;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    &:hover {
+        color: var(--new-main-color-two);
+    }
+    @include responsive(xxs) {
+        font-size: 16px;
+    }
+}
+
+.btn_flex {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}

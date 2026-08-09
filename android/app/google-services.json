@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "985118071013",
+    "project_id": "funmoments-project",
+    "storage_bucket": "funmoments-project.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:985118071013:android:4bc1cf8c1a2583e7779c0c",
+        "android_client_info": {
+          "package_name": "com.sa.funmomments"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWtpgMPHD0FE_cqiA3Md9IwSjj6MZK6rM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

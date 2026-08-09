@@ -1,0 +1,109 @@
+/* Blog area */
+
+.new_blog_area {
+    overflow: hidden;
+}
+
+.new_blog__single {
+    background: var(--white);
+    overflow: hidden;
+    -webkit-transition: all .3s;
+    -o-transition: all .3s;
+    transition: all .3s;
+    border: 1px solid var(--new-border-color);
+    &:hover {
+        -webkit-transform: translateY(-10px);
+        -ms-transform: translateY(-10px);
+        transform: translateY(-10px);
+        border: transparent;
+        -webkit-box-shadow: 0 0 20px rgba($black, .05);
+        box-shadow: 0 0 20px rgba($black, .05);
+        .new_blog__single {
+            &__thumb {
+                img {
+                    -webkit-transform: scale(1.2);
+                    -ms-transform: scale(1.2);
+                    transform: scale(1.2);
+                }
+            }
+        }
+    }
+    &__thumb {
+        overflow: hidden;
+        display: block;
+        img {
+            height: 100%;
+            width: 100%;
+            -o-object-fit: cover;
+            object-fit: cover;
+            -webkit-transition: all .4s;
+            -o-transition: all .4s;
+            transition: all .4s;
+        }
+    }
+    &__title {
+        font-size: 18px;
+        line-height: 26px;
+        font-weight: 600;
+        -webkit-transition: all 0.3s;
+        transition: all 0.3s;
+        margin-bottom: 0;
+        &:hover {
+            color: var(--new-main-color-one);
+        }
+    }
+    &__para {
+        font-size: 14px;
+        line-height: 24px;
+        color: var(--new-paragraph-color);
+    }
+    &__contents {
+        padding: 20px;
+        @include responsive(lg) {
+            padding: 20px 10px;
+        }
+        @include responsive(vxxs) {
+            padding: 20px 10px;
+        }
+        .tags {
+            padding: 0;
+            display: -webkit-box;
+            display: -ms-flexbox;
+            display: flex;
+            -webkit-box-align: center;
+            -ms-flex-align: center;
+            align-items: center;
+            margin-bottom: 15px;
+            li {
+                &:not(:last-child) {
+                    margin-right: 30px;
+                }
+                a {
+                    color: var(--light-color);
+                    font-size: 12px;
+                    -webkit-transition: all .3s;
+                    -o-transition: all .3s;
+                    transition: all .3s;
+                    &:hover {
+                        color: var(--new-main-color-one);
+                        i {
+                            color: var(--new-main-color-one);
+                        }
+                    }
+                    i {
+                        color: var(--new-main-color-three);
+                        -webkit-transition: all .3s;
+                        -o-transition: all .3s;
+                        transition: all .3s;
+                    }
+                }
+            }
+        }
+    }
+}
+
+.blog-pagination.margin-top-55 {
+    @include responsive(allPhone) {
+        margin-top: 30px;
+    }
+}

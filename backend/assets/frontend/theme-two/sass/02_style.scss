@@ -1,0 +1,99 @@
+/*--------------------------------------------------------------
+>>> TABLE OF CONTENTS:
+----------------------------------------------------------------
+
+# Google Fonts
+# Normalize
+# Global Padding
+# Alignments
+# Clearings
+# Sections
+    ## Nav bar 
+    ## Banner Area
+    ## Category area
+    ## Service area
+    ## Marketplace area
+    ## Professional Services
+    ## Seller area
+    ## Blog area
+    ## WIdgets
+    ## Banner Inner
+    ## Category Service area
+    ## Details Overview
+    ## Contact Map
+    ## Service Overview
+    ## Join area
+    ## Signup area
+    ## Register Step area
+    ## Service Details area
+    ## Blog Details
+    ## Details Tag area
+    ## Contact area
+    ## About area
+    ## Client logo area
+    ## Error area
+    ## Profile
+    ## Dashboard area
+    ## Seller Profile Details area
+    ## Seller Order View
+    ## Invoice area
+
+# Elements
+    ## section_title
+    ## button
+    ## back_top
+    ## preloader
+    ## Author tag
+    ## Tag list
+    ## Nice Select Style
+    ## inner menu
+    ## Pagination
+    ## Overview
+    ## Checkbox
+    ## Multi Step Form
+    ## Faq
+    ## Table Css
+
+--------------------------------------------------------------*/
+
+//== Global Design
+@import "global/_mixins";
+@import "global/_variables";
+@import "global/_global";
+//== Sections
+@import "sections/_navbar";
+@import "sections/_banner";
+@import "sections/banner_inner";
+@import "sections/_category";
+@import "sections/_services";
+@import "sections/choose";
+@import "sections/jobs";
+@import "sections/tasker";
+@import "sections/join";
+@import "sections/testimonial";
+@import "sections/app";
+@import "sections/_professional";
+@import "sections/_seller";
+@import "sections/_blog";
+@import "sections/footer";
+@import "sections/service_details";
+@import "sections/chat_inbox";
+//== Elements
+@import "elements/_section_title";
+@import "elements/_button";
+@import "elements/_back_top";
+@import "elements/_preloader";
+@import "elements/search_popup";
+@import "elements/_author_tag";
+@import "elements/_tag_list";
+@import "elements/custom_slider";
+@import "elements/select2";
+@import "elements/_pagination";
+@import "elements/_checkbox";
+@import "elements/multistep_form";
+@import "elements/_faq";
+@import "elements/_table";
+@import "elements/form";
+@import "elements/tab";
+@import "elements/custom_radio";
+@import "elements/pricing";

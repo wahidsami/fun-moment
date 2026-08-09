@@ -1,0 +1,74 @@
+# Flutter
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+coverage/
+
+# Android
+.gradle/
+local.properties
+*.jks
+*.keystore
+key.properties
+
+# iOS
+Pods/
+DerivedData/
+*.xcuserstate
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Laravel
+backend/vendor/
+backend/storage/app/
+backend/storage/assets/
+backend/storage/fonts/
+backend/storage/logs/
+backend/storage/framework/cache/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+backend/bootstrap/cache/*
+backend/public/assets/
+backend/public/common/
+backend/public/css/
+backend/public/js/
+backend/public/vendor/
+backend/public/storage/
+backend/public/mix-manifest.json
+admin-react/dist/
+
+# Environment
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# IDE / system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local exports / backups / archives
+data-*.csv
+*.sql
+*.dump
+*.bak
+*.backup
+Archive/
+backend/custom/
+backend/__rootFiles/
+**/__MACOSX/
+
+# Local assistant / workspace metadata
+.agents/
+.codex/

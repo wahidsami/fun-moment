@@ -1,0 +1,49 @@
+/* Tasker Css */
+
+.new_tasker__single {
+    border: 1px solid var(--new-border-color);
+    padding: 20px;
+    &__flex {
+        display: flex;
+        align-items: flex-start;
+        gap: 15px 12px;
+    }
+    &__thumb {
+        flex-shrink: 0;
+        max-width: 70px;
+        img {
+            border-radius: 50%;
+        }
+    }
+    &__contents {
+        flex-grow: 1;
+    }
+    &__title {
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 28px;
+        color: var(--new-heading-color);
+        margin: 0;
+        &.verified {
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            &::after {
+                @include fontawesomeIcon("\f00c");
+                color: var(--new-main-color-two);
+            }
+        }
+    }
+    &__order {
+        display: inline-block;
+        padding: 5px 10px;
+        color: var(--new-main-color-two);
+        border: 1px solid var(--new-main-color-two);
+        transition: all .3s;
+        &:hover {
+            background-color: var(--new-main-color-two);
+            color: var(--white);
+        }
+    }
+}

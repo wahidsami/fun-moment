@@ -1,0 +1,6 @@
+{
+  "name": "FUN MOMENT Admin Dashboard",
+  "description": "Production-grade, dual-language (AR/EN) RTL-capable admin dashboard for the FUN MOMENT service marketplace platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

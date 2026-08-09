@@ -1,0 +1,38 @@
+/* Choose Css */
+
+.new_choose__single {
+    border: 1px solid var(--new-border-color);
+    padding: 12px;
+    transition: all .3s;
+    &:hover {
+        -webkit-box-shadow: 0 0 20px rgba($black, .05);
+        box-shadow: 0 0 20px rgba($black, .05);
+        border-color: transparent;
+    }
+    &__flex {
+        display: flex;
+        gap: 12px 15px;
+    }
+    &__icon {
+        flex-shrink: 0;
+    }
+    &__contents {
+        flex-grow: 1;
+    }
+    &__title {
+        font-size: 24px;
+        line-height: 28px;
+        font-weight: 600;
+        color: var(--new-heading-color);
+        sub {
+            color: var(--new-paragraph-color);
+            font-size: 20px;
+        }
+    }
+    &__para {
+        font-size: 15px;
+        line-height: 24px;
+        font-weight: 400;
+        color: var(--new-paragraph-color);
+    }
+}
