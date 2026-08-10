@@ -163,6 +163,7 @@ Build note:
 
 - `backend/packages/xgenious-paymentgateway` now vendors the payment gateway package locally
 - `backend/packages/cinetpay/cinetpay-php` now satisfies the `cinetpay/cinetpay-php` dependency locally
+- `backend/packages/jomweb/billplz-laravel` now satisfies the BillPlz dependency locally
 - Coolify no longer needs SSH access to the dead third-party dependency repo
 
 If Coolify asks for a post-deploy command, use:

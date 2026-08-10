@@ -28,8 +28,7 @@
         "mercadopago/dx-php":"^2.4.4",
         "square/square": "18.0.0.20220420",
         "cinetpay/cinetpay-php": "^1.9",
-        "paytabscom/laravel_paytabs": "dev-master",
-        "jomweb/billplz-laravel" : "^2.2.2"
+        "paytabscom/laravel_paytabs": "dev-master"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.0",
