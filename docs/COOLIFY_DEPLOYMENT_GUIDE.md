@@ -243,8 +243,15 @@ flutter build appbundle --release --dart-define=BASE_API=https://vks008w44skg0cs
 If Coolify shows `404 page not found` from the proxy and keeps restarting the app:
 
 1. Re-check the domain field and make sure it uses the exact hostname with `https://`, not a path or trailing slash.
-2. Save the application, then redeploy.
-3. If it still restarts, open the Coolify deployment logs and look for the first startup error after the container begins running.
+2. Make sure `Ports Exposes` is set to `80` for the Laravel app.
+3. Save the application, then redeploy.
+4. If Coolify still says no server is available, open the deployment logs instead of the terminal. The terminal only works when the container is actually running.
+
+If the Coolify server page says terminal access is disabled:
+
+1. Open the Coolify server settings.
+2. Enable `Terminal Access`.
+3. Then redeploy the backend if the container is healthy enough to start.
 
 ## Simple first deployment order
 
