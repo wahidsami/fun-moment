@@ -76,6 +76,7 @@
     $page_type = isset($page_type) ? $page_post : [];
     @endphp
     @include('frontend.partials.root-style')
+    <link rel="stylesheet" href="{{ asset('assets/frontend/css/fun-moment-web.css') }}">
     @yield('style')
     @if(request()->routeIs('homepage'))
            {!! render_site_meta() !!}
@@ -90,7 +91,7 @@
  @endif
 
 </head>
-<body class="__qixer">
+<body class="__qixer fm-public-shell">
 @php
     $notice = \App\AdminNotice::where('status', 1)->where('expire_date', '>', now())->latest()->where('notice_for', 1)->first();
 @endphp

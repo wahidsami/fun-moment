@@ -10,7 +10,7 @@
         <div class="responsive-mobile-menu">
             <div class="logo-wrapper">
                 <a href="{{ route('homepage') }}" class="logo">
-                    {!! render_image_markup_by_attachment_id(get_static_option('site_logo')) !!}
+                    <img src="{{ asset('logo.png') }}" alt="{{ get_static_option('site_title') ?? __('FUN MOMENT') }}">
                 </a>
             </div>
 
@@ -35,6 +35,7 @@
 
         <div class="nav-right-content">
             <div class="navbar-right-inner">
+                <a class="fm-btn d-none d-lg-inline-flex" href="{{ route('service.list.category') }}">{{ __('Explore') }}</a>
                 <div class="info-bar-item">
                     @if(auth('web')->check() && Auth()->guard('web')->user()->unreadNotifications()->count() > 0)
                         @if(Auth::guard('web')->check() && Auth::guard('web')->user()->user_type==0)

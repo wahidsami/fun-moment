@@ -87,8 +87,48 @@
         $country_tax =  App\Tax::select('id','tax')->where('country_id',$service_country)->first();
     @endphp
 
+    <section class="fm-hero py-5">
+        <div class="container">
+            <div class="hero-shell">
+                <div class="row align-items-center g-4">
+                    <div class="col-lg-7">
+                        <span class="hero-badge">
+                            <i class="las la-calendar-check"></i>
+                            {{ __('Live booking checkout') }}
+                        </span>
+                        <h1 class="hero-title">{{ $service_details_for_book->title }}</h1>
+                        <p class="hero-subtitle mb-0">
+                            {{ __('Confirm the real service package, select date and schedule when needed, add extras, and place the order in the live backend.') }}
+                        </p>
+                        <div class="hero-actions">
+                            <a href="{{ route('service.list.details', $service_details_for_book->slug) }}" class="btn-outline-1">{{ __('Back to details') }}</a>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="fm-glass-card p-4">
+                            <div class="fm-grid-2">
+                                <div class="stat-card">
+                                    <div class="label">{{ __('Base price') }}</div>
+                                    <div class="value" style="font-size:22px">{{ amount_with_currency_symbol($service_details_for_book->price) }}</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="label">{{ __('Includes') }}</div>
+                                    <div class="value" style="font-size:22px">{{ $service_includes->count() }}</div>
+                                </div>
+                            </div>
+                            <div class="mt-3 stat-card">
+                                <div class="label">{{ __('Extras') }}</div>
+                                <div class="value" style="font-size:20px">{{ $service_additionals->count() }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
             <!-- Service Details area start -->
-    <div class="new_service_details_area padding-top-100 padding-bottom-100">
+    <div class="new_service_details_area padding-top-20 padding-bottom-100">
         <div class="container">
 
             <div class="new_stepForm">

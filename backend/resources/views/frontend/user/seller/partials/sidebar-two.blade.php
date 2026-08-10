@@ -4,7 +4,7 @@
         <div class="dashboard__top">
             <div class="dashboard__top__logo">
                 <a href="{{ route('homepage') }}" class="logo" target="_blank">
-                    {!! render_image_markup_by_attachment_id(get_static_option('site_logo')) !!}
+                    <img src="{{ asset('logo.png') }}" alt="{{ get_static_option('site_title') ?? __('FUN MOMENT') }}">
                 </a>
             </div>
         </div>

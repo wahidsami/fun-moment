@@ -27,6 +27,7 @@
     <link rel="canonical" href="{{request()->url()}}" />
     <script src="{{asset('assets/common/js/jquery-3.6.0.min.js')}}"></script>
     @include('frontend.partials.root-style')
+    <link rel="stylesheet" href="{{ asset('assets/frontend/css/fun-moment-web.css') }}">
     @yield('style')
 </head>
-<body>
+<body class="fm-dashboard-shell">

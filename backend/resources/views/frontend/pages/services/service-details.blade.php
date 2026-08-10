@@ -46,9 +46,49 @@
         </div>
     </div>
 
+    <section class="fm-hero py-5">
+        <div class="container">
+            <div class="hero-shell">
+                <div class="row align-items-center g-4">
+                    <div class="col-lg-7">
+                        <span class="hero-badge">
+                            <i class="las la-star"></i>
+                            {{ __('Live service detail page') }}
+                        </span>
+                        <h1 class="hero-title">{{ $service_details->title }}</h1>
+                        <p class="hero-subtitle mb-0">
+                            {{ __('Review the provider profile, service inclusions, extras, FAQ, and real booking options before you reserve.') }}
+                        </p>
+                        <div class="hero-actions">
+                            <a href="{{ route('service.list.book', $service_details->slug) }}" class="fm-btn">{{ __('Book Now') }}</a>
+                            <a href="{{ route('about.seller.profile', optional($service_details->seller)->username) }}" class="btn-outline-1">{{ __('View Provider') }}</a>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="fm-glass-card p-4">
+                            <div class="fm-grid-2">
+                                <div class="stat-card">
+                                    <div class="label">{{ __('Starting at') }}</div>
+                                    <div class="value" style="font-size:22px">{{ amount_with_currency_symbol($service_details->price) }}</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="label">{{ __('Reviews') }}</div>
+                                    <div class="value" style="font-size:22px">{{ $service_reviews->count() }}</div>
+                                </div>
+                            </div>
+                            <div class="mt-3 stat-card">
+                                <div class="label">{{ __('Provider') }}</div>
+                                <div class="value" style="font-size:20px">{{ optional($service_details->seller)->name }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- Service Details area starts -->
-    <section class="service-details-area padding-top-70 padding-bottom-100">
+    <section class="service-details-area padding-top-20 padding-bottom-100">
         <div class="container">
             <div class="row">
                 <div class="col-lg-8 margin-top-30 order-2 order-lg-1">
