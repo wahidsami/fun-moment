@@ -165,6 +165,7 @@ Build note:
 - `backend/packages/cinetpay/cinetpay-php` now satisfies the `cinetpay/cinetpay-php` dependency locally
 - `backend/packages/jomweb/billplz-laravel` now satisfies the BillPlz dependency locally
 - `backend/packages/xgenious-paymentgateway/composer.json` now allows `unicodeveloper/laravel-paystack` `^1.2.0`, which is compatible with Laravel 10 and modern Guzzle
+- `backend/package.json` sets `NODE_OPTIONS=--openssl-legacy-provider` for the production build so Laravel Mix 4 can compile under Node 22
 - Coolify no longer needs SSH access to the dead third-party dependency repo
 
 If Coolify asks for a post-deploy command, use:
