@@ -1,2 +1,2 @@
 [start]
-cmd = "php artisan serve --host=0.0.0.0 --port=80"
+cmd = "mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache && chmod -R ug+rwX storage bootstrap/cache || true && php artisan serve --host=0.0.0.0 --port=80"
