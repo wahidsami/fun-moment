@@ -161,7 +161,7 @@ npm run production
 
 Build note:
 
-- `backend/composer.json` now points to the public `xgenious-fundorex/paymentgateway` fork
+- `backend/packages/xgenious-paymentgateway` now vendors the payment gateway package locally
 - `backend/packages/cinetpay/cinetpay-php` now satisfies the `cinetpay/cinetpay-php` dependency locally
 - Coolify no longer needs SSH access to the dead third-party dependency repo
 

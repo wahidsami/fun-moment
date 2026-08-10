@@ -46,8 +46,11 @@
             }
         },
         {
-            "type": "vcs",
-            "url": "https://github.com/spdharshan/xgenious-paymentgateway.git"
+            "type": "path",
+            "url": "packages/xgenious-paymentgateway",
+            "options": {
+                "symlink": false
+            }
         }
     ],
     "require-dev": {
