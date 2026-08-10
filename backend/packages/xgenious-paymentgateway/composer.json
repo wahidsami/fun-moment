@@ -23,7 +23,7 @@
         "razorpay/razorpay": "2.*",
         "mollie/laravel-mollie": "^2.0",
         "kingflamez/laravelrave": "^v4.2.0",
-        "unicodeveloper/laravel-paystack": "1.0.*",
+        "unicodeveloper/laravel-paystack": "^1.2.0",
         "billowapp/payfast": "^0.4.0",
         "mercadopago/dx-php":"^2.4.4",
         "square/square": "18.0.0.20220420",
