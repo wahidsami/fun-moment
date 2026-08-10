@@ -166,6 +166,7 @@ Build note:
 - `backend/packages/jomweb/billplz-laravel` now satisfies the BillPlz dependency locally
 - `backend/packages/xgenious-paymentgateway/composer.json` now allows `unicodeveloper/laravel-paystack` `^1.2.0`, which is compatible with Laravel 10 and modern Guzzle
 - `backend/package.json` sets `NODE_OPTIONS=--openssl-legacy-provider` for the production build so Laravel Mix 4 can compile under Node 22
+- `backend/nixpacks.toml` overrides the container start command to `php artisan serve --host=0.0.0.0 --port=80` so Coolify does not generate a broken duplicate-Nginx config
 - Coolify no longer needs SSH access to the dead third-party dependency repo
 
 If Coolify asks for a post-deploy command, use:
@@ -246,6 +247,7 @@ If Coolify shows `404 page not found` from the proxy and keeps restarting the ap
 2. Make sure `Ports Exposes` is set to `80` for the Laravel app.
 3. Save the application, then redeploy.
 4. If Coolify still says no server is available, open the deployment logs instead of the terminal. The terminal only works when the container is actually running.
+5. If the logs mention `duplicate location "/" in /nginx.conf`, this repo now uses `backend/nixpacks.toml` to start Laravel directly with `php artisan serve` instead of the generated Nginx config.
 
 If the Coolify server page says terminal access is disabled:
 
