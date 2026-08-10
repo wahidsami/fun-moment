@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7102f8e7803b61927b2f381510871ec2",
+    "content-hash": "432f6e944ce0335735fd8156e1a79fe5",
     "packages": [
         {
             "name": "anandsiddharth/laravel-paytm-wallet",
@@ -2718,6 +2718,34 @@
                 }
             ],
             "time": "2022-05-21T17:30:32+00:00"
+        },
+        {
+            "name": "jomweb/billplz-laravel",
+            "version": "2.2.2",
+            "dist": {
+                "type": "path",
+                "url": "packages/jomweb/billplz-laravel",
+                "reference": "9214054eb0989fc38a8e84120db586804cf1a26b"
+            },
+            "require": {
+                "ext-json": "*",
+                "guzzlehttp/guzzle": "^7.0",
+                "php": "^8.1"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Billplz\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Compatibility Billplz Laravel package for Fun Moment deployments.",
+            "transport-options": {
+                "symlink": false,
+                "relative": true
+            }
         },
         {
             "name": "kingflamez/laravelrave",
@@ -13073,8 +13101,5 @@
         "ext-fileinfo": "*"
     },
     "platform-dev": {},
-    "platform-overrides": {
-        "php": "8.1.0"
-    },
     "plugin-api-version": "2.6.0"
 }

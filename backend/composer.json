@@ -34,6 +34,7 @@
         "twilio/sdk": "^7.4",
         "xgenious/installer": "^1.0.7",
         "xgenious-fundorex/paymentgateway": "^2.0",
+        "jomweb/billplz-laravel": "2.2.2",
         "xgenious/xgapiclient": "^3.0",
         "yajra/laravel-datatables-oracle": "~10.0"
     },
