@@ -33,11 +33,23 @@
         "stevebauman/location": "^7.3.2",
         "twilio/sdk": "^7.4",
         "xgenious/installer": "^1.0.7",
-        "xgenious/paymentgateway": "^4.6.0",
+        "xgenious-fundorex/paymentgateway": "^2.0",
         "xgenious/xgapiclient": "^3.0",
         "yajra/laravel-datatables-oracle": "~10.0"
     },
-    "repositories": [],
+    "repositories": [
+        {
+            "type": "path",
+            "url": "packages/cinetpay/cinetpay-php",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/spdharshan/xgenious-paymentgateway.git"
+        }
+    ],
     "require-dev": {
         "spatie/laravel-ignition": "2.0",
         "laravel/ui": "^4.0",
