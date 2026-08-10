@@ -50,11 +50,11 @@ Create a new Application and set:
 - Build pack: `Nixpacks`
 - Base directory: `backend`
 - Port exposes: `80`
-- Public domain: `http://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io`
+- Public domain: `https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io`
 
 If Coolify asks for the application URL, use:
 
-- `http://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io`
+- `https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io`
 
 ## Step 2 - Add backend environment variables
 
@@ -63,7 +63,7 @@ Start from the client's existing `.env` and keep every current value unless it i
 Replace only these lines in Coolify:
 
 ```dotenv
-APP_URL=http://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io
+APP_URL=https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io
 APP_KEY=base64:KURTu1uwFlb+pcmYFFIAFqEE0yrLgfJhsRDOaisj+9E=
 
 DB_CONNECTION=pgsql
@@ -191,9 +191,9 @@ php artisan view:cache
 
 Use these URLs for the Laravel deployment:
 
-- Website: `http://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io`
-- Admin: `http://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io/admin-home`
-- API: `http://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io/api/v1`
+- Website: `https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io`
+- Admin: `https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io/admin-home`
+- API: `https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io/api/v1`
 
 ## Step 8 - Optional queue worker
 
@@ -235,8 +235,16 @@ The Flutter app is not hosted on Coolify.
 When you build it, point it to the new API:
 
 ```bash
-flutter build appbundle --release --dart-define=BASE_API=http://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io/api/v1
+flutter build appbundle --release --dart-define=BASE_API=https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io/api/v1
 ```
+
+## Troubleshooting
+
+If Coolify shows `404 page not found` from the proxy and keeps restarting the app:
+
+1. Re-check the domain field and make sure it uses the exact hostname with `https://`, not a path or trailing slash.
+2. Save the application, then redeploy.
+3. If it still restarts, open the Coolify deployment logs and look for the first startup error after the container begins running.
 
 ## Simple first deployment order
 
