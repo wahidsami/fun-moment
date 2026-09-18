@@ -13,7 +13,7 @@
                         </div>
                         <div class="fm-footer-actions">
                             <a class="fm-btn" href="{{ route('service.list.category') }}">{{ __('Explore Services') }}</a>
-                            <a class="btn-outline-1" href="{{ route('seller.all') }}">{{ __('Meet Providers') }}</a>
+                            <a class="btn-outline-1" href="{{ route('all.sellers') }}">{{ __('Meet Providers') }}</a>
                         </div>
                     </div>
                 </div>
