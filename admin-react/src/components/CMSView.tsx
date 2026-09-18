@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Language, UserRole } from '../types';
 import { translations } from '../translations';
+import { LaravelAPI } from '../api';
 import {
   BookOpen,
   FolderTree,
@@ -375,6 +376,7 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
       image: blogForm.image,
       content_en: blogForm.content_en,
       content_ar: blogForm.content_ar,
+      type: 'blog' as const,
       tags: blogForm.tags ?? [],
     };
 
@@ -439,6 +441,7 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
       slug: selectedPage.slug,
       status: selectedPage.status,
       content_en: selectedPage.blocks.map(block => `${block.title_en}\n${block.content_en}`).join('\n\n'),
+      type: 'page' as const,
       content_ar: selectedPage.blocks.map(block => `${block.title_ar}\n${block.content_ar}`).join('\n\n'),
     };
 
