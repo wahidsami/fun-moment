@@ -140,7 +140,7 @@ class RecentBlog extends \App\PageBuilder\PageBuilderBase
         $blog_markup = '';
         foreach ($blogs as $blog){
 
-            $image =  render_background_image_markup_by_attachment_id($blog->image,'','','thumb');
+            $image =  render_blog_background_image_markup($blog->image, 'thumb');
             $blog_title =  $blog->title;    
             $route = route('frontend.blog.single',$blog->slug) ;
             $category_route = route('frontend.blog.category',optional($blog->category)->slug) ;

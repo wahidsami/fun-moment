@@ -46,7 +46,7 @@
             <div class="fm-grid-3">
                 @foreach($all_blogs as $blog)
                     <article class="single-blog no-margin wow fadeInUp" data-wow-delay=".2s">
-                        <a href="{{ route('frontend.blog.single', $blog->slug) }}" class="blog-thumb service-bg-thumb-format" {!! render_background_image_markup_by_attachment_id($blog->image) !!}></a>
+                        <a href="{{ route('frontend.blog.single', $blog->slug) }}" class="blog-thumb service-bg-thumb-format" {!! render_blog_background_image_markup($blog->image) !!}></a>
                         <div class="blog-contents">
                             <ul class="tags">
                                 <li>

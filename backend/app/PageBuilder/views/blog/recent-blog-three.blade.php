@@ -14,7 +14,7 @@
                 <div class="new_blog__single radius-10">
                     <div class="new_blog__single__thumb">
                         <a href="{{ route('frontend.blog.single',$blog->slug) }}">
-                            {!! render_image_markup_by_attachment_id($blog->image,'','','thumb') !!}
+                            {!! render_blog_image_markup($blog->image,'','thumb', $blog->title) !!}
                         </a>
                     </div>
                     <div class="new_blog__single__contents">

@@ -259,6 +259,73 @@ function render_background_image_markup_by_attachment_id($id, $size = 'full')
     }
     return $noImageMarkup;
 }
+
+function get_blog_image_url($image, $size = 'full')
+{
+    $defaultImage = asset('assets/uploads/no-image.png');
+    if (empty($image)) {
+        return $defaultImage;
+    }
+
+    if (is_int($image) || (is_string($image) && ctype_digit($image))) {
+        $attachment = get_attachment_image_by_id($image, $size, false);
+        if (!empty($attachment['img_url'])) {
+            return $attachment['img_url'];
+        }
+    }
+
+    if (is_string($image)) {
+        $trimmed = trim($image);
+
+        if (preg_match('/^https?:\/\//i', $trimmed)) {
+            return $trimmed;
+        }
+
+        // Guard against directory traversal
+        if (str_contains($trimmed, '..') || str_contains($trimmed, "\0")) {
+            return $defaultImage;
+        }
+
+        $cleanPath = ltrim($trimmed, '/\\');
+        $publicPath = public_path();
+        $basePath = base_path();
+
+        $candidates = [
+            [$publicPath, $publicPath . DIRECTORY_SEPARATOR . $cleanPath],
+            [$publicPath, $publicPath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'media-uploader' . DIRECTORY_SEPARATOR . $cleanPath],
+            [$publicPath, $publicPath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'blog' . DIRECTORY_SEPARATOR . $cleanPath],
+            [$publicPath, $publicPath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $cleanPath],
+            [$basePath, $basePath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'media-uploader' . DIRECTORY_SEPARATOR . $cleanPath],
+            [$basePath, $basePath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'blog' . DIRECTORY_SEPARATOR . $cleanPath],
+            [$basePath, $basePath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $cleanPath],
+        ];
+
+        foreach ($candidates as [$root, $filePath]) {
+            $realPath = realpath($filePath);
+            if ($realPath !== false && file_exists($realPath) && str_starts_with($realPath, $root)) {
+                $relative = str_replace([$root . DIRECTORY_SEPARATOR, $root . '/', '\\'], ['', '', '/'], $realPath);
+                return asset($relative);
+            }
+        }
+    }
+
+    return $defaultImage;
+}
+
+function render_blog_background_image_markup($image, $size = 'full')
+{
+    $imageUrl = get_blog_image_url($image, $size);
+    return 'style="background-image: url(' . e($imageUrl) . ');"';
+}
+
+function render_blog_image_markup($image, $class = null, $size = 'full', $alt = '')
+{
+    $imageUrl = get_blog_image_url($image, $size);
+    $classList = !empty($class) ? 'class="' . e($class) . '"' : '';
+    $altAttr = 'alt="' . e($alt) . '"';
+
+    return '<img src="' . e($imageUrl) . '" ' . $classList . ' ' . $altAttr . '/>';
+}
 function render_favicon_by_id($id)
 {
     $site_favicon = get_attachment_image_by_id($id, "full", false);
@@ -270,6 +337,15 @@ function render_favicon_by_id($id)
 }
 function get_attachment_image_by_id($id, $size = null, $default = false)
 {
+    if (empty($id) || (!is_int($id) && (!is_string($id) || !ctype_digit($id)))) {
+        if ($default) {
+            return [
+                'img_url' => asset('assets/uploads/no-image.png'),
+                'img_alt' => 'no-image'
+            ];
+        }
+        return [];
+    }
 
     $image_details = MediaUpload::find($id);
     $return_val = [];

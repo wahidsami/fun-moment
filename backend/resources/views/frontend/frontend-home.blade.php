@@ -317,7 +317,7 @@
                 <div class="fm-grid-3">
                     @foreach($latestBlogs as $blog)
                         <article class="single-service">
-                            <a href="{{ route('frontend.blog.single', $blog->slug) }}" class="service-thumb service-bg-thumb-format" {!! render_background_image_markup_by_attachment_id($blog->image) !!}></a>
+                            <a href="{{ route('frontend.blog.single', $blog->slug) }}" class="service-thumb service-bg-thumb-format" {!! render_blog_background_image_markup($blog->image) !!}></a>
                             <div class="services-contents">
                                 <h5 class="common-title">
                                     <a href="{{ route('frontend.blog.single', $blog->slug) }}">{{ Str::limit($blog->title, 58) }}</a>

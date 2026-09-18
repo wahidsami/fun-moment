@@ -101,7 +101,7 @@ foreach ($all_blogs as $blog)
     $title = $blog->title;
     $create_date = optional($blog->created_at)->diffForHumans();
     $category = $blog->category->name;
-    $image = render_background_image_markup_by_attachment_id($blog->image,'','','thumb');
+    $image = render_blog_background_image_markup($blog->image, 'thumb');
     $blog_content = purify_html_raw(Str::words($blog->blog_content,15));
     $route = route('frontend.blog.single',$blog->slug);  
     $category_blog_route = route('frontend.blog.category',optional($blog->category)->slug);

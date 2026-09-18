@@ -54,7 +54,7 @@
             <div class="fm-glass-card p-4 p-lg-5">
                 <div class="single-blog-details">
                     <div class="thumb mb-4">
-                        {!! render_image_markup_by_attachment_id($blog_post->image, '', 'large') !!}
+                        {!! render_blog_image_markup($blog_post->image, '', 'large', $blog_post->title) !!}
                     </div>
                     <ul class="tags">
                         <li class="list">
@@ -124,7 +124,7 @@
                             @foreach($related_blog as $blog)
                                 <div class="col-lg-4 col-md-6 margin-top-30">
                                     <article class="single-blog no-margin wow fadeInUp" data-wow-delay=".2s">
-                                        <a href="{{ route('frontend.blog.single', $blog->slug) }}" class="blog-thumb service-bg-thumb-format" {!! render_background_image_markup_by_attachment_id($blog->image) !!}></a>
+                                        <a href="{{ route('frontend.blog.single', $blog->slug) }}" class="blog-thumb service-bg-thumb-format" {!! render_blog_background_image_markup($blog->image) !!}></a>
                                         <div class="blog-contents">
                                             <ul class="tags">
                                                 <li>
