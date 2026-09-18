@@ -31,7 +31,10 @@ class AppServiceProvider extends ServiceProvider
             $all_language = null;
         }
         Paginator::useBootstrap();
-        if (get_static_option('site_force_ssl_redirection') === 'on'){
+        $forceHttps = config('app.force_https');
+        if ($forceHttps === true || $forceHttps === 'true' || $forceHttps === '1' || $forceHttps === 1) {
+            URL::forceScheme('https');
+        } elseif ($forceHttps === null && get_static_option('site_force_ssl_redirection') === 'on') {
             URL::forceScheme('https');
         }
 
