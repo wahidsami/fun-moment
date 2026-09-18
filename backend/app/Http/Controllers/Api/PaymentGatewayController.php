@@ -55,8 +55,7 @@ class PaymentGatewayController extends Controller
                             "test_mode" => (bool) !empty($paypal_mode),
                             "logo_link" => $paypal_img_url,
                             "app_id" => !empty($paypal_mode) ? get_static_option('paypal_sandbox_app_id') : get_static_option('paypal_live_app_id'),
-                            "client_id" => !empty($paypal_mode) ? get_static_option('paypal_sandbox_client_id') : get_static_option('paypal_live_client_id'),
-                            "secret_id" => !empty($paypal_mode) ? get_static_option('paypal_sandbox_client_secret') : get_static_option('paypal_live_client_secret')
+                            "client_id" => !empty($paypal_mode) ? get_static_option('paypal_sandbox_client_id') : get_static_option('paypal_live_client_id')
                         ];
                     }
                     break;
@@ -138,8 +137,7 @@ class PaymentGatewayController extends Controller
                             "name" => "stripe",
                             "test_mode" => (bool) !empty($stripe_mode),
                             "logo_link" => $stripe_img_url,
-                            "public_key" => get_static_option('stripe_public_key'),
-                            "secret_key" => get_static_option('stripe_secret_key')
+                            "public_key" => get_static_option('stripe_public_key')
                         ];
                     }
                     break;
@@ -155,8 +153,7 @@ class PaymentGatewayController extends Controller
                             "name" => "razorpay",
                             "test_mode" => (bool) !empty($razorpay_mode),
                             "logo_link" => $razorpay_img_url,
-                            "api_key" => get_static_option('razorpay_api_key'),
-                            "api_secret" => get_static_option('razorpay_api_secret')
+                            "api_key" => get_static_option('razorpay_api_key')
                         ];
                     }
                     break;
@@ -172,9 +169,7 @@ class PaymentGatewayController extends Controller
                             "name" => "flutterwave",
                             "test_mode" => (bool) !empty($flutterwave_mode),
                             "logo_link" => $flutterwave_img_url,
-                            "public_key" => get_static_option('flw_public_key'),
-                            "secret_key" => get_static_option('flw_secret_key'),
-                            "secret_hash" => get_static_option('flw_secret_hash')
+                            "public_key" => get_static_option('flw_public_key')
                         ];
                     }
                     break;
@@ -191,7 +186,6 @@ class PaymentGatewayController extends Controller
                             "test_mode" => (bool) !empty($paystack_mode),
                             "logo_link" => $paystack_img_url,
                             "public_key" => get_static_option('paystack_public_key'),
-                            "secret_key" => get_static_option('paystack_secret_key'),
                             "merchant_email" => get_static_option('paystack_merchant_email')
                         ];
                     }
@@ -208,8 +202,7 @@ class PaymentGatewayController extends Controller
                             "name" => "marcadopago",
                             "test_mode" => (bool) !empty($marcadopago_mode),
                             "logo_link" => $marcadopago_img_url,
-                            "client_id" => get_static_option('marcado_pago_client_id'),
-                            "client_secret" => get_static_option('marcado_pago_client_secret'),
+                            "client_id" => get_static_option('marcado_pago_client_id')
                         ];
                     }
                     break;
@@ -226,9 +219,7 @@ class PaymentGatewayController extends Controller
                             "test_mode" => (bool) !empty($instamojo_mode),
                             "logo_link" => $instamojo_img_url,
                             "client_id" => get_static_option('instamojo_client_id'),
-                            "client_secret" => get_static_option('instamojo_client_secret'),
-                            "username" => get_static_option('instamojo_username'),
-                            "password" => get_static_option('instamojo_password'),
+                            "username" => get_static_option('instamojo_username')
                         ];
                     }
                     break;
@@ -244,8 +235,7 @@ class PaymentGatewayController extends Controller
                             "name" => "cashfree",
                             "test_mode" => (bool) !empty($cashfree_mode),
                             "logo_link" => $cashfree_img_url,
-                            "app_id" => get_static_option('cashfree_app_id'),
-                            "secret_key" => get_static_option('cashfree_secret_key')
+                            "app_id" => get_static_option('cashfree_app_id')
                         ];
                     }
                     break;
@@ -262,8 +252,7 @@ class PaymentGatewayController extends Controller
                             "test_mode" => (bool) !empty($payfast_mode),
                             "logo_link" => $payfast_img_url,
                             "merchant_id" => get_static_option('payfast_merchant_id'),
-                            "merchant_key" => get_static_option('payfast_merchant_key'),
-                            "passphrase" => get_static_option('payfast_passphrase')
+                            "merchant_key" => get_static_option('payfast_merchant_key')
                         ];
                     }
                     break; 
@@ -280,7 +269,6 @@ class PaymentGatewayController extends Controller
                             "test_mode" => (bool) !empty($midtrans_mode),
                             "logo_link" => $midtrans_img_url,
                             "merchant_id" => get_static_option('midtrans_merchant_id'),
-                            "server_key" => get_static_option('midtrans_server_key'),
                             "client_key" => get_static_option('midtrans_client_key')
                         ];
                     }
@@ -297,8 +285,7 @@ class PaymentGatewayController extends Controller
                             "test_mode" => (bool) !empty($sqyareup_mode),
                             "logo_link" => $sqyareup_img_url,
                             "application_id" => get_static_option('squareup_application_id'),
-                            "location_id" => get_static_option('squareup_location_id'),
-                            "access_token" => get_static_option('squareup_access_token')
+                            "location_id" => get_static_option('squareup_location_id')
                         ];
                     }
                     break;
@@ -313,8 +300,7 @@ class PaymentGatewayController extends Controller
                             "name" => "cinetpay",
                             "test_mode" => (bool) !empty($cinetpay_mode),
                             "logo_link" => $cinetpay_img_url,
-                            "site_id" => get_static_option('cinetpay_site_id'),
-                            "app_key" => get_static_option('cinetpay_app_key'),
+                            "site_id" => get_static_option('cinetpay_site_id')
                         ];
                     }
                     break;
@@ -330,9 +316,8 @@ class PaymentGatewayController extends Controller
                             "name" => "paytabs",
                             "test_mode" => (bool) !empty($paytabs_mode),
                             "logo_link" => $paytabs_img_url,
-                            "region" => get_static_option('paytabs_region'),
-                            "profile_id" => get_static_option('paytabs_profile_id'),
-                            "server_key" => get_static_option('paytabs_server_key'),
+                            "region" => config('paytabs.region') ?: get_static_option('paytabs_region'),
+                            "profile_id" => config('paytabs.profile_id') ?: get_static_option('paytabs_profile_id')
                         ];
                     }
                     break;
@@ -348,9 +333,7 @@ class PaymentGatewayController extends Controller
                             "name" => "billplz",
                             "test_mode" => (bool) !empty($billplz_mode),
                             "logo_link" => $billplz_img_url,
-                            "collection_name" => get_static_option('billplz_collection_name'),
-                            "xsignature" => get_static_option('billplz_xsignature'),
-                            "key" => get_static_option('billplz_key'),
+                            "collection_name" => get_static_option('billplz_collection_name')
                         ];
                     }
                     break;

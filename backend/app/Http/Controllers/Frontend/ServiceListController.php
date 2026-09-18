@@ -1360,10 +1360,10 @@ class ServiceListController extends Controller
             elseif($request->selected_payment_gateway === 'paytabs'){
                 try{
 
-                    $paytabs_env =  !empty(get_static_option('paytabs_test_mode'));
-                    $paytabs_region = get_static_option('paytabs_region');
-                    $paytabs_profile_id = get_static_option('paytabs_profile_id');
-                    $paytabs_server_key = get_static_option('paytabs_server_key');
+                    $paytabs_env = config('paytabs.test_mode') !== null ? config('paytabs.test_mode') : !empty(get_static_option('paytabs_test_mode'));
+                    $paytabs_region = config('paytabs.region') ?: get_static_option('paytabs_region');
+                    $paytabs_profile_id = config('paytabs.profile_id') ?: get_static_option('paytabs_profile_id');
+                    $paytabs_server_key = config('paytabs.server_key') ?: get_static_option('paytabs_server_key');
 
                     $paytabs = XgPaymentGateway::paytabs();
                     $paytabs->setProfileId($paytabs_profile_id);
