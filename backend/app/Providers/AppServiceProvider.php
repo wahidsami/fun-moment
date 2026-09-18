@@ -34,6 +34,8 @@ class AppServiceProvider extends ServiceProvider
         $forceHttps = config('app.force_https');
         if ($forceHttps === true || $forceHttps === 'true' || $forceHttps === '1' || $forceHttps === 1) {
             URL::forceScheme('https');
+        } elseif ($forceHttps === false || $forceHttps === 'false' || $forceHttps === '0' || $forceHttps === 0) {
+            URL::forceScheme('http');
         } elseif ($forceHttps === null && get_static_option('site_force_ssl_redirection') === 'on') {
             URL::forceScheme('https');
         }
