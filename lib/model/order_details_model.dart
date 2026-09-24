@@ -108,48 +108,65 @@ class OrderInfo {
   Seller? sellerDetails;
   Seller? seller;
 
-  factory OrderInfo.fromJson(Map<String, dynamic>? json) => OrderInfo(
-        id: json?["id"],
-        serviceId: json?["service_id"],
-        sellerId: json?["seller_id"],
-        buyerId: json?["buyer_id"],
-        name: json?["name"],
-        email: json?["email"],
-        phone: json?["phone"],
-        postCode: json?["post_code"],
-        address: json?["address"],
-        city: json?["city"],
-        area: json?["area"],
-        country: json?["country"],
-        date: json?["date"] == null ? null : DateTime.parse(json?["date"]),
-        schedule: json?["schedule"],
-        packageFee: json?["package_fee"],
-        extraService: json?["extra_service"],
-        subTotal: json?["sub_total"],
-        tax: json?["tax"],
-        total: json?["total"],
-        couponCode: json?["coupon_code"],
-        couponType: json?["coupon_type"],
-        couponAmount: json?["coupon_amount"],
-        commissionType: json?["commission_type"],
-        commissionCharge: json?["commission_charge"],
-        commissionAmount: json?["commission_amount"]?.toDouble(),
-        paymentGateway: json?["payment_gateway"],
-        paymentStatus: json?["payment_status"],
-        status: json?["status"],
-        isOrderOnline: json?["is_order_online"],
-        orderCompleteRequest: json?["order_complete_request"],
-        cancelOrderMoneyReturn: json?["cancel_order_money_return"],
-        transactionId: json?["transaction_id"],
-        orderNote: json?["order_note"],
-        createdAt: DateTime.parse(json?["created_at"]),
-        updatedAt: DateTime.parse(json?["updated_at"]),
-        manualPaymentImage: json?["manual_payment_image"],
-        sellerDetails: json?["seller_details"] != null
-            ? Seller.fromJson(json?["seller_details"])
-            : null,
-        seller: Seller.fromJson(json?["seller"]),
-      );
+  factory OrderInfo.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return OrderInfo();
+
+    DateTime? tryParseDate(dynamic val) {
+      if (val == null) return null;
+      try {
+        return DateTime.parse(val.toString());
+      } catch (_) {
+        return null;
+      }
+    }
+
+    return OrderInfo(
+      id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+      serviceId: json["service_id"] is int ? json["service_id"] : int.tryParse(json["service_id"]?.toString() ?? ''),
+      sellerId: json["seller_id"] is int ? json["seller_id"] : int.tryParse(json["seller_id"]?.toString() ?? ''),
+      buyerId: json["buyer_id"] is int ? json["buyer_id"] : int.tryParse(json["buyer_id"]?.toString() ?? ''),
+      name: json["name"]?.toString(),
+      email: json["email"]?.toString(),
+      phone: json["phone"]?.toString(),
+      postCode: json["post_code"]?.toString(),
+      address: json["address"]?.toString(),
+      city: json["city"] is int ? json["city"] : int.tryParse(json["city"]?.toString() ?? ''),
+      area: json["area"] is int ? json["area"] : int.tryParse(json["area"]?.toString() ?? ''),
+      country: json["country"] is int ? json["country"] : int.tryParse(json["country"]?.toString() ?? ''),
+      date: tryParseDate(json["date"]),
+      schedule: json["schedule"]?.toString(),
+      packageFee: json["package_fee"]?.toString(),
+      extraService: json["extra_service"]?.toString(),
+      subTotal: json["sub_total"]?.toString(),
+      tax: json["tax"]?.toString(),
+      total: json["total"]?.toString(),
+      couponCode: json["coupon_code"],
+      couponType: json["coupon_type"]?.toString(),
+      couponAmount: json["coupon_amount"],
+      commissionType: json["commission_type"]?.toString(),
+      commissionCharge: json["commission_charge"] is int ? json["commission_charge"] : int.tryParse(json["commission_charge"]?.toString() ?? ''),
+      commissionAmount: json["commission_amount"] is num
+          ? (json["commission_amount"] as num).toDouble()
+          : double.tryParse(json["commission_amount"]?.toString() ?? ''),
+      paymentGateway: json["payment_gateway"]?.toString(),
+      paymentStatus: json["payment_status"]?.toString(),
+      status: json["status"] is int ? json["status"] : int.tryParse(json["status"]?.toString() ?? ''),
+      isOrderOnline: json["is_order_online"] is int ? json["is_order_online"] : int.tryParse(json["is_order_online"]?.toString() ?? ''),
+      orderCompleteRequest: json["order_complete_request"] is int ? json["order_complete_request"] : int.tryParse(json["order_complete_request"]?.toString() ?? ''),
+      cancelOrderMoneyReturn: json["cancel_order_money_return"] is int ? json["cancel_order_money_return"] : int.tryParse(json["cancel_order_money_return"]?.toString() ?? ''),
+      transactionId: json["transaction_id"],
+      orderNote: json["order_note"],
+      createdAt: tryParseDate(json["created_at"]),
+      updatedAt: tryParseDate(json["updated_at"]),
+      manualPaymentImage: json["manual_payment_image"],
+      sellerDetails: json["seller_details"] is Map<String, dynamic>
+          ? Seller.fromJson(json["seller_details"])
+          : null,
+      seller: json["seller"] is Map<String, dynamic>
+          ? Seller.fromJson(json["seller"])
+          : null,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         "id": id,

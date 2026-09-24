@@ -61,7 +61,7 @@ class User extends Authenticatable
     ];
 
     protected $hidden = [
-        'password', 'remember_token',
+        'password', 'remember_token', 'otp_code', 'otp_expire_at', 'email_verify_token',
     ];
 
     protected $casts = [

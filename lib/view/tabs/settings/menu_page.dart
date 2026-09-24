@@ -18,6 +18,8 @@ import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/constant_styles.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:funmoments/view/wallet/wallet_page.dart';
+import 'package:funmoments/view/provider/provider_services_page.dart';
+import 'package:funmoments/view/provider/provider_add_service_page.dart';
 
 import '../../auth/delete_account_page.dart';
 import '../../utils/login_or_register.dart';
@@ -77,56 +79,80 @@ class _MenuPageState extends State<MenuPage> {
                                                       .symmetric(
                                                       horizontal: 10),
                                                   child: Column(children: [
-                                                    SettingsHelper().settingOption(
-                                                        'assets/svg/menu_job.svg',
-                                                        asProvider.getString(
-                                                            "My jobs"), () {
-                                                      if (!pProvider
-                                                          .jobPermission) {
-                                                        OthersHelper().showToast(
-                                                            'You don\'t have permission to access this feature',
-                                                            Colors.black);
-                                                        return;
-                                                      }
+                                                    if (profileProvider.isSeller) ...[
+                                                      SettingsHelper().settingOption(
+                                                          'assets/svg/menu_job_list.svg',
+                                                          asProvider.getString(
+                                                              "My Services"), () {
+                                                        Navigator.push(
+                                                          context,
+                                                          MaterialPageRoute<void>(
+                                                            builder: (BuildContext
+                                                                    context) =>
+                                                                const ProviderServicesPage(),
+                                                          ),
+                                                        );
+                                                      }),
+                                                      CommonHelper().dividerCommon(),
+                                                      SettingsHelper().settingOption(
+                                                          'assets/svg/menu_job.svg',
+                                                          asProvider.getString(
+                                                              "Add Service"), () {
+                                                        Navigator.push(
+                                                          context,
+                                                          MaterialPageRoute<void>(
+                                                            builder: (BuildContext
+                                                                    context) =>
+                                                                const ProviderAddServicePage(),
+                                                          ),
+                                                        );
+                                                      }),
+                                                      CommonHelper().dividerCommon(),
+                                                      SettingsHelper().settingOption(
+                                                          'assets/svg/menu_job.svg',
+                                                          asProvider.getString(
+                                                              "My jobs"), () {
+                                                        if (!pProvider
+                                                            .jobPermission) {
+                                                          OthersHelper().showToast(
+                                                              'You don\'t have permission to access this feature',
+                                                              Colors.black);
+                                                          return;
+                                                        }
 
-                                                      Navigator.push(
-                                                        context,
-                                                        MaterialPageRoute<void>(
-                                                          builder: (BuildContext
-                                                                  context) =>
-                                                              const MyJobsPage(),
-                                                        ),
-                                                      );
-                                                    }),
-                                                    //============>
-                                                    CommonHelper()
-                                                        .dividerCommon(),
-                                                    SettingsHelper().settingOption(
-                                                        'assets/svg/menu_job_list.svg',
-                                                        asProvider.getString(
-                                                            "Job requests"),
-                                                        () {
-                                                      if (!pProvider
-                                                          .jobPermission) {
-                                                        OthersHelper().showToast(
-                                                            'You don\'t have permission to access this feature',
-                                                            Colors.black);
-                                                        return;
-                                                      }
-                                                      //=====>
-                                                      Navigator.push(
-                                                        context,
-                                                        MaterialPageRoute<void>(
-                                                          builder: (BuildContext
-                                                                  context) =>
-                                                              const JobRequestPage(),
-                                                        ),
-                                                      );
-                                                    }),
-
-                                                    //===========>
-                                                    CommonHelper()
-                                                        .dividerCommon(),
+                                                        Navigator.push(
+                                                          context,
+                                                          MaterialPageRoute<void>(
+                                                            builder: (BuildContext
+                                                                    context) =>
+                                                                const MyJobsPage(),
+                                                          ),
+                                                        );
+                                                      }),
+                                                      CommonHelper().dividerCommon(),
+                                                      SettingsHelper().settingOption(
+                                                          'assets/svg/menu_job_list.svg',
+                                                          asProvider.getString(
+                                                              "Job requests"),
+                                                          () {
+                                                        if (!pProvider
+                                                            .jobPermission) {
+                                                          OthersHelper().showToast(
+                                                              'You don\'t have permission to access this feature',
+                                                              Colors.black);
+                                                          return;
+                                                        }
+                                                        Navigator.push(
+                                                          context,
+                                                          MaterialPageRoute<void>(
+                                                            builder: (BuildContext
+                                                                    context) =>
+                                                                const JobRequestPage(),
+                                                          ),
+                                                        );
+                                                      }),
+                                                      CommonHelper().dividerCommon(),
+                                                    ],
                                                     SettingsHelper().settingOption(
                                                         'assets/svg/menu_ticket.svg',
                                                         asProvider.getString(

@@ -19,8 +19,11 @@ class WalletHistoryModel {
 
   factory WalletHistoryModel.fromJson(Map<String, dynamic> json) =>
       WalletHistoryModel(
-        history:
-            List<History>.from(json["history"].map((x) => History.fromJson(x))),
+        history: json["history"] is List
+            ? List<History>.from((json["history"] as List)
+                .whereType<Map<String, dynamic>>()
+                .map((x) => History.fromJson(x)))
+            : [],
       );
 
   Map<String, dynamic> toJson() => {
@@ -41,14 +44,14 @@ class History {
   int? buyerId;
   String? paymentGateway;
   String? paymentStatus;
-  int? amount;
+  double? amount;
 
   factory History.fromJson(Map<String, dynamic> json) => History(
-        id: json["id"],
-        buyerId: json["buyer_id"],
-        paymentGateway: json["payment_gateway"],
-        paymentStatus: json["payment_status"],
-        amount: json["amount"],
+        id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+        buyerId: json["buyer_id"] is int ? json["buyer_id"] : int.tryParse(json["buyer_id"]?.toString() ?? ''),
+        paymentGateway: json["payment_gateway"]?.toString(),
+        paymentStatus: json["payment_status"]?.toString(),
+        amount: json["amount"] is num ? (json["amount"] as num).toDouble() : double.tryParse(json["amount"]?.toString() ?? ''),
       );
 
   Map<String, dynamic> toJson() => {

@@ -6,7 +6,7 @@ import 'package:funmoments/helper/extension/context_extension.dart';
 import 'package:funmoments/helper/extension/string_extension.dart';
 import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/auth_services/apple_sign_in_sevice.dart';
-import 'package:funmoments/service/auth_services/facebook_login_service.dart';
+
 import 'package:funmoments/service/auth_services/google_sign_service.dart';
 import 'package:funmoments/service/auth_services/login_service.dart';
 import 'package:funmoments/service/profile_service.dart';
@@ -391,20 +391,7 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                             ],
-                            const SizedBox(height: 14),
-                            Consumer<FacebookLoginService>(
-                              builder: (context, fProvider, child) =>
-                                  _socialButton(
-                                asset: 'assets/icons/facebook.png',
-                                label: asProvider.getString('Login with Facebook'),
-                                loading: fProvider.isloading,
-                                onTap: () {
-                                  if (fProvider.isloading == false) {
-                                    fProvider.checkIfLoggedIn(context);
-                                  }
-                                },
-                              ),
-                            ),
+
                           ],
                         ),
                       ),

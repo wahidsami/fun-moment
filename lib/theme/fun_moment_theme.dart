@@ -4,6 +4,7 @@ class FMColors {
   static const Color background = Color(0xFF070810);
   static const Color backgroundSoft = Color(0xFF0C0F1A);
   static const Color surface = Color(0xFF121625);
+  static const Color surfaceDark = Color(0xFF121625);
   static const Color surfaceElevated = Color(0xFF181E2E);
   static const Color card = Color(0xFF161B29);
   static const Color inputSurface = Color(0xFF101421);
@@ -256,7 +257,7 @@ class FMTheme {
         showUnselectedLabels: true,
         showSelectedLabels: true,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: FMColors.card,
         surfaceTintColor: FMColors.card,
         elevation: 0,
@@ -287,7 +288,7 @@ class FMTheme {
         contentTextStyle: TextStyle(color: FMColors.textPrimary),
         behavior: SnackBarBehavior.floating,
       ),
-      tabBarTheme: const TabBarTheme(
+      tabBarTheme: const TabBarThemeData(
         labelColor: FMColors.magenta,
         unselectedLabelColor: FMColors.textMuted,
         indicatorColor: FMColors.magenta,

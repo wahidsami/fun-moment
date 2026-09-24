@@ -23,10 +23,12 @@ class MyordersListModel {
 
   factory MyordersListModel.fromJson(Map<String, dynamic> json) =>
       MyordersListModel(
-          myOrders: List<MyOrder>.from(
-              json["my_orders"]['data'].map((x) => MyOrder.fromJson(x))),
-          userId: json["user_id"],
-          nextPage: json['my_orders']['next_page_url']);
+          myOrders: json["my_orders"] is Map && json["my_orders"]['data'] is List
+              ? List<MyOrder>.from(
+                  (json["my_orders"]['data'] as List).map((x) => x is Map<String, dynamic> ? MyOrder.fromJson(x) : MyOrder.fromJson(Map<String, dynamic>.from(x is Map ? x : {}))))
+              : [],
+          userId: json["user_id"] is int ? json["user_id"] : int.tryParse(json["user_id"]?.toString() ?? '') ?? 0,
+          nextPage: json['my_orders'] is Map ? json['my_orders']['next_page_url']?.toString() : null);
 
   Map<String, dynamic> toJson() => {
         "my_orders": List<dynamic>.from(myOrders.map((x) => x.toJson())),
@@ -109,25 +111,32 @@ class MyOrder {
   dynamic manualPaymentImage;
 
   factory MyOrder.fromJson(Map<String, dynamic> json) => MyOrder(
-        id: json["id"],
-        serviceId: json["service_id"],
-        sellerId: json["seller_id"],
-        buyerId: json["buyer_id"],
-        name: json["name"],
-        email: json["email"],
-        phone: json["phone"],
-        postCode: json["post_code"],
-        address: json["address"],
-        city: json["city"],
-        area: json["area"],
-        country: json["country"],
-        date: json["date"] == null ? null : DateTime.parse(json['date']),
-        schedule: json["schedule"],
+        id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+        serviceId: json["service_id"] is int ? json["service_id"] : int.tryParse(json["service_id"]?.toString() ?? ''),
+        sellerId: json["seller_id"] is int ? json["seller_id"] : int.tryParse(json["seller_id"]?.toString() ?? ''),
+        buyerId: json["buyer_id"] is int ? json["buyer_id"] : int.tryParse(json["buyer_id"]?.toString() ?? ''),
+        name: json["name"]?.toString(),
+        email: json["email"]?.toString(),
+        phone: json["phone"]?.toString(),
+        postCode: json["post_code"]?.toString(),
+        address: json["address"]?.toString(),
+        city: json["city"] is int ? json["city"] : int.tryParse(json["city"]?.toString() ?? ''),
+        area: json["area"] is int ? json["area"] : int.tryParse(json["area"]?.toString() ?? ''),
+        country: json["country"] is int ? json["country"] : int.tryParse(json["country"]?.toString() ?? ''),
+        date: () {
+          if (json["date"] == null) return null;
+          try {
+            return DateTime.parse(json['date'].toString());
+          } catch (_) {
+            return null;
+          }
+        }(),
+        schedule: json["schedule"]?.toString(),
         packageFee: json["package_fee"],
         extraService: json["extra_service"],
         subTotal: json["sub_total"],
-        tax: json["tax"].toDouble(),
-        total: json["total"].toDouble(),
+        tax: json["tax"] is num ? (json["tax"] as num).toDouble() : (double.tryParse(json["tax"]?.toString() ?? '') ?? 0.0),
+        total: json["total"] is num ? (json["total"] as num).toDouble() : (double.tryParse(json["total"]?.toString() ?? '') ?? 0.0),
         couponCode: json["coupon_code"],
         couponType: json["coupon_type"],
         couponAmount: json["coupon_amount"],

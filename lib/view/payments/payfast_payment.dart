@@ -36,7 +36,6 @@ class PayfastPayment extends StatelessWidget {
   final isFromHireJob;
 
   String? url;
-  late WebViewController _controller;
   @override
   Widget build(BuildContext context) {
     Future.delayed(const Duration(microseconds: 600), () {
@@ -71,47 +70,54 @@ class PayfastPayment extends StatelessWidget {
                   child: Text('Loding failed.'),
                 );
               }
-              return WebView(
-                onWebResourceError: (error) {
-                  showDialog(
-                      context: context,
-                      builder: (ctx) {
-                        return const AlertDialog(
-                          title: Text('Loading failed!'),
-                          content: Text('Failed to load payment page.'),
-                        );
-                      });
+              final controller = WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..setNavigationDelegate(
+                  NavigationDelegate(
+                    onWebResourceError: (error) {
+                      showDialog(
+                          context: context,
+                          builder: (ctx) {
+                            return const AlertDialog(
+                              title: Text('Loading failed!'),
+                              content: Text('Failed to load payment page.'),
+                            );
+                          });
 
-                  Navigator.pop(context);
-                },
-                initialUrl: url,
-                javascriptMode: JavascriptMode.unrestricted,
-                onPageFinished: (value) async {
-                  if (value.contains('finish')) {
-                    bool paySuccess = await verifyPayment(value);
-                    if (paySuccess) {
-                      if (isFromOrderExtraAccept == true) {
-                        await Provider.of<OrderDetailsService>(context,
-                                listen: false)
-                            .acceptOrderExtra(context);
-                      } else if (isFromWalletDeposite) {
-                        await Provider.of<WalletService>(context, listen: false)
-                            .makeDepositeToWalletSuccess(context);
-                      } else if (isFromHireJob) {
-                        Provider.of<JobRequestService>(context, listen: false)
-                            .goToJobSuccessPage(context);
-                      } else {
+                      Navigator.pop(context);
+                    },
+                    onPageFinished: (value) async {
+                      if (value.contains('finish')) {
+                        bool paySuccess = await verifyPayment(value);
+                        if (paySuccess) {
+                          if (isFromOrderExtraAccept == true) {
+                            await Provider.of<OrderDetailsService>(context,
+                                    listen: false)
+                                .acceptOrderExtra(context);
+                          } else if (isFromWalletDeposite) {
+                            await Provider.of<WalletService>(context,
+                                    listen: false)
+                                .makeDepositeToWalletSuccess(context);
+                          } else if (isFromHireJob) {
+                            Provider.of<JobRequestService>(context,
+                                    listen: false)
+                                .goToJobSuccessPage(context);
+                          } else {
+                            await Provider.of<PlaceOrderService>(context,
+                                    listen: false)
+                                .makePaymentSuccess(context);
+                          }
+                          return;
+                        }
                         await Provider.of<PlaceOrderService>(context,
                                 listen: false)
-                            .makePaymentSuccess(context);
+                            .doNext(context, 'failed', paymentFailed: true);
                       }
-                      return;
-                    }
-                    await Provider.of<PlaceOrderService>(context, listen: false)
-                        .doNext(context, 'failed', paymentFailed: true);
-                  }
-                },
-              );
+                    },
+                  ),
+                )
+                ..loadRequest(Uri.parse(url!));
+              return WebViewWidget(controller: controller);
             }),
       ),
     );

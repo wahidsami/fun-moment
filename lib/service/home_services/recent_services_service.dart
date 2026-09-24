@@ -51,7 +51,7 @@ class RecentServicesService with ChangeNotifier {
                 j < data.latestServices[i].reviewsForMobile.length;
                 j++) {
               totalRating = totalRating +
-                  data.latestServices[i].reviewsForMobile[j].rating!.toInt();
+                  (data.latestServices[i].reviewsForMobile[j].rating?.toInt() ?? 0);
             }
 
             double averageRate = 0;

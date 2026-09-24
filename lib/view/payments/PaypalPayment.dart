@@ -36,6 +36,7 @@ class PaypalPaymentState extends State<PaypalPayment> {
   var checkoutUrl;
   var executeUrl;
   var accessToken;
+  WebViewController? _controller;
   PaypalService services = PaypalService();
 
   // you can change default currency according to your need
@@ -64,6 +65,36 @@ class PaypalPaymentState extends State<PaypalPayment> {
             widget.amount, widget.name, widget.phone, widget.email);
         final res =
             await services.createPaypalPayment(transactions, accessToken);
+        if (!mounted) return;
+        _controller = WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..setNavigationDelegate(
+            NavigationDelegate(
+              onNavigationRequest: (NavigationRequest request) {
+                if (request.url.contains(returnURL)) {
+                  final uri = Uri.parse(request.url);
+                  final payerID = uri.queryParameters['PayerID'];
+                  if (payerID != null) {
+                    services
+                        .executePayment(executeUrl, payerID, accessToken)
+                        .then((id) {
+                      widget.onFinish(id);
+
+                      Navigator.of(context).pop();
+                    });
+                  } else {
+                    Navigator.of(context).pop();
+                  }
+                  Navigator.of(context).pop();
+                }
+                if (request.url.contains(cancelURL)) {
+                  Navigator.of(context).pop();
+                }
+                return NavigationDecision.navigate;
+              },
+            ),
+          )
+          ..loadRequest(Uri.parse(res["approvalUrl"] as String));
         setState(() {
           checkoutUrl = res["approvalUrl"];
           executeUrl = res["executeUrl"];
@@ -168,7 +199,7 @@ class PaypalPaymentState extends State<PaypalPayment> {
   Widget build(BuildContext context) {
     print(checkoutUrl);
 
-    if (checkoutUrl != null) {
+    if (checkoutUrl != null && _controller != null) {
       return Scaffold(
         appBar: AppBar(
           backgroundColor: Theme.of(context).colorScheme.background,
@@ -178,32 +209,7 @@ class PaypalPaymentState extends State<PaypalPayment> {
                 .doNext(context, 'failed', paymentFailed: true),
           ),
         ),
-        body: WebView(
-          initialUrl: checkoutUrl,
-          javascriptMode: JavascriptMode.unrestricted,
-          navigationDelegate: (NavigationRequest request) {
-            if (request.url.contains(returnURL)) {
-              final uri = Uri.parse(request.url);
-              final payerID = uri.queryParameters['PayerID'];
-              if (payerID != null) {
-                services
-                    .executePayment(executeUrl, payerID, accessToken)
-                    .then((id) {
-                  widget.onFinish(id);
-
-                  Navigator.of(context).pop();
-                });
-              } else {
-                Navigator.of(context).pop();
-              }
-              Navigator.of(context).pop();
-            }
-            if (request.url.contains(cancelURL)) {
-              Navigator.of(context).pop();
-            }
-            return NavigationDecision.navigate;
-          },
-        ),
+        body: WebViewWidget(controller: _controller!),
       );
     } else {
       return Scaffold(

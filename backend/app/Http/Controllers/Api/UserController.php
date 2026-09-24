@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\User;
+use App\SellerVerify;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use App\OrderCompleteDecline;
@@ -93,21 +94,30 @@ class UserController extends Controller
     public function walletDepositPaymentStatus(Request $request){
 
         $request->validate([
-            'wallet_history_id' => 'required'
+            'wallet_history_id' => 'required|integer'
         ]);
 
         $buyer_id = auth('sanctum')->id();
-        $user_info = auth('sanctum')->user();
         $user_column = 'buyer_id';
         $wallet_details = Wallet::where($user_column,$buyer_id)->first();
+        if (empty($wallet_details)) {
+            return response(['msg' => __('wallet not found')], 404);
+        }
         
         $wallet_history = WalletHistory::where([$user_column => $buyer_id,'id' => $request->wallet_history_id ])->first();
+        if (empty($wallet_history)) {
+            return response(['msg' => __('deposit history not found')], 404);
+        }
+
+        if ($wallet_history->payment_status === 'complete') {
+            return response(['msg' => __('deposit already completed'), 'balance' => amount_with_currency_symbol($wallet_details->balance)], 200);
+        }
+
         $wallet_history->payment_status = 'complete';
         $wallet_history->save();
         
         $wallet_details->balance += $wallet_history->amount;
         $wallet_details->save();
-        
 
         return response(['msg' => __('wallet deposit success')],200);
     }
@@ -210,12 +220,9 @@ class UserController extends Controller
             $login_type = 'username';
         }
 
-        $user_type = 1;
-        if($request->has('user_type')){
-            $user_type = 0;
-        }
-
-        $user = User::select('id', 'email','user_type', 'password','country_id','state','username', 'email_verified')->where([$login_type => $request->email,'user_type' => $user_type])->first();
+        $user = User::select('id', 'name', 'email', 'user_type', 'password', 'country_id', 'state', 'username', 'email_verified')
+            ->where($login_type, $request->email)
+            ->first();
 
             //check user account deleted or not
             if (!is_null($user) && $user->account_status?->status === 1){
@@ -242,84 +249,87 @@ class UserController extends Controller
     //social login
     public function socialLogin(Request $request)
     {
-        
-        $user_type = 0;
-        $usernamePrefix = $request->isApple == 1 ? 'ap_' : ($request->isGoogle == 1 ? 'gl_' : 'fb_');
-        $username = $usernamePrefix . Str::slug($request->displayName);
-        
-        // Fetch user based on email, username, or apple_id
-        $user_info =  User::select('id', 'email', 'username', 'user_type', 'google_id', 'facebook_id', 'apple_id')
-            ->where('email', $request->email)
-            ->where('user_type', $user_type)
-            ->first();
+        $request->validate([
+            'email' => 'required|email',
+        ]);
 
-        if(empty($user_info)){
-            $user_info = User::select('id', 'email', 'username', 'user_type', 'google_id', 'facebook_id', 'apple_id')
-                ->where('email', $request->email)
-                ->where('user_type', $user_type)
-                ->first();
+        if (!filter_var($request->email, FILTER_VALIDATE_EMAIL)) {
+            return response()->error([
+                'message' => __('invalid Email'),
+            ]);
         }
 
-        if (empty($user_info)){
-            $user_info = User::select('id', 'email', 'username', 'user_type', 'google_id', 'facebook_id', 'apple_id')
-                ->where('apple_id', $request->id)
-                ->where('user_type', $user_type)
-                ->first();
-        }
+        $providerId = $request->id;
+        $isGoogle = $request->isGoogle == 1;
+        $isApple = $request->isApple == 1;
 
-        if(empty($user_info)){
-            $user_info = User::select('id', 'email', 'username', 'user_type', 'google_id', 'facebook_id', 'apple_id')
-                ->where('facebook_id', $request->id)
-                ->where('user_type', $user_type)
-                ->first();
-        }
-
-        if(empty($user_info)){
-            $user_info = User::select('id', 'email', 'username', 'user_type', 'google_id', 'facebook_id', 'apple_id')
-                ->where('google_id', $request->id)
-                ->where('user_type', $user_type)
-                ->first();
-        }
-
-
-        // Check if a user is found
-        if ($user_info) {
-            if (($user_info->email !== null && $user_info->email == $request->email) ||
-                ($user_info->apple_id !== null && $user_info->apple_id == $request->id) ||
-                ($user_info->facebook_id !== null && $user_info->facebook_id == $request->id) ||
-                ($user_info->google_id !== null && $user_info->google_id == $request->id)) {
-                $user = $user_info;
+        // 1. Search for existing user by provider ID or email (no user_type filtering)
+        $user = null;
+        if (!empty($providerId)) {
+            if ($isGoogle) {
+                $user = User::where('google_id', $providerId)->first();
+            } elseif ($isApple) {
+                $user = User::where('apple_id', $providerId)->first();
             } else {
-                $user = null;
+                $user = User::where('facebook_id', $providerId)->first();
             }
-        } else {
-            $user = null;
         }
 
         if (is_null($user)) {
-            $request->validate([
-                'email' => 'required|email',
-            ]);
-            if (!filter_var($request->email, FILTER_VALIDATE_EMAIL)) {
+            $user = User::where('email', $request->email)->first();
+        }
+
+        if (!is_null($user)) {
+            // Check account deletion status
+            if ($user->account_status?->status === 1) {
                 return response()->error([
-                    'message' => __('invalid Email'),
+                    'message' => __('Your account has been deleted'),
+                    'status' => 'account-delete'
                 ]);
             }
+
+            // Link missing provider ID on existing account
+            $dirty = false;
+            if ($isGoogle && empty($user->google_id) && !empty($providerId)) {
+                $user->google_id = $providerId;
+                $dirty = true;
+            } elseif ($isApple && empty($user->apple_id) && !empty($providerId)) {
+                $user->apple_id = $providerId;
+                $dirty = true;
+            } elseif (!$isGoogle && !$isApple && empty($user->facebook_id) && !empty($providerId)) {
+                $user->facebook_id = $providerId;
+                $dirty = true;
+            }
+            if ($dirty) {
+                $user->save();
+            }
+        } else {
+            // 2. Create new user defaulting to BUYER (user_type = 1)
+            $usernamePrefix = $isApple ? 'ap_' : ($isGoogle ? 'gl_' : 'fb_');
+            $baseUsername = $usernamePrefix . Str::slug($request->displayName ?: 'user');
+            $username = $baseUsername;
+            $counter = 1;
+            while (User::where('username', $username)->exists()) {
+                $username = $baseUsername . '_' . $counter;
+                $counter++;
+            }
+
             $user = User::create([
-                'name' => $request->displayName,
+                'name' => $request->displayName ?: $username,
                 'email' => $request->email,
                 'username' => $username,
-                'password' => Hash::make(\Str::random(8)),
-                'user_type' => $user_type,
+                'password' => Hash::make(Str::random(16)),
+                'user_type' => 1,
                 'terms_condition' => 1,
-                'google_id' => $request->isGoogle == 1 ? $request->id : null,
-                'facebook_id' => $request->isGoogle == 0 ? $request->id : null,
-                'apple_id' => $request->isApple == 1 ? $request->id : null,
+                'email_verified' => 1,
+                'google_id' => $isGoogle ? $providerId : null,
+                'facebook_id' => (!$isGoogle && !$isApple) ? $providerId : null,
+                'apple_id' => $isApple ? $providerId : null,
             ]);
         }
 
         $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
-        return response()->json([
+        return response()->success([
             'users' => $user,
             'token' => $token,
         ]);
@@ -406,8 +416,9 @@ class UserController extends Controller
         }
 
         $user_type = 1;
-        if($request->has('user_type')){
-            $user_type = 0;
+        if ($request->has('user_type')) {
+            $reqType = (int) $request->input('user_type');
+            $user_type = in_array($reqType, [0, 1], true) ? $reqType : 1;
         }
 
         $user = User::create([
@@ -425,6 +436,9 @@ class UserController extends Controller
             'terms_condition' => 1,
         ]);
         if (!is_null($user)) {
+            if ($user_type === 0) {
+                SellerVerify::firstOrCreate(['seller_id' => $user->id], ['status' => 0]);
+            }
             $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
             return response()->success([
                 'users' => $user,
@@ -451,11 +465,18 @@ class UserController extends Controller
             ]);
         }
 
-        $user = User::where('id', $request->user_id)->update([
+        $auth_user_id = auth('sanctum')->id();
+        if ($auth_user_id != $request->user_id) {
+            return response()->error([
+                'message' => __('Unauthorized action'),
+            ]);
+        }
+
+        $user = User::where('id', $auth_user_id)->update([
             'email_verified' =>  $request->email_verified
         ]);
 
-        if(is_null($user)){
+        if(!$user){
             return response()->error([
                 'message' => __('Something went wrong, plese try after sometime,'),
             ]);
@@ -477,15 +498,21 @@ class UserController extends Controller
 
         if (!is_null($user_email)) {
             try {
-                $message = get_static_option('user_email_verify_message');
-                $message = str_replace(["@name", "@email_verify_tokn"],[$user_email->name, $otp_code],$message);
+                $rawMessage = get_static_option('user_email_verify_message');
+                if (empty($rawMessage)) {
+                    $rawMessage = __('Hello @name, your email verification code is: @email_verify_tokn');
+                }
+                $message = str_replace(["@name", "@email_verify_tokn"],[$user_email->name, $otp_code],$rawMessage);
+                $subject = get_static_option('user_email_verify_subject') ?: __('Email Verification Code');
+
                 Mail::to($user_email->email)->send(new BasicMail([
-                    'subject' => get_static_option('user_email_verify_subject'),
+                    'subject' => $subject,
                     'message' => $message
                 ]));
             } catch (\Exception $e) {
+                \Log::error('OTP send error: ' . $e->getMessage());
                 return response()->error([
-                    'message' => __($e->getMessage()),
+                    'message' => __('Unable to send verification email. Please check your email configuration or try again later.'),
                 ]);
             }
 
@@ -787,7 +814,14 @@ class UserController extends Controller
             return response()->error(['message' => __('no order found')]);
         }
 
-        $orderInfo = Order::where('id',$request->id)->first();
+        $buyer_id = auth('sanctum')->id();
+        $orderInfo = Order::where('id',$request->id)->where('buyer_id', $buyer_id)->first();
+        if(is_null($orderInfo)){
+            return response()->error([
+                'message'=>__('Order Not Found')
+            ]);
+        }
+
         $orderInfo->payment_status = !empty($orderInfo->payment_status) ? $orderInfo->payment_status : 'pending';
         $orderInfo->total = amount_with_currency_symbol($orderInfo->total);
         $orderInfo->tax = amount_with_currency_symbol($orderInfo->tax);
@@ -798,13 +832,12 @@ class UserController extends Controller
 
         $orderInfo->date = null;
         if($orderInfo->date !== "No Date Created"){
-            
             try{
                 $orderInfo->date = \Carbon\Carbon::parse($orderInfo->date);
             }
             catch(\Exception $e){
                 
-            };
+            }
         }
 
         //append seller infomation
@@ -812,12 +845,6 @@ class UserController extends Controller
         $is_report_exist = Report::where(['order_id'=> $request->order_id , 'report_from'=>'buyer'])->first();
 
         $orderInfo->has_report = is_null($is_report_exist) ? 1 : 0;
-
-        if(is_null($orderInfo)){
-            return response()->success([
-                'message'=>__('Order Not Found')
-            ]);
-        }
 
         return response()->success([
             'orderInfo'=> $orderInfo
@@ -982,15 +1009,16 @@ class UserController extends Controller
     //order request complete approve
     public function orderCompleteRequestApprove(Request $request)
     {
-        $find_order = Order::find($request->order_id);
+        $buyer_id = auth('sanctum')->id();
+        $find_order = Order::where('id', $request->order_id)->where('buyer_id', $buyer_id)->first();
         if(!empty($find_order)){
-            Order::where('id',$request->order_id)->update(['order_complete_request'=>2,'status'=>2]);
+            $find_order->update(['order_complete_request'=>2,'status'=>2]);
             return response()->success([
                 'msg'=>__('Order complete request successfully approved.'),
             ]);
         }else{
             return response()->error([
-                'msg'=>__('Order id does not exists.'),
+                'msg'=>__('Order id does not exist or unauthorized.'),
             ]);
         }
     }
@@ -1006,11 +1034,20 @@ class UserController extends Controller
         $request->validate([
             'decline_reason'=>'min:20|max:1000'
         ]);
+
+        $buyer_id = auth('sanctum')->id();
+        $find_order = Order::where('id', $request->order_id)->where('buyer_id', $buyer_id)->first();
+        if(empty($find_order)){
+            return response()->error([
+                'msg'=>__('Order id does not exist or unauthorized.'),
+            ]);
+        }
+
         OrderCompleteDecline::where('order_id',$request->order_id)->update([
             'decline_reason'=>$request->decline_reason,
         ]);
-        Order::where('id',$request->order_id)->update(['order_complete_request'=>3]);
-        $seller_email = User::select(['id','email'])->where('id',$request->seller_id)->first();
+        $find_order->update(['order_complete_request'=>3]);
+        $seller_email = User::select(['id','email'])->where('id',$find_order->seller_id)->first();
 
         //Send decline mail to seller and admin
         try {
@@ -1032,7 +1069,7 @@ class UserController extends Controller
         } catch (\Exception $e) {
             //
         }
-        return response()->error([
+        return response()->success([
             'msg'=>__('Order complete request decline successfully'),
         ]);
     }

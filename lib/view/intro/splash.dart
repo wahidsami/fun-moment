@@ -6,6 +6,8 @@ import 'package:funmoments/view/home/landing_page.dart';
 import 'package:funmoments/view/intro/introduction_page.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:funmoments/service/common_service.dart';
+import 'package:funmoments/view/utils/responsive.dart';
 
 import '../home/homepage_helper.dart';
 
@@ -32,6 +34,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _startInitialization() async {
     await runAtstart(context);
+    screenSizeAndPlatform(context);
     initializeLNProvider(context);
     final prefs = await SharedPreferences.getInstance();
     final intro = prefs.getBool('intro');

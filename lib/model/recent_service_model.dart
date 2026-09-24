@@ -23,16 +23,22 @@ class RecentServiceModel {
 
   factory RecentServiceModel.fromJson(Map<String, dynamic> json) =>
       RecentServiceModel(
-        latestServices: List<LatestService>.from(
-            json["latest_services"].map((x) => LatestService.fromJson(x))),
-        serviceImage: List<Image?>.from(json["service_image"].map((x) {
-          if (x is List) {
-            return null;
-          } else {
-            return Image?.fromJson(x);
-          }
-        })),
-        reviewerImage: List<dynamic>.from(json["reviewer_image"].map((x) => x)),
+        latestServices: json["latest_services"] is List
+            ? List<LatestService>.from((json["latest_services"] as List)
+                .map((x) => x is Map<String, dynamic> ? LatestService.fromJson(x) : LatestService.fromJson(Map<String, dynamic>.from(x is Map ? x : {}))))
+            : [],
+        serviceImage: json["service_image"] is List
+            ? List<Image?>.from((json["service_image"] as List).map((x) {
+                if (x is Map<String, dynamic>) {
+                  return Image.fromJson(x);
+                } else if (x is Map) {
+                  return Image.fromJson(Map<String, dynamic>.from(x));
+                } else {
+                  return null;
+                }
+              }))
+            : [],
+        reviewerImage: json["reviewer_image"] is List ? List<dynamic>.from(json["reviewer_image"].map((x) => x)) : [],
       );
 
   Map<String, dynamic> toJson() => {
@@ -64,14 +70,18 @@ class LatestService {
   SellerForMobile sellerForMobile;
 
   factory LatestService.fromJson(Map<String, dynamic> json) => LatestService(
-        id: json["id"],
-        title: json["title"],
-        image: json["image"],
+        id: json["id"] == null ? null : int.tryParse(json["id"].toString()),
+        title: json["title"]?.toString(),
+        image: json["image"]?.toString(),
         price: json["price"],
-        sellerId: json["seller_id"],
-        reviewsForMobile: List<ReviewsForMobile>.from(json["reviews_for_mobile"]
-            .map((x) => ReviewsForMobile.fromJson(x))),
-        sellerForMobile: SellerForMobile.fromJson(json["seller_for_mobile"]),
+        sellerId: json["seller_id"] == null ? null : int.tryParse(json["seller_id"].toString()),
+        reviewsForMobile: json["reviews_for_mobile"] is List
+            ? List<ReviewsForMobile>.from(json["reviews_for_mobile"]
+                .map((x) => x is Map<String, dynamic> ? ReviewsForMobile.fromJson(x) : ReviewsForMobile()))
+            : [],
+        sellerForMobile: json["seller_for_mobile"] is Map<String, dynamic>
+            ? SellerForMobile.fromJson(json["seller_for_mobile"])
+            : SellerForMobile(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -93,24 +103,26 @@ class ReviewsForMobile {
     this.rating,
     this.message,
     this.buyerId,
-    required this.buyerForMobile,
+    this.buyerForMobile,
   });
 
   int? id;
   int? serviceId;
-  int? rating;
+  num? rating;
   String? message;
   int? buyerId;
   BuyerForMobile? buyerForMobile;
 
   factory ReviewsForMobile.fromJson(Map<String, dynamic>? json) =>
       ReviewsForMobile(
-        id: json?["id"],
-        serviceId: json?["service_id"],
-        rating: json?["rating"],
-        message: json?["message"],
-        buyerId: json?["buyer_id"],
-        buyerForMobile: BuyerForMobile.fromJson(json?["buyer_for_mobile"]),
+        id: json?["id"] == null ? null : int.tryParse(json!["id"].toString()),
+        serviceId: json?["service_id"] == null ? null : int.tryParse(json!["service_id"].toString()),
+        rating: json?["rating"] == null ? null : num.tryParse(json!["rating"].toString()),
+        message: json?["message"]?.toString(),
+        buyerId: json?["buyer_id"] == null ? null : int.tryParse(json!["buyer_id"].toString()),
+        buyerForMobile: json?["buyer_for_mobile"] is Map<String, dynamic>
+            ? BuyerForMobile.fromJson(json!["buyer_for_mobile"])
+            : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -133,8 +145,8 @@ class BuyerForMobile {
   String? image;
 
   factory BuyerForMobile.fromJson(Map<String, dynamic>? json) => BuyerForMobile(
-        id: json?["id"],
-        image: json?["image"],
+        id: json?["id"] == null ? null : int.tryParse(json!["id"].toString()),
+        image: json?["image"]?.toString(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -158,10 +170,10 @@ class SellerForMobile {
 
   factory SellerForMobile.fromJson(Map<String, dynamic> json) =>
       SellerForMobile(
-        id: json["id"],
-        name: json["name"],
-        image: json["image"],
-        countryId: json["country_id"],
+        id: json["id"] == null ? null : int.tryParse(json["id"].toString()),
+        name: json["name"]?.toString(),
+        image: json["image"]?.toString(),
+        countryId: json["country_id"] == null ? null : int.tryParse(json["country_id"].toString()),
       );
 
   Map<String, dynamic> toJson() => {
@@ -186,9 +198,9 @@ class Image {
   dynamic imgAlt;
 
   factory Image.fromJson(Map<String, dynamic>? json) => Image(
-        imageId: json?["image_id"],
-        path: json?["path"],
-        imgUrl: json?["img_url"],
+        imageId: json?["image_id"] == null ? null : int.tryParse(json!["image_id"].toString()),
+        path: json?["path"]?.toString(),
+        imgUrl: json?["img_url"]?.toString(),
         imgAlt: json?["img_alt"],
       );
 

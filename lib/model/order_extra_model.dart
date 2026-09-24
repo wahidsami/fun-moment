@@ -19,8 +19,10 @@ class OrderExtraModel {
 
   factory OrderExtraModel.fromJson(Map<String, dynamic> json) =>
       OrderExtraModel(
-        extraServiceList: List<ExtraServiceList>.from(json["extra_service_list"]
-            .map((x) => ExtraServiceList.fromJson(x))),
+        extraServiceList: json["extra_service_list"] is List
+            ? List<ExtraServiceList>.from((json["extra_service_list"] as List)
+                .map((x) => x is Map<String, dynamic> ? ExtraServiceList.fromJson(x) : ExtraServiceList.fromJson(Map<String, dynamic>.from(x is Map ? x : {}))))
+            : [],
       );
 
   Map<String, dynamic> toJson() => {
@@ -53,14 +55,14 @@ class ExtraServiceList {
 
   factory ExtraServiceList.fromJson(Map<String, dynamic> json) =>
       ExtraServiceList(
-          id: json["id"],
-          orderId: json["order_id"],
-          title: json["title"],
-          quantity: json["quantity"],
-          price: json["price"],
-          tax: json["tax"].toDouble(),
-          subTotal: json["sub_total"],
-          total: json["total"].toDouble(),
+          id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+          orderId: json["order_id"] is int ? json["order_id"] : int.tryParse(json["order_id"]?.toString() ?? ''),
+          title: json["title"]?.toString(),
+          quantity: json["quantity"] is int ? json["quantity"] : int.tryParse(json["quantity"]?.toString() ?? ''),
+          price: json["price"] is int ? json["price"] : int.tryParse(json["price"]?.toString() ?? ''),
+          tax: json["tax"] is num ? (json["tax"] as num).toDouble() : (double.tryParse(json["tax"]?.toString() ?? '') ?? 0.0),
+          subTotal: json["sub_total"] is int ? json["sub_total"] : int.tryParse(json["sub_total"]?.toString() ?? ''),
+          total: json["total"] is num ? (json["total"] as num).toDouble() : (double.tryParse(json["total"]?.toString() ?? '') ?? 0.0),
           status: json["status"]);
 
   Map<String, dynamic> toJson() => {

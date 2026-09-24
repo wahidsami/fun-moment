@@ -60,6 +60,13 @@ class SignupService with ChangeNotifier {
     notifyListeners();
   }
 
+  int selectedUserType = 1; // 1 = Buyer, 0 = Seller
+
+  setUserType(int type) {
+    selectedUserType = type;
+    notifyListeners();
+  }
+
   Future signup(
     String fullName,
     String email,
@@ -86,7 +93,8 @@ class SignupService with ChangeNotifier {
             Provider.of<CountryDropdownService>(context, listen: false)
                 .selectedCountryId,
         'terms_conditions': 1,
-        'country_code': countryCode
+        'country_code': countryCode,
+        'user_type': selectedUserType
       });
       var header = {
         //if header type is application/json then the data should be in jsonEncode method
@@ -109,11 +117,12 @@ class SignupService with ChangeNotifier {
         //   ),
         // );
 
-        String token = jsonDecode(response.body)['token'];
-        int userId = jsonDecode(response.body)['users']['id'];
-        String state = jsonDecode(response.body)['users']['state'].toString();
+        var responseData = jsonDecode(response.body);
+        String token = responseData['token']?.toString() ?? '';
+        int userId = int.tryParse(responseData['users']?['id']?.toString() ?? '') ?? 0;
+        String state = responseData['users']?['state']?.toString() ?? '';
         String countryId =
-            jsonDecode(response.body)['users']['country_id'].toString();
+            responseData['users']?['country_id']?.toString() ?? '';
 
         //Send otp
         var isOtepSent =
@@ -130,22 +139,29 @@ class SignupService with ChangeNotifier {
                 userId: userId,
                 state: state,
                 countryId: countryId,
+                userType: selectedUserType,
               ),
             ),
           );
         } else {
-          OthersHelper().showToast('Otp send failed', Colors.black);
+          // Backend error toast was already shown by sendOtpForEmailValidation
         }
 
         return true;
       } else {
         //Sign up unsuccessful ==========>
         print('sign up failed ${response.body}');
-        if (jsonDecode(response.body).containsKey('errors')) {
-          showError(jsonDecode(response.body)['errors']);
-        } else {
-          OthersHelper()
-              .showToast(jsonDecode(response.body)['message'], Colors.black);
+        try {
+          var errBody = jsonDecode(response.body);
+          if (errBody is Map && errBody.containsKey('errors')) {
+            showError(errBody['errors']);
+          } else if (errBody is Map && errBody.containsKey('message')) {
+            OthersHelper().showToast(errBody['message']?.toString() ?? 'Registration failed', Colors.black);
+          } else {
+            OthersHelper().showToast('Registration failed', Colors.black);
+          }
+        } catch (_) {
+          OthersHelper().showToast('Registration failed (${response.statusCode})', Colors.black);
         }
 
         setLoadingFalse();

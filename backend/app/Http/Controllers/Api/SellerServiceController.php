@@ -80,16 +80,16 @@ class SellerServiceController extends Controller
     
      public function ServiceOnOff($id)
     {
-        $is_service_on = Service::select('is_service_on')->where('id', $id)->first();
-        if ($is_service_on->is_service_on == 1) {
-            $is_service_on = 0;
-            Service::where('id', $id)->update(['is_service_on' => $is_service_on]);
-            return response()->success(['msg'=> __('Service Off Successfully.')]);
-        } else {
-            $is_service_on = 1;
-            Service::where('id', $id)->update(['is_service_on' => $is_service_on]);
-            return response()->success(['msg'=> __('Service On Successfully.')]);
+        $seller_id = Auth::guard('sanctum')->id();
+        $service = Service::where('id', $id)->where('seller_id', $seller_id)->first();
+        if (empty($service)) {
+            return response()->error(['msg' => __('Service not found or unauthorized.')]);
         }
+
+        $new_status = ($service->is_service_on == 1) ? 0 : 1;
+        $service->update(['is_service_on' => $new_status]);
+        $msg = ($new_status == 1) ? __('Service On Successfully.') : __('Service Off Successfully.');
+        return response()->success(['msg' => $msg]);
     }
 
     public function addService(Request $request)
@@ -185,7 +185,13 @@ class SellerServiceController extends Controller
                 $image_id = DB::getPdo()->lastInsertId();
             }
 
-            Service::where('id', $request->service_id)->update([
+            $seller_id = Auth::guard('sanctum')->id();
+            $service = Service::where('id', $request->service_id)->where('seller_id', $seller_id)->first();
+            if (empty($service)) {
+                return response()->error(['message' => __('Service not found or unauthorized')]);
+            }
+
+            $service->update([
                 'category_id' => $request->category,
                 'subcategory_id' => $request->subcategory,
                 'child_category_id' => $request->child_category,
@@ -583,10 +589,19 @@ class SellerServiceController extends Controller
     
     public function deleteIncludeService($id = null)
     {
+        $seller_id = Auth::guard('sanctum')->user()->id;
         $include_details = Serviceinclude::find($id);
+        if (!$include_details) {
+            return response()->error(['message' => __('Include service not found.')]);
+        }
 
-        //todo udpate service price
-        $service_details = Service::where('id',$include_details->service_id)->first();
+        // Check ownership of the parent service
+        $service_details = Service::where('id', $include_details->service_id)->where('seller_id', $seller_id)->first();
+        if (!$service_details) {
+            return response()->error(['message' => __('Unauthorized')]);
+        }
+
+        // Update service price
         $service_details->price -= $include_details->include_service_price * $include_details->include_service_quantity;
         $service_details->save();
         $include_details->delete();
@@ -597,15 +612,25 @@ class SellerServiceController extends Controller
     
     public function deleteAdditionalService($id = null)
     {
-        Serviceadditional::find($id)->delete();
+        $seller_id = Auth::guard('sanctum')->user()->id;
+        $additional = Serviceadditional::where('id', $id)->where('seller_id', $seller_id)->first();
+        if (!$additional) {
+            return response()->error(['message' => __('Additional Service not found or unauthorized.')]);
+        }
+        $additional->delete();
         return response()->success([
             'message'=>__('Additional Service Delete Success.')
         ]);
     }
     
-        public function deleteBenefits($id = null)
+    public function deleteBenefits($id = null)
     {
-        Servicebenifit::find($id)->delete();
+        $seller_id = Auth::guard('sanctum')->user()->id;
+        $benefit = Servicebenifit::where('id', $id)->where('seller_id', $seller_id)->first();
+        if (!$benefit) {
+            return response()->error(['message' => __('Service Benefit not found or unauthorized.')]);
+        }
+        $benefit->delete();
         return response()->success([
             'message'=>__('Service Benefit Delete Success')
         ]);
@@ -613,11 +638,17 @@ class SellerServiceController extends Controller
 
     public function deleteService($id = null)
     {
-        Serviceinclude::where('service_id',$id)->delete();
-        Serviceadditional::where('service_id',$id)->delete();
-        Servicebenifit::where('service_id',$id)->delete();
-        OnlineServiceFaq::where('service_id',$id)->delete();
-        Service::find($id)->delete();
+        $seller_id = Auth::guard('sanctum')->user()->id;
+        $service = Service::where('id', $id)->where('seller_id', $seller_id)->first();
+        if (!$service) {
+            return response()->error(['message' => __('Service not found or unauthorized.')]);
+        }
+
+        Serviceinclude::where('service_id', $id)->delete();
+        Serviceadditional::where('service_id', $id)->delete();
+        Servicebenifit::where('service_id', $id)->delete();
+        OnlineServiceFaq::where('service_id', $id)->delete();
+        $service->delete();
         return response()->success([
             'message'=>__('Service Delete Success'),
         ]);

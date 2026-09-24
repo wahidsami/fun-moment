@@ -56,27 +56,33 @@ class LoginService with ChangeNotifier {
               .showToast("Login successful", ConstantColors().successColor);
         }
         var responseData = jsonDecode(response.body);
-        String token = jsonDecode(response.body)['token'];
-        int userId = jsonDecode(response.body)['users']['id'];
-        String state = jsonDecode(response.body)['users']['state'].toString();
+        String token = responseData['token']?.toString() ?? '';
+        int userId = int.tryParse(responseData['users']?['id']?.toString() ?? '') ?? 0;
+        String state = responseData['users']?['state']?.toString() ?? '';
         String countryId =
-            jsonDecode(response.body)['users']['country_id'].toString();
-        if (responseData["users"]["email_verified"].toString() != "1") {
+            responseData['users']?['country_id']?.toString() ?? '';
+        int userType = responseData['users']?['user_type'] != null
+            ? int.tryParse(responseData['users']['user_type'].toString()) ?? 1
+            : 1;
+
+        if (responseData["users"] != null &&
+            responseData["users"]["email_verified"]?.toString() != "1") {
           var isOtepSent =
               await Provider.of<EmailVerifyService>(context, listen: false)
                   .sendOtpForEmailValidation(
-                      responseData["users"]["email"], context, token);
+                      responseData["users"]["email"]?.toString() ?? '', context, token);
 
           if (isOtepSent) {
             Navigator.push(
               context,
               MaterialPageRoute<void>(
                 builder: (BuildContext context) => EmailVerifyPage(
-                  email: responseData["users"]["email"].toString(),
+                  email: responseData["users"]["email"]?.toString() ?? '',
                   token: token,
                   userId: userId,
                   state: state,
                   countryId: countryId,
+                  userType: userType,
                 ),
               ),
             );
@@ -89,9 +95,9 @@ class LoginService with ChangeNotifier {
 
         if (keepLoggedIn) {
           saveDetails(email, token, userId, state, countryId,
-              pass: pass, keepLogin: keepLoggedIn);
+              pass: pass, keepLogin: keepLoggedIn, userType: userType);
         } else {
-          setKeepLoggedInFalseSaveToken(token);
+          setKeepLoggedInFalseSaveToken(token, userType: userType);
         }
 
         //start pusher
@@ -115,10 +121,12 @@ class LoginService with ChangeNotifier {
         return true;
       } else {
         print(response.body);
-        //Login unsuccessful ==========>
-        if (isFromLoginPage) {
-          OthersHelper().showToast(
-              "Invalid Email or Password", ConstantColors().warningColor);
+        try {
+          final res = jsonDecode(response.body);
+          final msg = res['message'] ?? res['msg'] ?? 'Login failed';
+          OthersHelper().showToast(msg.toString(), Colors.black);
+        } catch (_) {
+          OthersHelper().showToast('Login failed (${response.statusCode})', Colors.black);
         }
         setLoadingFalse();
         return false;
@@ -130,7 +138,7 @@ class LoginService with ChangeNotifier {
   }
 
   saveDetails(String email, String token, int userId, state, countryId,
-      {String? pass, bool keepLogin = true}) async {
+      {String? pass, bool keepLogin = true, int userType = 1}) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     prefs.setString("email", email);
     prefs.setBool('keepLoggedIn', keepLogin);
@@ -143,11 +151,13 @@ class LoginService with ChangeNotifier {
     prefs.setInt('userId', userId);
     prefs.setString("state", state);
     prefs.setString("countryId", countryId);
+    prefs.setInt('userType', userType);
   }
 
-  setKeepLoggedInFalseSaveToken(token) async {
+  setKeepLoggedInFalseSaveToken(token, {int userType = 1}) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     prefs.setBool('keepLoggedIn', false);
     prefs.setString("token", token);
+    prefs.setInt('userType', userType);
   }
 }

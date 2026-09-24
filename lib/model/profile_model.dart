@@ -25,11 +25,15 @@ class ProfileModel {
   int? totalOrder;
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) => ProfileModel(
-        userDetails: UserDetails.fromJson(json["user_details"]),
-        pendingOrder: json["pending_order"],
-        activeOrder: json["active_order"],
-        completeOrder: json["complete_order"],
-        totalOrder: json["total_order"],
+        userDetails: json["user_details"] is Map<String, dynamic>
+            ? UserDetails.fromJson(json["user_details"])
+            : (json["user_details"] is Map
+                ? UserDetails.fromJson(Map<String, dynamic>.from(json["user_details"]))
+                : UserDetails(country: null, city: null, area: null)),
+        pendingOrder: json["pending_order"] == null ? null : int.tryParse(json["pending_order"].toString()),
+        activeOrder: json["active_order"] == null ? null : int.tryParse(json["active_order"].toString()),
+        completeOrder: json["complete_order"] == null ? null : int.tryParse(json["complete_order"].toString()),
+        totalOrder: json["total_order"] == null ? null : int.tryParse(json["total_order"].toString()),
       );
 
   Map<String, dynamic> toJson() => {
@@ -57,6 +61,7 @@ class UserDetails {
     this.postCode,
     this.image,
     this.countryCode,
+    this.userType,
     required this.country,
     required this.city,
     required this.area,
@@ -76,28 +81,30 @@ class UserDetails {
   String? postCode;
   String? image;
   String? countryCode;
+  int? userType;
   Country? country;
   City? city;
   Area? area;
 
   factory UserDetails.fromJson(Map<String, dynamic> json) => UserDetails(
-        id: json["id"],
-        name: json["name"],
-        email: json["email"],
-        phone: json["phone"],
-        address: json["address"],
+        id: json["id"] == null ? null : int.tryParse(json["id"].toString()),
+        name: json["name"]?.toString(),
+        email: json["email"]?.toString(),
+        phone: json["phone"]?.toString(),
+        address: json["address"]?.toString(),
         about: json["about"],
-        countryId: json["country_id"],
-        serviceCity: json["service_city"],
-        serviceArea: json["service_area"],
+        countryId: json["country_id"] == null ? null : int.tryParse(json["country_id"].toString()),
+        serviceCity: json["service_city"]?.toString(),
+        serviceArea: json["service_area"]?.toString(),
         googleId: json["google_id"],
         facebookId: json["facebook_id"],
-        postCode: json["post_code"],
-        image: json["image"],
-        countryCode: json["country_code"],
-        country: Country.fromJson(json["country"]),
-        city: City.fromJson(json["city"]),
-        area: Area.fromJson(json["area"]),
+        postCode: json["post_code"]?.toString(),
+        image: json["image"]?.toString(),
+        countryCode: json["country_code"]?.toString(),
+        userType: json["user_type"] == null ? 1 : int.tryParse(json["user_type"].toString()),
+        country: json["country"] is Map<String, dynamic> ? Country.fromJson(json["country"]) : null,
+        city: json["city"] is Map<String, dynamic> ? City.fromJson(json["city"]) : null,
+        area: json["area"] is Map<String, dynamic> ? Area.fromJson(json["area"]) : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -135,11 +142,11 @@ class Area {
   int? status;
 
   factory Area.fromJson(Map<String?, dynamic>? json) => Area(
-        id: json?["id"],
-        serviceArea: json?["service_area"],
-        serviceCityId: json?["service_city_id"],
-        countryId: json?["country_id"],
-        status: json?["status"],
+        id: json?["id"] == null ? null : int.tryParse(json!["id"].toString()),
+        serviceArea: json?["service_area"]?.toString(),
+        serviceCityId: json?["service_city_id"] == null ? null : int.tryParse(json!["service_city_id"].toString()),
+        countryId: json?["country_id"] == null ? null : int.tryParse(json!["country_id"].toString()),
+        status: json?["status"] == null ? null : int.tryParse(json!["status"].toString()),
       );
 
   Map<String?, dynamic>? toJson() => {
@@ -165,10 +172,10 @@ class City {
   int? status;
 
   factory City.fromJson(Map<String?, dynamic>? json) => City(
-        id: json?["id"],
-        serviceCity: json?["service_city"],
-        countryId: json?["country_id"],
-        status: json?["status"],
+        id: json?["id"] == null ? null : int.tryParse(json!["id"].toString()),
+        serviceCity: json?["service_city"]?.toString(),
+        countryId: json?["country_id"] == null ? null : int.tryParse(json!["country_id"].toString()),
+        status: json?["status"] == null ? null : int.tryParse(json!["status"].toString()),
       );
 
   Map<String?, dynamic>? toJson() => {
@@ -191,9 +198,9 @@ class Country {
   int? status;
 
   factory Country.fromJson(Map<String?, dynamic>? json) => Country(
-        id: json?["id"],
-        country: json?["country"],
-        status: json?["status"],
+        id: json?["id"] == null ? null : int.tryParse(json!["id"].toString()),
+        country: json?["country"]?.toString(),
+        status: json?["status"] == null ? null : int.tryParse(json!["status"].toString()),
       );
 
   Map<String?, dynamic>? toJson() => {

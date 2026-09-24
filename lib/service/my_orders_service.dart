@@ -26,7 +26,7 @@ class MyOrdersService with ChangeNotifier {
   var selectedPaymentSort = "All";
   var selectedOrderSort = "All";
 
-  late int totalPages;
+  int totalPages = 1;
   int currentPage = 1;
 
   String get paymentStatusCode {

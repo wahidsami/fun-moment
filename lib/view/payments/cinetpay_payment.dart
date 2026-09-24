@@ -62,26 +62,25 @@ class CinetPayPayment extends StatelessWidget {
                 child: Text('Loding failed.'),
               );
             }
+            final controller = WebViewController()
+              ..setJavaScriptMode(JavaScriptMode.unrestricted)
+              ..setNavigationDelegate(
+                NavigationDelegate(
+                  onWebResourceError: (error) {
+                    Provider.of<PlaceOrderService>(context, listen: false)
+                        .doNext(context, 'failed', paymentFailed: true);
+                  },
+                  onPageFinished: (value) async {},
+                ),
+              )
+              ..loadRequest(Uri.parse(url!));
             return WillPopScope(
               onWillPop: () async {
                 await Provider.of<PlaceOrderService>(context, listen: false)
                     .doNext(context, 'failed', paymentFailed: true);
                 return true;
               },
-              child: WebView(
-                // onWebViewCreated: ((controller) {
-                //   _controller = controller;
-                // }),
-                onWebResourceError: (error) {
-                  Provider.of<PlaceOrderService>(context, listen: false)
-                      .doNext(context, 'failed', paymentFailed: true);
-                },
-
-                initialUrl: url,
-                javascriptMode: JavascriptMode.unrestricted,
-
-                onPageFinished: (value) async {},
-              ),
+              child: WebViewWidget(controller: controller),
             );
           }),
     );

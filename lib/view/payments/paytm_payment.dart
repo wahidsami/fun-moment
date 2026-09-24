@@ -38,36 +38,16 @@ class _PaytmPaymentState extends State<PaytmPayment> {
         Provider.of<PlaceOrderService>(context, listen: false).successUrl;
     failedUrl =
         Provider.of<PlaceOrderService>(context, listen: false).cancelUrl;
-  }
 
-  String? html;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: CommonHelper().appbarCommon('Paytm', context, () {
+    var paytmHtmlString =
         Provider.of<PlaceOrderService>(context, listen: false)
-            .doNext(context, 'failed', paymentFailed: true);
-      }),
-      body: WillPopScope(
-        onWillPop: () async {
-          await Provider.of<PlaceOrderService>(context, listen: false)
-              .doNext(context, 'failed', paymentFailed: true);
-          return false;
-        },
-        child: WebView(
-          onWebViewCreated: (controller) {
-            _controller = controller;
+            .paytmHtmlForm as String;
 
-            var paytmHtmlString =
-                Provider.of<PlaceOrderService>(context, listen: false)
-                    .paytmHtmlForm as String;
-
-            controller.loadHtmlString(paytmHtmlString);
-          },
-          initialUrl: "url",
-          javascriptMode: JavascriptMode.unrestricted,
-          navigationDelegate: (NavigationRequest request) async {
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) async {
             print('current url is ${request.url}');
             print('success url is $successUrl');
             print('failed url is $failedUrl');
@@ -102,6 +82,26 @@ class _PaytmPaymentState extends State<PaytmPayment> {
             return NavigationDecision.navigate;
           },
         ),
+      )
+      ..loadHtmlString(paytmHtmlString);
+  }
+
+  String? html;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: CommonHelper().appbarCommon('Paytm', context, () {
+        Provider.of<PlaceOrderService>(context, listen: false)
+            .doNext(context, 'failed', paymentFailed: true);
+      }),
+      body: WillPopScope(
+        onWillPop: () async {
+          await Provider.of<PlaceOrderService>(context, listen: false)
+              .doNext(context, 'failed', paymentFailed: true);
+          return false;
+        },
+        child: WebViewWidget(controller: _controller!),
       ),
     );
   }

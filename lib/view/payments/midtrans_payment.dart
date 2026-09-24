@@ -72,27 +72,34 @@ class MidtransPayment extends StatelessWidget {
                   child: Text('Loding failed.'),
                 );
               }
-              return WebView(
-                initialUrl: url,
-                javascriptMode: JavascriptMode.unrestricted,
-                onPageFinished: (value) async {
-                  if (value.contains('success')) {
-                    if (isFromOrderExtraAccept == true) {
-                      Provider.of<OrderDetailsService>(context, listen: false)
-                          .acceptOrderExtra(context);
-                    } else if (isFromWalletDeposite) {
-                      Provider.of<WalletService>(context, listen: false)
-                          .makeDepositeToWalletSuccess(context);
-                    } else if (isFromHireJob) {
-                      Provider.of<JobRequestService>(context, listen: false)
-                          .goToJobSuccessPage(context);
-                    } else {
-                      Provider.of<PlaceOrderService>(context, listen: false)
-                          .makePaymentSuccess(context);
-                    }
-                  }
-                },
-              );
+              final controller = WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..setNavigationDelegate(
+                  NavigationDelegate(
+                    onPageFinished: (value) async {
+                      if (value.contains('success')) {
+                        if (isFromOrderExtraAccept == true) {
+                          Provider.of<OrderDetailsService>(context,
+                                  listen: false)
+                              .acceptOrderExtra(context);
+                        } else if (isFromWalletDeposite) {
+                          Provider.of<WalletService>(context, listen: false)
+                              .makeDepositeToWalletSuccess(context);
+                        } else if (isFromHireJob) {
+                          Provider.of<JobRequestService>(context,
+                                  listen: false)
+                              .goToJobSuccessPage(context);
+                        } else {
+                          Provider.of<PlaceOrderService>(context,
+                                  listen: false)
+                              .makePaymentSuccess(context);
+                        }
+                      }
+                    },
+                  ),
+                )
+                ..loadRequest(Uri.parse(url!));
+              return WebViewWidget(controller: controller);
             }),
       ),
     );

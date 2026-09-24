@@ -73,7 +73,7 @@ class _InstamojoPaymentPageState extends State<InstamojoPaymentPage> {
                 const CircularProgressIndicator() //if true
                 : InAppWebView(
                     initialUrlRequest: URLRequest(
-                      url: Uri.tryParse(selectedUrl),
+                      url: WebUri(selectedUrl),
                     ),
                     onWebViewCreated: (InAppWebViewController controller) {},
                     onProgressChanged:

@@ -77,51 +77,57 @@ class _MercadopagoPaymentPageState extends State<MercadopagoPaymentPage> {
                   child: Text('Loding failed.'),
                 );
               }
-              return WebView(
-                onWebResourceError: (error) => showDialog(
-                    context: context,
-                    builder: (ctx) {
-                      return const AlertDialog(
-                        title: Text('Loading failed!'),
-                        content: Text('Failed to load payment page.'),
-                        actions: [
-                          Spacer(),
-                        ],
-                      );
-                    }),
-                initialUrl: url,
-                javascriptMode: JavascriptMode.unrestricted,
-                navigationDelegate: (NavigationRequest request) async {
-                  if (request.url.contains('https://www.google.com/')) {
-                    print('payment success');
-                    if (widget.isFromOrderExtraAccept == true) {
-                      await Provider.of<OrderDetailsService>(context,
-                              listen: false)
-                          .acceptOrderExtra(context);
-                    } else if (widget.isFromWalletDeposite) {
-                      await Provider.of<WalletService>(context, listen: false)
-                          .makeDepositeToWalletSuccess(context);
-                    } else if (widget.isFromHireJob) {
-                      Provider.of<JobRequestService>(context, listen: false)
-                          .goToJobSuccessPage(context);
-                    } else {
-                      await Provider.of<PlaceOrderService>(context,
-                              listen: false)
-                          .makePaymentSuccess(context);
-                    }
+              final controller = WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..setNavigationDelegate(
+                  NavigationDelegate(
+                    onWebResourceError: (error) => showDialog(
+                        context: context,
+                        builder: (ctx) {
+                          return const AlertDialog(
+                            title: Text('Loading failed!'),
+                            content: Text('Failed to load payment page.'),
+                            actions: [
+                              Spacer(),
+                            ],
+                          );
+                        }),
+                    onNavigationRequest: (NavigationRequest request) async {
+                      if (request.url.contains('https://www.google.com/')) {
+                        print('payment success');
+                        if (widget.isFromOrderExtraAccept == true) {
+                          await Provider.of<OrderDetailsService>(context,
+                                  listen: false)
+                              .acceptOrderExtra(context);
+                        } else if (widget.isFromWalletDeposite) {
+                          await Provider.of<WalletService>(context,
+                                  listen: false)
+                              .makeDepositeToWalletSuccess(context);
+                        } else if (widget.isFromHireJob) {
+                          Provider.of<JobRequestService>(context,
+                                  listen: false)
+                              .goToJobSuccessPage(context);
+                        } else {
+                          await Provider.of<PlaceOrderService>(context,
+                                  listen: false)
+                              .makePaymentSuccess(context);
+                        }
 
-                    return NavigationDecision.prevent;
-                  }
-                  if (request.url.contains('https://www.facebook.com/')) {
-                    print('payment failed');
-                    Provider.of<PlaceOrderService>(context, listen: false)
-                        .doNext(context, 'failed', paymentFailed: true);
+                        return NavigationDecision.prevent;
+                      }
+                      if (request.url.contains('https://www.facebook.com/')) {
+                        print('payment failed');
+                        Provider.of<PlaceOrderService>(context, listen: false)
+                            .doNext(context, 'failed', paymentFailed: true);
 
-                    return NavigationDecision.prevent;
-                  }
-                  return NavigationDecision.navigate;
-                },
-              );
+                        return NavigationDecision.prevent;
+                      }
+                      return NavigationDecision.navigate;
+                    },
+                  ),
+                )
+                ..loadRequest(Uri.parse(url));
+              return WebViewWidget(controller: controller);
             }),
       ),
     );

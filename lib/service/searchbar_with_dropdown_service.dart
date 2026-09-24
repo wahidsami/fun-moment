@@ -164,7 +164,7 @@ class SearchBarWithDropdownService with ChangeNotifier {
           int totalRating = 0;
           for (int j = 0; j < data.services[i].reviewsForMobile.length; j++) {
             totalRating = totalRating +
-                data.services[i].reviewsForMobile[j].rating!.toInt();
+                (data.services[i].reviewsForMobile[j].rating?.toInt() ?? 0);
           }
           double averageRate = 0;
 

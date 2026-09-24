@@ -59,7 +59,13 @@ class EmailVerifyService with ChangeNotifier {
         return true;
       } else {
         print(response.body);
-        jsonDecode(response.body)['message']?.toString().showToast();
+        try {
+          final res = jsonDecode(response.body);
+          final msg = res['message'] ?? res['msg'] ?? 'Failed to send OTP code';
+          OthersHelper().showToast(msg.toString(), Colors.black);
+        } catch (_) {
+          OthersHelper().showToast('Failed to send OTP code (${response.statusCode})', Colors.black);
+        }
 
         return false;
       }
@@ -67,7 +73,7 @@ class EmailVerifyService with ChangeNotifier {
   }
 
   verifyOtpAndLogin(enteredOtp, BuildContext context, email, token, userId,
-      state, countryId) async {
+      state, countryId, {int userType = 1}) async {
     var otpNumber =
         Provider.of<ResetPasswordService>(context, listen: false).otpNumber;
     if (otpNumber != null) {
@@ -94,13 +100,8 @@ class EmailVerifyService with ChangeNotifier {
         notifyListeners();
 
         if (response.statusCode == 201) {
-          // Navigator.pushReplacement(
-          //   context,
-          //   MaterialPageRoute<void>(
-          //     builder: (BuildContext context) => const LandingPage(),
-          //   ),
           //save the details for later login
-          LoginService().saveDetails(email, token, userId, state, countryId);
+          LoginService().saveDetails(email, token, userId, state, countryId, userType: userType);
           // );
           await Provider.of<ProfileService>(context, listen: false).fetchData();
           await Provider.of<PushNotificationService>(context, listen: false)

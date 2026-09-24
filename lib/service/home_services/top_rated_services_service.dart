@@ -42,7 +42,7 @@ class TopRatedServicesSerivce with ChangeNotifier {
                 j < data.topServices[i].reviewsForMobile.length;
                 j++) {
               totalRating = totalRating +
-                  data.topServices[i].reviewsForMobile[j].rating!.toInt();
+                  (data.topServices[i].reviewsForMobile[j].rating?.toInt() ?? 0);
             }
             double averageRate = 0;
 

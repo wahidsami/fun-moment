@@ -14,7 +14,13 @@ import 'package:funmoments/view/tabs/saved_item_page.dart';
 import 'package:funmoments/view/tabs/search/search_tab.dart';
 import 'package:funmoments/view/tabs/settings/menu_page.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
+import 'package:funmoments/view/utils/responsive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:funmoments/service/profile_service.dart';
+import 'package:funmoments/view/jobs/my_jobs_page.dart';
+import 'package:funmoments/view/provider/provider_dashboard_page.dart';
+import 'package:funmoments/view/provider/provider_services_page.dart';
 
 import '../search/service_filter_molde.dart';
 
@@ -42,11 +48,19 @@ class _HomePageState extends State<LandingPage> {
     HomepageHelper.tabIndex.value = index;
   }
 
-  final List<Widget> _children = [
+  final List<Widget> _buyerChildren = [
     const Homepage(),
     const SearchTab(),
     const OrdersPage(),
     const SavedItemPage(),
+    const MenuPage(),
+  ];
+
+  final List<Widget> _sellerChildren = [
+    const ProviderDashboardPage(),
+    const ProviderServicesPage(),
+    const OrdersPage(),
+    const MyJobsPage(),
     const MenuPage(),
   ];
 
@@ -90,6 +104,9 @@ class _HomePageState extends State<LandingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final profileProvider = Provider.of<ProfileService>(context);
+    final isSeller = profileProvider.isSeller;
+
     return Scaffold(
       body: ValueListenableBuilder<int>(
         valueListenable: HomepageHelper.tabIndex,
@@ -108,7 +125,7 @@ class _HomePageState extends State<LandingPage> {
             },
             child: IndexedStack(
               index: value,
-              children: _children,
+              children: isSeller ? _sellerChildren : _buyerChildren,
             ),
           );
         },
@@ -119,6 +136,7 @@ class _HomePageState extends State<LandingPage> {
           return BottomNav(
             currentIndex: value,
             onTabTapped: onTabTapped,
+            isSeller: isSeller,
           );
         },
       ),

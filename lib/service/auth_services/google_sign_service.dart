@@ -28,35 +28,34 @@ class GoogleSignInService with ChangeNotifier {
     notifyListeners();
   }
 
-  final googleSignIn = GoogleSignIn();
+  static const String _serverClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+  final googleSignIn = GoogleSignIn(
+    serverClientId: _serverClientId.isNotEmpty ? _serverClientId : null,
+  );
 
   GoogleSignInAccount? _user;
   GoogleSignInAccount get user => _user!;
 
   Future googleLogin(BuildContext context) async {
-    final googleUser = await googleSignIn.signIn();
+    try {
+      final googleUser = await googleSignIn.signIn();
 
-    print(googleUser);
-    if (googleUser == null) return;
-    _user = googleUser;
+      if (googleUser == null) return;
+      _user = googleUser;
 
-    // final googleAuth = await googleUser.authentication;
-    // final credential = GoogleAuthProvider.credential(
-    //     accessToken: googleAuth.accessToken, idToken: googleAuth.idToken);
-
-    // await FirebaseAuth.instance.signInWithCredential(credential);
-
-    // try to login with the info
-    if (_user != null) {
-      socialLogin(_user!.email, _user!.displayName, _user?.id, 1, context);
-
-      // _user.
-    } else {
-      OthersHelper().showToast(
-          "Didn't get any user info after google sign in. visit google sign in service file",
-          Colors.black);
+      if (_user != null) {
+        await socialLogin(_user!.email, _user!.displayName, _user?.id, 1, context);
+      }
+    } catch (e) {
+      debugPrint('Google Sign-In failed: $e');
+      String msg = 'Google Sign-In is not currently available.';
+      if (e.toString().contains('ApiException: 10')) {
+        msg = 'Google Sign-In setup is pending in Firebase Console.';
+      }
+      OthersHelper().showToast(msg, Colors.black);
+    } finally {
+      notifyListeners();
     }
-    notifyListeners();
   }
 
 //Logout from google ====>
@@ -88,14 +87,19 @@ class GoogleSignInService with ChangeNotifier {
       var response = await http.post(Uri.parse('$baseApi/social/login'),
           body: data, headers: header);
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         setLoadingFalse();
         print(response.body);
 
-        String token = jsonDecode(response.body)['token'];
-        int userId = jsonDecode(response.body)['users']['id'];
+        var responseData = jsonDecode(response.body);
+        String token = responseData['token']?.toString() ?? '';
+        int userId = int.tryParse(responseData['users']?['id']?.toString() ?? '') ?? 0;
+        int userType = responseData['users']?['user_type'] != null
+            ? int.tryParse(responseData['users']['user_type'].toString()) ?? 1
+            : 1;
+
         await saveDetailsAfterSocialLogin(
-            email, username, token, userId, isGoogleLogin);
+            email, username, token, userId, isGoogleLogin, userType: userType);
         await Provider.of<ProfileService>(context, listen: false)
             .getProfileDetails();
         await Provider.of<PushNotificationService>(context, listen: false)
@@ -105,7 +109,11 @@ class GoogleSignInService with ChangeNotifier {
                 .pusherInstance;
 
         if (pusherInstance != null) {
-          await PusherBeams.instance.start(pusherInstance);
+          try {
+            await PusherBeams.instance.start(pusherInstance);
+          } catch (e) {
+            debugPrint('Pusher error: $e');
+          }
         }
         Navigator.pushReplacement<void, void>(
           context,
@@ -113,15 +121,17 @@ class GoogleSignInService with ChangeNotifier {
             builder: (BuildContext context) => const LandingPage(),
           ),
         );
-        print(response.body);
 
         return true;
       } else {
         debugPrint(response.body);
-        //Login unsuccessful ==========>
-        // OthersHelper().showToast(jsonDecode(response.body)['message'],
-        //     ConstantColors().warningColor);
-        OthersHelper().showToast('Something went wrong', Colors.black);
+        try {
+          final res = jsonDecode(response.body);
+          final msg = res['message'] ?? res['msg'] ?? 'Social login failed';
+          OthersHelper().showToast(msg.toString(), Colors.black);
+        } catch (_) {
+          OthersHelper().showToast('Social login failed (${response.statusCode})', Colors.black);
+        }
 
         setLoadingFalse();
         return false;
@@ -133,7 +143,7 @@ class GoogleSignInService with ChangeNotifier {
   }
 
   saveDetailsAfterSocialLogin(String email, userName, String token, int userId,
-      bool isGoogleLogin) async {
+      bool isGoogleLogin, {int userType = 1}) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     print('token is $token');
     print('user id is $userId');
@@ -144,11 +154,10 @@ class GoogleSignInService with ChangeNotifier {
 
     prefs.setString("token", token);
     prefs.setInt('userId', userId);
+    prefs.setInt('userType', userType);
 
     if (isGoogleLogin == true) {
       prefs.setBool('googleLogin', true);
-    } else {
-      prefs.setBool('fbLogin', true);
     }
 
     return true;

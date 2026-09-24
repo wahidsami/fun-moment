@@ -27,11 +27,17 @@ class BookService with ChangeNotifier {
   String? weekDay;
 
   setData(id, title, newPrice, sellerNewId, {image}) {
-    serviceId = id;
-    serviceTitle = title;
+    serviceId = id is int ? id : int.tryParse(id?.toString() ?? '');
+    serviceTitle = title?.toString() ?? '';
     serviceImage = image ?? placeHolderUrl;
-    totalPrice = newPrice.round();
-    sellerId = sellerNewId;
+    double parsedPrice = 0.0;
+    if (newPrice is num) {
+      parsedPrice = newPrice.toDouble();
+    } else if (newPrice != null) {
+      parsedPrice = double.tryParse(newPrice.toString()) ?? 0.0;
+    }
+    totalPrice = parsedPrice.round();
+    sellerId = sellerNewId is int ? sellerNewId : int.tryParse(sellerNewId?.toString() ?? '');
     notifyListeners();
   }
 
@@ -53,21 +59,18 @@ class BookService with ChangeNotifier {
   }
 
   setDeliveryDetailsBasedOnProfile(BuildContext context) {
-    name = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            .userDetails
-            .name ??
-        'test';
-    phone = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            .userDetails
-            .phone ??
-        '111111111';
-    email = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            .userDetails
-            .email ??
-        'test@test.com';
+    try {
+      final userDetails = Provider.of<ProfileService>(context, listen: false)
+          .profileDetails
+          .userDetails;
+      name = userDetails?.name ?? 'Customer';
+      phone = userDetails?.phone ?? '';
+      email = userDetails?.email ?? '';
+    } catch (_) {
+      name = 'Customer';
+      phone = '';
+      email = '';
+    }
     notifyListeners();
   }
 
@@ -80,7 +83,11 @@ class BookService with ChangeNotifier {
   }
 
   setTotalPrice(newPrice) {
-    totalPrice = newPrice;
+    if (newPrice is num) {
+      totalPrice = newPrice.round();
+    } else if (newPrice != null) {
+      totalPrice = (double.tryParse(newPrice.toString()) ?? 0.0).round();
+    }
     notifyListeners();
   }
 

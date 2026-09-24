@@ -9,20 +9,30 @@ class BottomNav extends StatelessWidget {
     Key? key,
     required this.currentIndex,
     required this.onTabTapped,
+    this.isSeller = false,
   }) : super(key: key);
 
   final int currentIndex;
   final Function(int) onTabTapped;
+  final bool isSeller;
 
   @override
   Widget build(BuildContext context) {
-    final items = <_NavItem>[
-      _NavItem('assets/svg/home-icon.svg', lnProvider.getString('Home')),
-      _NavItem('assets/svg/search-icon.svg', lnProvider.getString('Discover')),
-      _NavItem('assets/svg/orders-icon.svg', lnProvider.getString('Bookings')),
-      _NavItem('assets/svg/saved-icon.svg', lnProvider.getString('Saved')),
-      _NavItem('assets/svg/user.svg', lnProvider.getString('Profile')),
-    ];
+    final items = isSeller
+        ? <_NavItem>[
+            _NavItem('assets/svg/home-icon.svg', lnProvider.getString('Dashboard')),
+            _NavItem('assets/svg/search-icon.svg', lnProvider.getString('Services')),
+            _NavItem('assets/svg/orders-icon.svg', lnProvider.getString('Orders')),
+            _NavItem('assets/svg/menu_job.svg', lnProvider.getString('Jobs')),
+            _NavItem('assets/svg/user.svg', lnProvider.getString('Profile')),
+          ]
+        : <_NavItem>[
+            _NavItem('assets/svg/home-icon.svg', lnProvider.getString('Home')),
+            _NavItem('assets/svg/search-icon.svg', lnProvider.getString('Discover')),
+            _NavItem('assets/svg/orders-icon.svg', lnProvider.getString('Bookings')),
+            _NavItem('assets/svg/saved-icon.svg', lnProvider.getString('Saved')),
+            _NavItem('assets/svg/user.svg', lnProvider.getString('Profile')),
+          ];
 
     return SafeArea(
       top: false,

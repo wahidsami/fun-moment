@@ -68,79 +68,80 @@ class PaystackPaymentPage extends StatelessWidget {
               //     child: Text('Loding failed.'),
               //   );
               // }
-              return WebView(
-                // onWebViewCreated: ((controller) {
-                //   _controller = controller;
-                // }),
-                onWebResourceError: (error) =>
-                    Provider.of<PlaceOrderService>(context, listen: false)
-                        .doNext(context, 'failed', paymentFailed: true),
-                initialUrl: url,
-                javascriptMode: JavascriptMode.unrestricted,
-                onPageFinished: (value) async {
-                  // final title = await _controller.currentUrl();
-                  // print(title);
-                  print('on finished.........................$value');
-                  final uri = Uri.parse(value);
-                  final response = await http.get(uri);
-                  // if (response.body.contains('PAYMENT ID')) {
+              final controller = WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..setNavigationDelegate(
+                  NavigationDelegate(
+                    onWebResourceError: (error) =>
+                        Provider.of<PlaceOrderService>(context, listen: false)
+                            .doNext(context, 'failed', paymentFailed: true),
+                    onPageFinished: (value) async {
+                      // final title = await _controller.currentUrl();
+                      // print(title);
+                      print('on finished.........................$value');
+                      final uri = Uri.parse(value);
+                      final response = await http.get(uri);
+                      // if (response.body.contains('PAYMENT ID')) {
 
-                  if (response.body.contains('Payment Successful')) {
-                    if (isFromOrderExtraAccept == true) {
-                      Provider.of<OrderDetailsService>(context, listen: false)
-                          .acceptOrderExtra(context);
-                    } else if (isFromWalletDeposite) {
-                      Provider.of<WalletService>(context, listen: false)
-                          .makeDepositeToWalletSuccess(context);
-                    } else if (isFromHireJob) {
-                      Provider.of<JobRequestService>(context, listen: false)
-                          .goToJobSuccessPage(context);
-                    } else {
-                      Provider.of<PlaceOrderService>(context, listen: false)
-                          .makePaymentSuccess(context);
-                    }
+                      if (response.body.contains('Payment Successful')) {
+                        if (isFromOrderExtraAccept == true) {
+                          Provider.of<OrderDetailsService>(context, listen: false)
+                              .acceptOrderExtra(context);
+                        } else if (isFromWalletDeposite) {
+                          Provider.of<WalletService>(context, listen: false)
+                              .makeDepositeToWalletSuccess(context);
+                        } else if (isFromHireJob) {
+                          Provider.of<JobRequestService>(context, listen: false)
+                              .goToJobSuccessPage(context);
+                        } else {
+                          Provider.of<PlaceOrderService>(context, listen: false)
+                              .makePaymentSuccess(context);
+                        }
 
-                    return;
-                  }
-                  if (response.body.contains('Declined')) {}
-                },
-                navigationDelegate: (navRequest) async {
-                  print('nav req to .......................${navRequest.url}');
-                  if (navRequest.url.contains('success')) {
-                    if (isFromOrderExtraAccept == true) {
-                      await Provider.of<OrderDetailsService>(context,
-                              listen: false)
-                          .acceptOrderExtra(context);
-                    } else if (isFromWalletDeposite) {
-                      Provider.of<WalletService>(context, listen: false)
-                          .makeDepositeToWalletSuccess(context);
-                    } else if (isFromHireJob) {
-                      Provider.of<JobRequestService>(context, listen: false)
-                          .goToJobSuccessPage(context);
-                    } else {
-                      await Provider.of<PlaceOrderService>(context,
-                              listen: false)
-                          .makePaymentSuccess(context);
-                    }
-                    return NavigationDecision.prevent;
-                  }
-                  if (navRequest.url.contains('failed')) {
-                    Provider.of<PlaceOrderService>(context, listen: false)
-                        .doNext(context, 'failed', paymentFailed: true);
-                  }
-                  return NavigationDecision.navigate;
-                },
+                        return;
+                      }
+                      if (response.body.contains('Declined')) {}
+                    },
+                    onNavigationRequest: (navRequest) async {
+                      print('nav req to .......................${navRequest.url}');
+                      if (navRequest.url.contains('success')) {
+                        if (isFromOrderExtraAccept == true) {
+                          await Provider.of<OrderDetailsService>(context,
+                                  listen: false)
+                              .acceptOrderExtra(context);
+                        } else if (isFromWalletDeposite) {
+                          Provider.of<WalletService>(context, listen: false)
+                              .makeDepositeToWalletSuccess(context);
+                        } else if (isFromHireJob) {
+                          Provider.of<JobRequestService>(context, listen: false)
+                              .goToJobSuccessPage(context);
+                        } else {
+                          await Provider.of<PlaceOrderService>(context,
+                                  listen: false)
+                              .makePaymentSuccess(context);
+                        }
+                        return NavigationDecision.prevent;
+                      }
+                      if (navRequest.url.contains('failed')) {
+                        Provider.of<PlaceOrderService>(context, listen: false)
+                            .doNext(context, 'failed', paymentFailed: true);
+                      }
+                      return NavigationDecision.navigate;
+                    },
+                  ),
+                )
+                ..loadRequest(Uri.parse(url!));
 
-                // javascriptChannels: <JavascriptChannel>[
-                //   // Set Javascript Channel to WebView
-                //   JavascriptChannel(
-                //       name: 'same',
-                //       onMessageReceived: (javMessage) {
-                //         print(javMessage.message);
-                //         print('...........................................');
-                //       }),
-                // ].toSet(),
-              );
+              // javascriptChannels: <JavascriptChannel>[
+              //   // Set Javascript Channel to WebView
+              //   JavascriptChannel(
+              //       name: 'same',
+              //       onMessageReceived: (javMessage) {
+              //         print(javMessage.message);
+              //         print('...........................................');
+              //       }),
+              // ].toSet(),
+              return WebViewWidget(controller: controller);
             }),
       ),
     );

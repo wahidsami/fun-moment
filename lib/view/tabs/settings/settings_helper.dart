@@ -9,7 +9,7 @@ import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/custom_input.dart';
 import 'package:rflutter_alert/rflutter_alert.dart';
 
-import '../../../service/auth_services/facebook_login_service.dart';
+
 import '../../../service/auth_services/google_sign_service.dart';
 
 class SettingsHelper {
@@ -109,8 +109,6 @@ class SettingsHelper {
                           //if logged in by google then logout from it
                           GoogleSignInService().logOutFromGoogleLogin();
 
-                          //if logged in by facebook then logout from it
-                          FacebookLoginService().logoutFromFacebook();
                         }
                       },
                               isloading:
@@ -187,8 +185,6 @@ class SettingsHelper {
                           //if logged in by google then logout from it
                           GoogleSignInService().logOutFromGoogleLogin();
 
-                          //if logged in by facebook then logout from it
-                          FacebookLoginService().logoutFromFacebook();
                         }
                       },
                               isloading:

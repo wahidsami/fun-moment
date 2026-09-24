@@ -314,7 +314,7 @@ class SellerController extends Controller
             return response()->error(['message' => __('no order found')]);
         }
 
-        $orderInfo = Order::with('service')->where('id', $request->id)->first();
+        $orderInfo = Order::with('service')->where('id', $request->id)->where('seller_id', auth('sanctum')->id())->first();
         if ($orderInfo != null) {
             $orderInfo->payment_status = !empty($orderInfo->payment_status) ? $orderInfo->payment_status : 'pending';
             $orderInfo->total = amount_with_currency_symbol($orderInfo->total);
@@ -448,7 +448,12 @@ class SellerController extends Controller
             ]);
         }
 
-        $payout_details = PayoutRequest::where('id', $id)->first();
+        $payout_details = PayoutRequest::where('id', $id)->where('seller_id', auth('sanctum')->id())->first();
+        if (!$payout_details) {
+            return response()->error([
+                'message' => __('Payout request not found or unauthorized'),
+            ]);
+        }
         $payout_details->payment_receipt = get_attachment_image_by_id($payout_details->payment_receipt) ?? null;
         $payout_details->status = $this->payoutStatusText($payout_details->status);
 
@@ -716,6 +721,9 @@ class SellerController extends Controller
 
         //todo: get order details from database
         $orderDetails = Order::where('seller_id', $user_id)->where('id', $request->order_id)->first();
+        if (!$orderDetails) {
+            return response()->error(['message' => __('Order not found or unauthorized')]);
+        }
         //todo: check order payment status paid or completed
         if ($orderDetails->payment_status === 'complete') {
             //todo: if order status is completed then save data in new database table , update order table total price and admin commission etc
@@ -950,7 +958,7 @@ class SellerController extends Controller
 
     public function orderDecline(Request $request)
     {
-        $find_order_id = Order::where('id', $request->order_id)->update([
+        $find_order_id = Order::where('id', $request->order_id)->where('seller_id', auth('sanctum')->id())->update([
             'status' => 5
         ]);
 
@@ -974,7 +982,16 @@ class SellerController extends Controller
         $request->validate([
             'id' => 'required|integer'
         ]);
-        ExtraService::find($request->id)->delete();
+        $seller_id = auth('sanctum')->id();
+        $extra = ExtraService::find($request->id);
+        if (!$extra) {
+            return response()->error(['message' => __('Extra service not found')]);
+        }
+        $order = Order::where('id', $extra->order_id)->where('seller_id', $seller_id)->first();
+        if (!$order) {
+            return response()->error(['message' => __('Unauthorized')]);
+        }
+        $extra->delete();
         return response()->success([
             'message' => 'Delete Success',
         ]);
@@ -983,6 +1000,10 @@ class SellerController extends Controller
     /* Extra Service list */
     public function extraServiceList($id)
     {
+        $order = Order::where('id', $id)->where('seller_id', auth('sanctum')->id())->first();
+        if (!$order) {
+            return response()->error(['message' => __('Order not found or unauthorized')]);
+        }
         $extra_service_list = ExtraService::where('order_id', $id)->get(['id', 'order_id', 'title', 'quantity', 'price', 'tax', 'sub_total', 'total']);
         return response()->success([
             'extra_service_list' => $extra_service_list,
@@ -997,9 +1018,14 @@ class SellerController extends Controller
                 'msg' => __('Please select both status and order id first.'),
             ]);
         }
-        $payment_status = Order::select('id', 'payment_status', 'status', 'email', 'name')->where('id', $request->order_id)->first();
-        $cancel_order_money_return = Order::select('id', 'cancel_order_money_return')->where('id', $request->order_id)->first();
-        if ($cancel_order_money_return->cancel_order_money_return === 1) {
+        $payment_status = Order::select('id', 'payment_status', 'status', 'email', 'name')->where('id', $request->order_id)->where('seller_id', auth('sanctum')->id())->first();
+        if (!$payment_status) {
+            return response()->error([
+                'msg' => __('Order not found or unauthorized.'),
+            ]);
+        }
+        $cancel_order_money_return = Order::select('id', 'cancel_order_money_return')->where('id', $request->order_id)->where('seller_id', auth('sanctum')->id())->first();
+        if ($cancel_order_money_return && $cancel_order_money_return->cancel_order_money_return === 1) {
             return response()->error([
                 'msg' => __('You can not change status because earlier you canceled the order'),
             ]);
@@ -1106,9 +1132,9 @@ class SellerController extends Controller
 
     public function codPaymentStatusChange(Request $request)
     {
-        $orderInfo = Order::where('id', $request->id)->first();
+        $orderInfo = Order::where('id', $request->id)->where('seller_id', auth('sanctum')->id())->first();
         if (is_null($orderInfo)) {
-            return response(['msg' => __("order not found")], 422);
+            return response(['msg' => __("order not found or unauthorized")], 422);
         }
         if ($orderInfo->payment_gateway === "cash_on_delivery") {
             $orderInfo->payment_status = "complete";
@@ -1122,12 +1148,9 @@ class SellerController extends Controller
                 $buyer_phone= User::select('phone')->where('id',$orderInfo->buyer_id)->first();
                 
                 //send sms to buyer
-                $buyer_phone=$buyer_phone->phone;
-                
-                $smsService->send_sms($buyer_phone,  $message_body_buyer);
-            
-          
-          //$smsService->send_sms($number,  $message_body_buyer);
+                if ($buyer_phone) {
+                    $smsService->send_sms($buyer_phone->phone, $message_body_buyer);
+                }
 
             $admins = Admin::all();
             $message_body_admin = __(" payment status changed to complete") . __('Order ID is:') . $request->id;
@@ -1147,9 +1170,9 @@ class SellerController extends Controller
 
     public function OrderStatusChange(Request $request)
     {
-        $orderInfo = Order::where('id', $request->id)->first();
+        $orderInfo = Order::where('id', $request->id)->where('seller_id', auth('sanctum')->id())->first();
         if (is_null($orderInfo)) {
-            return response(['msg' => __("order not found")], 422);
+            return response(['msg' => __("order not found or unauthorized")], 422);
         }
         $orderInfo->status = 4;
         $orderInfo->save();
@@ -1163,13 +1186,9 @@ class SellerController extends Controller
             $buyer_phone= User::select('phone')->where('id',$orderInfo->buyer_id)->first();
             
             //send sms to buyer
-            $buyer_phone=$buyer_phone->phone;
-            
- 
-            $smsService->send_sms($buyer_phone,  $message_body_buyer);
-        
-       
-      //$smsService->send_sms($number,  $message_body_buyer);
+            if ($buyer_phone) {
+                $smsService->send_sms($buyer_phone->phone, $message_body_buyer);
+            }
 
         $admins = Admin::all();
         $message_body_admin = __(" order status changed to complete") . __('Order ID is:') . $request->id;
@@ -1178,13 +1197,13 @@ class SellerController extends Controller
                 $message_for_super_admin = $message_body_admin;
 
                  $smsService->send_sms($admin->phone,  $message_for_super_admin);
-             // $smsService->send_sms($number,  $message_for_super_admin);
+              // $smsService->send_sms($number,  $message_for_super_admin);
             }
         }
 
 
 
-        return response(['msg' => __("order status changed to cancel")], 500);
+        return response()->json(['msg' => __("order status changed to cancel")], 200);
     }
 
     public function availableDaysList()
@@ -1298,7 +1317,7 @@ class SellerController extends Controller
             ], 422);
         }
 
-        Schedule::find($request->id)->delete();
+        Schedule::where('id', $request->id)->where('seller_id', Auth::guard('sanctum')->user()->id)->delete();
 
         return response()->json([
             "message" => __('Day Delete Success---')
@@ -1358,9 +1377,8 @@ class SellerController extends Controller
             ], 422);
         }
 
-        Schedule::where('id', $request->up_id)->update([
+        Schedule::where('id', $request->up_id)->where('seller_id', Auth::guard('sanctum')->user()->id)->update([
             'day_id' => $request->day_id,
-            'seller_id' => Auth::guard('sanctum')->user()->id,
             'schedule' => $request->schedule,
         ]);
         return response()->json(["message" => __('Schedule Update Success---')]);

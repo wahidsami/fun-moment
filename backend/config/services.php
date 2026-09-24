@@ -49,4 +49,8 @@ return [
         'redirect' => env('GOOGLE_CALLBACK_URL')
     ],
 
+    'resend' => [
+        'key' => env('RESEND_API_KEY'),
+    ],
+
 ];

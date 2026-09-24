@@ -36,7 +36,16 @@ class BookConfirmationService with ChangeNotifier {
   includedTotalPrice(List includedList) {
     var total = 0.0;
     for (int i = 0; i < includedList.length; i++) {
-      total = total + (includedList[i]['price'] * includedList[i]['qty']);
+      final item = includedList[i];
+      if (item is Map) {
+        final price = item['price'] is num
+            ? (item['price'] as num).toDouble()
+            : double.tryParse(item['price']?.toString() ?? '') ?? 0.0;
+        final qty = item['qty'] is num
+            ? (item['qty'] as num).toDouble()
+            : double.tryParse(item['qty']?.toString() ?? '') ?? 0.0;
+        total = total + (price * qty);
+      }
     }
     return total;
   }
@@ -44,8 +53,15 @@ class BookConfirmationService with ChangeNotifier {
   extrasTotalPrice(List extrasList) {
     var total = 0.0;
     for (int i = 0; i < extrasList.length; i++) {
-      if (extrasList[i]['selected'] == true) {
-        total = total + (extrasList[i]['price'] * extrasList[i]['qty']);
+      final item = extrasList[i];
+      if (item is Map && (item['selected'] == true || item['selected'] == 1 || item['selected'] == '1')) {
+        final price = item['price'] is num
+            ? (item['price'] as num).toDouble()
+            : double.tryParse(item['price']?.toString() ?? '') ?? 0.0;
+        final qty = item['qty'] is num
+            ? (item['qty'] as num).toDouble()
+            : double.tryParse(item['qty']?.toString() ?? '') ?? 0.0;
+        total = total + (price * qty);
       }
     }
     return total;
@@ -75,7 +91,10 @@ class BookConfirmationService with ChangeNotifier {
     List extrasList,
   ) {
     var subTotal = calculateSubtotal(includedList, extrasList);
-    taxPrice = (subTotal * taxPercent) / 100 ?? 0;
+    final parsedTax = taxPercent is num
+        ? (taxPercent as num).toDouble()
+        : double.tryParse(taxPercent?.toString() ?? '') ?? 0.0;
+    taxPrice = (subTotal * parsedTax) / 100;
 
     return taxPrice;
   }
@@ -94,20 +113,24 @@ class BookConfirmationService with ChangeNotifier {
       taxPercent, List includedList, List extrasList, BuildContext context) {
     var subTotal = calculateSubtotal(includedList, extrasList);
     var tax = calculateTax(taxPercent, includedList, extrasList);
-    totalPriceOnlineServiceAfterAllCalculation = subTotal +
-        tax +
-        Provider.of<PersonalizationService>(context, listen: false)
-            .defaultprice;
+    final defaultPrice = Provider.of<PersonalizationService>(context, listen: false).defaultprice;
+    final parsedDefaultPrice = defaultPrice is num
+        ? (defaultPrice as num).toDouble()
+        : double.tryParse(defaultPrice?.toString() ?? '') ?? 0.0;
+    totalPriceOnlineServiceAfterAllCalculation = subTotal + tax + parsedDefaultPrice;
     Future.delayed(const Duration(microseconds: 500), () {
       notifyListeners();
     });
   }
 
   caculateTotalAfterCouponApplied(couponDiscount) {
+    final parsedDiscount = couponDiscount is num
+        ? (couponDiscount as num).toDouble()
+        : double.tryParse(couponDiscount?.toString() ?? '') ?? 0.0;
     totalPriceAfterAllcalculation =
-        totalPriceAfterAllcalculation - couponDiscount;
+        totalPriceAfterAllcalculation - parsedDiscount;
     totalPriceOnlineServiceAfterAllCalculation =
-        totalPriceOnlineServiceAfterAllCalculation - couponDiscount;
+        totalPriceOnlineServiceAfterAllCalculation - parsedDiscount;
     notifyListeners();
   }
 }

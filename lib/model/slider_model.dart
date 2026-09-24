@@ -19,10 +19,26 @@ class SliderModel {
   List<ImageUrl> imageUrl;
 
   factory SliderModel.fromJson(Map<String, dynamic> json) => SliderModel(
-        sliderDetails: List<SliderDetail>.from(
-            json["slider-details"].map((x) => SliderDetail.fromJson(x))),
-        imageUrl: List<ImageUrl>.from(
-            json["image_url"].map((x) => ImageUrl.fromJson(x))),
+        sliderDetails: json["slider-details"] is List
+            ? (json["slider-details"] as List).map((x) {
+                if (x is Map<String, dynamic>) {
+                  return SliderDetail.fromJson(x);
+                } else if (x is Map) {
+                  return SliderDetail.fromJson(Map<String, dynamic>.from(x));
+                }
+                return SliderDetail();
+              }).toList()
+            : [],
+        imageUrl: json["image_url"] is List
+            ? (json["image_url"] as List).map((x) {
+                if (x is Map<String, dynamic>) {
+                  return ImageUrl.fromJson(x);
+                } else if (x is Map) {
+                  return ImageUrl.fromJson(Map<String, dynamic>.from(x));
+                }
+                return ImageUrl();
+              }).toList()
+            : [],
       );
 
   Map<String, dynamic> toJson() => {
@@ -46,9 +62,9 @@ class ImageUrl {
   dynamic imgAlt;
 
   factory ImageUrl.fromJson(Map<String, dynamic> json) => ImageUrl(
-        imageId: json["image_id"],
-        path: json["path"],
-        imgUrl: json["img_url"],
+        imageId: json["image_id"] == null ? null : int.tryParse(json["image_id"].toString()),
+        path: json["path"]?.toString(),
+        imgUrl: json["img_url"]?.toString(),
         imgAlt: json["img_alt"],
       );
 
@@ -72,9 +88,9 @@ class SliderDetail {
   String? subTitle;
 
   factory SliderDetail.fromJson(Map<String, dynamic> json) => SliderDetail(
-        backgroundImage: json["background_image"],
-        title: json["title"],
-        subTitle: json["sub_title"],
+        backgroundImage: json["background_image"]?.toString(),
+        title: json["title"]?.toString(),
+        subTitle: json["sub_title"]?.toString(),
       );
 
   Map<String, dynamic> toJson() => {

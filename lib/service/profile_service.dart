@@ -29,6 +29,7 @@ class ProfileService with ChangeNotifier {
     profileDetails = null;
     profileImage = null;
     ordersList = [0, 0, 0, 0];
+    _cachedUserType = null;
     notifyListeners();
   }
 
@@ -71,9 +72,13 @@ class ProfileService with ChangeNotifier {
 
     var response =
         await http.get(Uri.parse('$baseApi/user/profile'), headers: header);
-    if (response.statusCode == 201) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
       var data = ProfileModel.fromJson(jsonDecode(response.body));
       profileDetails = data;
+      if (data.userDetails.userType != null) {
+        _cachedUserType = data.userDetails.userType;
+        prefs.setInt('userType', data.userDetails.userType!);
+      }
 
       ordersList[0] = profileDetails.pendingOrder;
       ordersList[1] = profileDetails.activeOrder;
@@ -91,12 +96,35 @@ class ProfileService with ChangeNotifier {
       return true;
     } else {
       print(response.body);
-      profileDetails == 'error';
+      profileDetails = 'error';
       setLoadingFalse();
-      // OthersHelper().showToast('Something went wrong', Colors.black);
       notifyListeners();
 
       return false;
     }
+  }
+
+  int? _cachedUserType;
+
+  Future<void> initUserType() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    _cachedUserType = prefs.getInt('userType');
+    notifyListeners();
+  }
+
+  bool get isSeller {
+    if (profileDetails is ProfileModel) {
+      return (profileDetails as ProfileModel).userDetails.userType == 0;
+    }
+    return _cachedUserType == 0;
+  }
+
+  bool get isBuyer => !isSeller;
+
+  int? get userType {
+    if (profileDetails is ProfileModel) {
+      return (profileDetails as ProfileModel).userDetails.userType;
+    }
+    return _cachedUserType;
   }
 }

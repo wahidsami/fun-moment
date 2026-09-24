@@ -18,7 +18,8 @@ class EmailVerifyPage extends StatefulWidget {
       required this.token,
       required this.userId,
       required this.state,
-      required this.countryId})
+      required this.countryId,
+      this.userType = 1})
       : super(key: key);
 
   final email;
@@ -26,6 +27,7 @@ class EmailVerifyPage extends StatefulWidget {
   final userId;
   final state;
   final countryId;
+  final int userType;
 
   @override
   _EmailVerifyPageState createState() => _EmailVerifyPageState();
@@ -111,7 +113,8 @@ class _EmailVerifyPageState extends State<EmailVerifyPage> {
                           widget.token,
                           widget.userId,
                           widget.state,
-                          widget.countryId);
+                          widget.countryId,
+                          userType: widget.userType);
                     },
                     onChanged: (value) {
                       // setState(() {

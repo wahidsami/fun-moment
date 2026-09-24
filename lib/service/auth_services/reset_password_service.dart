@@ -62,8 +62,13 @@ class ResetPasswordService with ChangeNotifier {
         }
         setLoadingFalse();
       } else {
-        OthersHelper()
-            .showToast(jsonDecode(response.body)['message'], Colors.black);
+        try {
+          final res = jsonDecode(response.body);
+          final msg = res['message'] ?? res['msg'] ?? 'Failed to send OTP code';
+          OthersHelper().showToast(msg.toString(), Colors.black);
+        } catch (_) {
+          OthersHelper().showToast('Failed to send OTP code (${response.statusCode})', Colors.black);
+        }
         setLoadingFalse();
       }
     }
@@ -114,8 +119,13 @@ class ResetPasswordService with ChangeNotifier {
             ),
           );
         } else {
-          OthersHelper()
-              .showToast(jsonDecode(response.body)['message'], Colors.black);
+          try {
+            final res = jsonDecode(response.body);
+            final msg = res['message'] ?? res['msg'] ?? 'Password reset failed';
+            OthersHelper().showToast(msg.toString(), Colors.black);
+          } catch (_) {
+            OthersHelper().showToast('Password reset failed (${response.statusCode})', Colors.black);
+          }
           setLoadingFalse();
         }
       }

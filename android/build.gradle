@@ -1,14 +1,8 @@
 buildscript {
-    ext.kotlin_version = '1.8.21'
+    ext.kotlin_version = '2.1.20'
     repositories {
         google()
         mavenCentral()
-    }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:7.4.1'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath 'com.google.gms:google-services:4.3.14'
     }
 }
 
@@ -24,7 +18,41 @@ subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
 subprojects {
+    project.afterEvaluate {
+        if (project.name == 'pusher_channels_flutter') {
+            project.android {
+                compileSdkVersion 35
+            }
+        }
+    }
+}
+subprojects {
     project.evaluationDependsOn(':app')
+}
+subprojects {
+    project.plugins.withId('com.android.library') {
+        if (project.name == 'firebase_core') {
+            project.android {
+                namespace 'io.flutter.plugins.firebase.core'
+            }
+        } else if (project.name == 'just_audio') {
+            project.android {
+                namespace 'com.ryanheise.just_audio'
+            }
+        } else if (project.name == 'pusher_beams_android') {
+            project.android {
+                namespace 'com.pusher.pusher_beams'
+            }
+        } else if (project.name == 'wakelock') {
+            project.android {
+                namespace 'creativemaybeno.wakelock'
+            }
+        } else if (project.name == 'pusher_channels_flutter') {
+            project.android {
+                namespace 'com.pusher.channels_flutter'
+            }
+        }
+    }
 }
 
 tasks.register("clean", Delete) {

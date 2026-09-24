@@ -96,7 +96,7 @@ class ServiceByCategoryService with ChangeNotifier {
               j < data.allServices.data[i].reviewsForMobile.length;
               j++) {
             totalRating = totalRating +
-                data.allServices.data[i].reviewsForMobile[j].rating!.toInt();
+                (data.allServices.data[i].reviewsForMobile[j].rating?.toInt() ?? 0);
           }
           double averageRate = 0;
 

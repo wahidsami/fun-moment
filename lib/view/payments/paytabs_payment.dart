@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_print, prefer_typing_uninitialized_variables, must_be_immutable
+// ignore_for_file: avoid_print, prefer_typing_uninitialized_variables
 
 import 'dart:async';
 import 'dart:convert';
@@ -15,8 +15,8 @@ import 'package:http/http.dart' as http;
 import '../../service/rtl_service.dart';
 import '../utils/common_helper.dart';
 
-class PayTabsPayment extends StatelessWidget {
-  PayTabsPayment(
+class PayTabsPayment extends StatefulWidget {
+  const PayTabsPayment(
       {Key? key,
       required this.amount,
       required this.name,
@@ -38,7 +38,21 @@ class PayTabsPayment extends StatelessWidget {
   final isFromOrderExtraAccept;
   final isFromWalletDeposite;
 
+  @override
+  State<PayTabsPayment> createState() => _PayTabsPaymentState();
+}
+
+class _PayTabsPaymentState extends State<PayTabsPayment> {
   String? url;
+  bool _isProcessed = false;
+
+  void _handleFailure() {
+    if (_isProcessed) return;
+    _isProcessed = true;
+    Provider.of<PlaceOrderService>(context, listen: false)
+        .doNext(context, 'failed', paymentFailed: true);
+  }
+
   @override
   Widget build(BuildContext context) {
     Future.delayed(const Duration(microseconds: 600), () {
@@ -47,13 +61,11 @@ class PayTabsPayment extends StatelessWidget {
 
     return Scaffold(
       appBar: CommonHelper().appbarCommon('PayTabs', context, () {
-        Provider.of<PlaceOrderService>(context, listen: false)
-            .doNext(context, 'failed', paymentFailed: true);
+        _handleFailure();
       }),
       body: WillPopScope(
         onWillPop: () async {
-          await Provider.of<PlaceOrderService>(context, listen: false)
-              .doNext(context, 'failed', paymentFailed: true);
+          _handleFailure();
           return false;
         },
         child: FutureBuilder(
@@ -62,67 +74,61 @@ class PayTabsPayment extends StatelessWidget {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
-              if (snapshot.hasData) {
+              if (snapshot.hasData || snapshot.hasError || url == null) {
                 return const Center(
-                  child: Text('Loding failed.'),
+                  child: Text('Loading failed.'),
                 );
               }
-              if (snapshot.hasError) {
-                print(snapshot.error);
-                return const Center(
-                  child: Text('Loding failed.'),
-                );
-              }
-              return WebView(
-                // onWebViewCreated: ((controller) {
-                //   _controller = controller;
-                // }),
-                onWebResourceError: (error) {
-                  Provider.of<PlaceOrderService>(context, listen: false)
-                      .doNext(context, 'failed', paymentFailed: true);
-                },
-                initialUrl: url,
-                javascriptMode: JavascriptMode.unrestricted,
+              final controller = WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..setNavigationDelegate(
+                  NavigationDelegate(
+                    onWebResourceError: (error) {
+                      _handleFailure();
+                    },
+                    onPageFinished: (value) async {},
+                    onPageStarted: (value) async {
+                      if (!value.contains('result')) {
+                        return;
+                      }
+                      if (_isProcessed) return;
+                      bool paySuccess = await verifyPayment(value);
 
-                onPageFinished: (value) async {},
-                onPageStarted: (value) async {
-                  if (!value.contains('result')) {
-                    return;
-                  }
-                  bool paySuccess = await verifyPayment(value);
+                      if (_isProcessed) return;
 
-                  if (paySuccess) {
-                    if (isFromOrderExtraAccept == true) {
-                      await Provider.of<OrderDetailsService>(context,
-                              listen: false)
-                          .acceptOrderExtra(context);
-                    } else if (isFromWalletDeposite) {
-                      await Provider.of<WalletService>(context, listen: false)
-                          .makeDepositeToWalletSuccess(context);
-                    } else if (isFromHireJob) {
-                      Provider.of<JobRequestService>(context, listen: false)
-                          .goToJobSuccessPage(context);
-                    } else {
-                      await Provider.of<PlaceOrderService>(context,
-                              listen: false)
-                          .makePaymentSuccess(context);
-                    }
-                    return;
-                  }
-                  await Provider.of<PlaceOrderService>(context, listen: false)
-                      .doNext(context, 'failed', paymentFailed: true);
-                },
-                navigationDelegate: (navRequest) async {
-                  return NavigationDecision.navigate;
-                },
-              );
+                      if (paySuccess) {
+                        _isProcessed = true;
+                        if (widget.isFromOrderExtraAccept == true) {
+                          await Provider.of<OrderDetailsService>(context,
+                                  listen: false)
+                              .acceptOrderExtra(context);
+                        } else if (widget.isFromWalletDeposite) {
+                          await Provider.of<WalletService>(context,
+                                  listen: false)
+                              .makeDepositeToWalletSuccess(context);
+                        } else if (widget.isFromHireJob) {
+                          Provider.of<JobRequestService>(context,
+                                  listen: false)
+                              .goToJobSuccessPage(context);
+                        } else {
+                          await Provider.of<PlaceOrderService>(context,
+                                  listen: false)
+                              .makePaymentSuccess(context);
+                        }
+                        return;
+                      }
+                      _handleFailure();
+                    },
+                    onNavigationRequest: (navRequest) async {
+                      return NavigationDecision.navigate;
+                    },
+                  ),
+                )
+                ..loadRequest(Uri.parse(url!));
+              return WebViewWidget(controller: controller);
             }),
       ),
     );
-  }
-
-  static String encodeToBase64(String data) {
-    return base64.encode(utf8.encode(data));
   }
 
   waitForIt(BuildContext context) async {
@@ -135,37 +141,41 @@ class PayTabsPayment extends StatelessWidget {
     final currencyCode =
         Provider.of<RtlService>(context, listen: false).currencyCode;
 
-    final url = Uri.parse('https://secure.paytabs.sa/payment/request');
+    final requestUrl = Uri.parse('https://secure.paytabs.sa/payment/request');
     final header = {
       "Content-Type": "application/json",
       "Authorization": serverkey,
     };
-    final response = await http.post(url,
+    final response = await http.post(requestUrl,
         headers: header,
         body: json.encode({
-          "profile_id": int.parse(profileId),
+          "profile_id": int.tryParse(profileId) ?? 0,
           "tran_type": "sale",
           "tran_class": "ecom",
-          "cart_id": orderId.toString(),
+          "cart_id": widget.orderId.toString(),
           "cart_description": "Fun Moments payment",
           "cart_currency": currencyCode,
-          "cart_amount": amount,
+          "cart_amount": widget.amount,
         }));
 
-    print(response.body);
     if (response.statusCode == 200) {
-      this.url = jsonDecode(response.body)['redirect_url'];
-      print(this.url);
-      return;
+      final resBody = jsonDecode(response.body);
+      if (resBody is Map && resBody['redirect_url'] != null) {
+        url = resBody['redirect_url'];
+        return;
+      }
     }
 
     return true;
   }
 
-  Future<bool> verifyPayment(String url) async {
-    final uri = Uri.parse(url);
-    final response = await http.get(uri);
-    print(response.body.contains('successful'));
-    return response.body.contains('successful');
+  Future<bool> verifyPayment(String resultUrl) async {
+    try {
+      final uri = Uri.parse(resultUrl);
+      final response = await http.get(uri);
+      return response.body.contains('successful');
+    } catch (_) {
+      return false;
+    }
   }
 }

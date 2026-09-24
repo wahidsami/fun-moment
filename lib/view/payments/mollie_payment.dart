@@ -77,66 +77,73 @@ class MolliePayment extends StatelessWidget {
                   child: Text('Loding failed.'),
                 );
               }
-              return WebView(
-                initialUrl: url,
-                javascriptMode: JavascriptMode.unrestricted,
-                onPageStarted: (value) async {
-                  var redirectUrl = successUrl;
+              final controller = WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..setNavigationDelegate(
+                  NavigationDelegate(
+                    onPageStarted: (value) async {
+                      var redirectUrl = successUrl;
 
-                  if (value.contains(redirectUrl)) {
-                    String status = await verifyPayment(context);
-                    if (status == 'paid') {
-                      if (isFromOrderExtraAccept == true) {
-                        Provider.of<OrderDetailsService>(context, listen: false)
-                            .acceptOrderExtra(context);
-                      } else if (isFromWalletDeposite) {
-                        Provider.of<WalletService>(context, listen: false)
-                            .makeDepositeToWalletSuccess(context);
-                      } else if (isFromHireJob) {
-                        Provider.of<JobRequestService>(context, listen: false)
-                            .goToJobSuccessPage(context);
-                      } else {
-                        Provider.of<PlaceOrderService>(context, listen: false)
-                            .makePaymentSuccess(context);
+                      if (value.contains(redirectUrl)) {
+                        String status = await verifyPayment(context);
+                        if (status == 'paid') {
+                          if (isFromOrderExtraAccept == true) {
+                            Provider.of<OrderDetailsService>(context,
+                                    listen: false)
+                                .acceptOrderExtra(context);
+                          } else if (isFromWalletDeposite) {
+                            Provider.of<WalletService>(context, listen: false)
+                                .makeDepositeToWalletSuccess(context);
+                          } else if (isFromHireJob) {
+                            Provider.of<JobRequestService>(context,
+                                    listen: false)
+                                .goToJobSuccessPage(context);
+                          } else {
+                            Provider.of<PlaceOrderService>(context,
+                                    listen: false)
+                                .makePaymentSuccess(context);
+                          }
+                        }
+                        if (status == 'open') {
+                          await showDialog(
+                              context: context,
+                              builder: (ctx) {
+                                return AlertDialog(
+                                  title: Text(lnProvider
+                                      .getString('Payment cancelled!')),
+                                  content: Text(lnProvider.getString(
+                                      'Payment has been cancelled.')),
+                                );
+                              });
+                        }
+                        if (status == 'failed') {
+                          await showDialog(
+                              context: context,
+                              builder: (ctx) {
+                                return AlertDialog(
+                                  title: Text(lnProvider
+                                      .getString('Payment failed!')),
+                                );
+                              });
+                        }
+                        if (status == 'expired') {
+                          await showDialog(
+                              context: context,
+                              builder: (ctx) {
+                                return AlertDialog(
+                                  title: Text(lnProvider
+                                      .getString('Payment failed!')),
+                                  content: Text(lnProvider
+                                      .getString('Payment has been expired.')),
+                                );
+                              });
+                        }
                       }
-                    }
-                    if (status == 'open') {
-                      await showDialog(
-                          context: context,
-                          builder: (ctx) {
-                            return AlertDialog(
-                              title: Text(
-                                  lnProvider.getString('Payment cancelled!')),
-                              content: Text(lnProvider
-                                  .getString('Payment has been cancelled.')),
-                            );
-                          });
-                    }
-                    if (status == 'failed') {
-                      await showDialog(
-                          context: context,
-                          builder: (ctx) {
-                            return AlertDialog(
-                              title:
-                                  Text(lnProvider.getString('Payment failed!')),
-                            );
-                          });
-                    }
-                    if (status == 'expired') {
-                      await showDialog(
-                          context: context,
-                          builder: (ctx) {
-                            return AlertDialog(
-                              title:
-                                  Text(lnProvider.getString('Payment failed!')),
-                              content: Text(lnProvider
-                                  .getString('Payment has been expired.')),
-                            );
-                          });
-                    }
-                  }
-                },
-              );
+                    },
+                  ),
+                )
+                ..loadRequest(Uri.parse(url!));
+              return WebViewWidget(controller: controller);
             }),
       ),
     );

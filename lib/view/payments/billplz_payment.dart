@@ -37,7 +37,6 @@ class BillplzPayment extends StatelessWidget {
   final isFromHireJob;
 
   String? url;
-  late WebViewController _controller;
   @override
   Widget build(BuildContext context) {
     Future.delayed(const Duration(microseconds: 600), () {
@@ -74,34 +73,26 @@ class BillplzPayment extends StatelessWidget {
                   child: Text('Loding failed.'),
                 );
               }
-              return WebView(
-                // onWebViewCreated: ((controller) {
-                //   _controller = controller;
-                // }),
-                onWebResourceError: (error) =>
-                    Provider.of<PlaceOrderService>(context, listen: false)
-                        .doNext(context, 'failed', paymentFailed: true),
-                initialUrl: url,
-                javascriptMode: JavascriptMode.unrestricted,
-                onPageFinished: (value) async {
-                  verifyPayment(value, context, isFromOrderExtraAccept,
-                      isFromWalletDeposite, isFromHireJob);
-                },
-              );
+              final controller = WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..setNavigationDelegate(
+                  NavigationDelegate(
+                    onWebResourceError: (error) =>
+                        Provider.of<PlaceOrderService>(context, listen: false)
+                            .doNext(context, 'failed', paymentFailed: true),
+                    onPageFinished: (value) async {
+                      verifyPayment(value, context, isFromOrderExtraAccept,
+                          isFromWalletDeposite, isFromHireJob);
+                    },
+                  ),
+                )
+                ..loadRequest(Uri.parse(url!));
+              return WebViewWidget(controller: controller);
             }),
       ),
     );
   }
 
-  JavascriptChannel _extractDataJSChannel(BuildContext context) {
-    return JavascriptChannel(
-      name: 'Flutter',
-      onMessageReceived: (JavascriptMessage message) {
-        String pageBody = message.message;
-        print('page body: $pageBody');
-      },
-    );
-  }
 
   waitForIt(BuildContext context) async {
     // String orderId =

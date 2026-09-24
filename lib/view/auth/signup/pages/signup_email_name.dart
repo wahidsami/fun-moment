@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/auth_services/signup_service.dart';
 import 'package:funmoments/theme/fun_moment_components.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/auth/signup/components/email_name_fields.dart';
 import 'package:funmoments/view/auth/signup/signup_helper.dart';
 
@@ -33,6 +34,100 @@ class _SignupEmailNameState extends State<SignupEmailName> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Consumer<SignupService>(
+              builder: (context, provider, child) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    asProvider.getString("What would you like to do?"),
+                    style: const TextStyle(
+                      color: FMColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => provider.setUserType(1),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: provider.selectedUserType == 1 ? FMColors.magenta.withOpacity(0.15) : FMColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: provider.selectedUserType == 1 ? FMColors.magenta : FMColors.border,
+                                width: provider.selectedUserType == 1 ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.shopping_bag_outlined,
+                                  color: provider.selectedUserType == 1 ? FMColors.magenta : FMColors.textMuted,
+                                  size: 22,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  asProvider.getString("Book services"),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: provider.selectedUserType == 1 ? FMColors.textPrimary : FMColors.textMuted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => provider.setUserType(0),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: provider.selectedUserType == 0 ? FMColors.cyan.withOpacity(0.15) : FMColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: provider.selectedUserType == 0 ? FMColors.cyan : FMColors.border,
+                                width: provider.selectedUserType == 0 ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.storefront_outlined,
+                                  color: provider.selectedUserType == 0 ? FMColors.cyan : FMColors.textMuted,
+                                  size: 22,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  asProvider.getString("Offer my services"),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: provider.selectedUserType == 0 ? FMColors.textPrimary : FMColors.textMuted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
             EmailNameFields(
               emailController: widget.emailController,
               fullNameController: widget.fullNameController,

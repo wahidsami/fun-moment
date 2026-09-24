@@ -1,0 +1,261 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:funmoments/service/app_string_service.dart';
+import 'package:funmoments/service/provider_service_management_service.dart';
+import 'package:funmoments/service/rtl_service.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
+import 'package:funmoments/view/provider/provider_add_service_page.dart';
+import 'package:funmoments/view/utils/common_helper.dart';
+
+class ProviderServicesPage extends StatefulWidget {
+  const ProviderServicesPage({Key? key}) : super(key: key);
+
+  @override
+  State<ProviderServicesPage> createState() => _ProviderServicesPageState();
+}
+
+class _ProviderServicesPageState extends State<ProviderServicesPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<ProviderServiceManagementService>(context, listen: false)
+          .fetchMyServices();
+    });
+  }
+
+  void _confirmDelete(BuildContext context, int serviceId, String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: FMColors.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Service', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to delete "$title"?', style: const TextStyle(color: FMColors.textMuted)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: FMColors.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await Provider.of<ProviderServiceManagementService>(context, listen: false)
+                  .deleteService(serviceId, context);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lnProvider = Provider.of<AppStringService>(context);
+    final rtl = Provider.of<RtlService>(context);
+
+    return Scaffold(
+      backgroundColor: FMColors.background,
+      appBar: AppBar(
+        title: Text(
+          lnProvider.getString('My Services'),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        backgroundColor: FMColors.surfaceDark,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline, color: FMColors.magenta),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProviderAddServicePage()),
+              );
+            },
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: FMColors.magenta,
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProviderAddServicePage()),
+          );
+        },
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: Text(
+          lnProvider.getString('Add Service'),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: Consumer<ProviderServiceManagementService>(
+        builder: (context, provider, child) {
+          if (provider.isLoading && provider.services.isEmpty) {
+            return const Center(child: CircularProgressIndicator(color: FMColors.magenta));
+          }
+
+          if (provider.services.isEmpty) {
+            return RefreshIndicator(
+              color: FMColors.magenta,
+              onRefresh: () => provider.fetchMyServices(isRefresh: true),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                  const Center(
+                    child: Icon(Icons.miscellaneous_services_outlined, size: 64, color: FMColors.textMuted),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(
+                      lnProvider.getString('No service found'),
+                      style: const TextStyle(color: FMColors.textMuted, fontSize: 16),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: FMColors.magenta,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ProviderAddServicePage()),
+                        );
+                      },
+                      icon: const Icon(Icons.add, color: Colors.white),
+                      label: Text(lnProvider.getString('Create First Service'), style: const TextStyle(color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            color: FMColors.magenta,
+            onRefresh: () => provider.fetchMyServices(isRefresh: true),
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              itemCount: provider.services.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final service = provider.services[index];
+                final isOn = service.isServiceOn == 1;
+
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: FMColors.surfaceDark,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: FMColors.border.withOpacity(0.6)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Thumbnail
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: service.imageUrl != null && service.imageUrl!.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: service.imageUrl!,
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => Container(color: Colors.black26),
+                                errorWidget: (_, __, ___) => Container(
+                                  width: 80,
+                                  height: 80,
+                                  color: Colors.black26,
+                                  child: const Icon(Icons.image_not_supported, color: FMColors.textMuted),
+                                ),
+                              )
+                            : Container(
+                                width: 80,
+                                height: 80,
+                                color: Colors.black26,
+                                child: const Icon(Icons.business_center, color: FMColors.textMuted),
+                              ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              service.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '${rtl.currency}${service.price}',
+                              style: const TextStyle(
+                                color: FMColors.magenta,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Icon(Icons.visibility_outlined, size: 14, color: FMColors.textMuted),
+                                const SizedBox(width: 4),
+                                Text('${service.view ?? 0}', style: const TextStyle(color: FMColors.textMuted, fontSize: 12)),
+                                const SizedBox(width: 12),
+                                Icon(Icons.shopping_bag_outlined, size: 14, color: FMColors.textMuted),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${service.completeOrderCount ?? 0} done',
+                                  style: const TextStyle(color: FMColors.textMuted, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Actions: Active Switch & Delete
+                      Column(
+                        children: [
+                          Switch(
+                            value: isOn,
+                            activeColor: FMColors.magenta,
+                            onChanged: (_) {
+                              provider.toggleServiceStatus(service.id);
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                            onPressed: () => _confirmDelete(context, service.id, service.title),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}

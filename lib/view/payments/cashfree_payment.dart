@@ -39,7 +39,6 @@ class CashfreePayment extends StatelessWidget {
   final isFromHireJob;
 
   String? html;
-  late WebViewController _controller;
   @override
   Widget build(BuildContext context) {
     Future.delayed(const Duration(microseconds: 600), () {
@@ -74,77 +73,55 @@ class CashfreePayment extends StatelessWidget {
                   child: Text('Loding failed.'),
                 );
               }
-              return WebView(
-                onWebViewCreated: (controller) {
-                  _controller = controller;
-                  controller.loadHtmlString(html ?? "payment failed");
-                },
-                onWebResourceError: (error) {
-                  showDialog(
-                      context: context,
-                      builder: (ctx) {
-                        return const AlertDialog(
-                          title: Text('Loading failed!'),
-                          content: Text('Failed to load payment page.'),
-                        );
-                      });
+              final controller = WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..setNavigationDelegate(
+                  NavigationDelegate(
+                    onWebResourceError: (error) {
+                      showDialog(
+                          context: context,
+                          builder: (ctx) {
+                            return const AlertDialog(
+                              title: Text('Loading failed!'),
+                              content: Text('Failed to load payment page.'),
+                            );
+                          });
 
-                  Navigator.pop(context);
-                },
-                initialUrl: baseApi.replaceAll("/api/v1", ""),
-                javascriptMode: JavascriptMode.unrestricted,
-                // onPageFinished: (value) async {
-                //   if (value.contains('finish')) {
-                //     bool paySuccess = await verifyPayment(value);
-                //     if (paySuccess) {
-                //       if (isFromOrderExtraAccept == true) {
-                //         await Provider.of<OrderDetailsService>(context,
-                //                 listen: false)
-                //             .acceptOrderExtra(context);
-                //       } else if (isFromWalletDeposite) {
-                //         await Provider.of<WalletService>(context, listen: false)
-                //             .makeDepositeToWalletSuccess(context);
-                //       } else if (isFromHireJob) {
-                //         Provider.of<JobRequestService>(context, listen: false)
-                //             .goToJobSuccessPage(context);
-                //       } else {
-                //         await Provider.of<PlaceOrderService>(context,
-                //                 listen: false)
-                //             .makePaymentSuccess(context);
-                //       }
-                //       return;
-                //     }
-                //     await Provider.of<PlaceOrderService>(context, listen: false)
-                //         .doNext(context, 'failed', paymentFailed: true);
-                //   }
-                // },
-                navigationDelegate: (navigation) async {
-                  if (navigation.url.contains("success")) {
-                    if (isFromOrderExtraAccept == true) {
-                      await Provider.of<OrderDetailsService>(context,
-                              listen: false)
-                          .acceptOrderExtra(context);
-                    } else if (isFromWalletDeposite) {
-                      await Provider.of<WalletService>(context, listen: false)
-                          .makeDepositeToWalletSuccess(context);
-                    } else if (isFromHireJob) {
-                      Provider.of<JobRequestService>(context, listen: false)
-                          .goToJobSuccessPage(context);
-                    } else {
-                      await Provider.of<PlaceOrderService>(context,
-                              listen: false)
-                          .makePaymentSuccess(context);
-                    }
-                    return NavigationDecision.prevent;
-                  }
-                  if (navigation.url.contains("failed")) {
-                    await Provider.of<PlaceOrderService>(context, listen: false)
-                        .doNext(context, 'failed', paymentFailed: true);
-                    return NavigationDecision.prevent;
-                  }
-                  return NavigationDecision.navigate;
-                },
-              );
+                      Navigator.pop(context);
+                    },
+                    onNavigationRequest: (navigation) async {
+                      if (navigation.url.contains("success")) {
+                        if (isFromOrderExtraAccept == true) {
+                          await Provider.of<OrderDetailsService>(context,
+                                  listen: false)
+                              .acceptOrderExtra(context);
+                        } else if (isFromWalletDeposite) {
+                          await Provider.of<WalletService>(context,
+                                  listen: false)
+                              .makeDepositeToWalletSuccess(context);
+                        } else if (isFromHireJob) {
+                          Provider.of<JobRequestService>(context, listen: false)
+                              .goToJobSuccessPage(context);
+                        } else {
+                          await Provider.of<PlaceOrderService>(context,
+                                  listen: false)
+                              .makePaymentSuccess(context);
+                        }
+                        return NavigationDecision.prevent;
+                      }
+                      if (navigation.url.contains("failed")) {
+                        await Provider.of<PlaceOrderService>(context,
+                                listen: false)
+                            .doNext(context, 'failed', paymentFailed: true);
+                        return NavigationDecision.prevent;
+                      }
+                      return NavigationDecision.navigate;
+                    },
+                  ),
+                )
+                ..loadHtmlString(html ?? "payment failed",
+                    baseUrl: baseApi.replaceAll("/api/v1", ""));
+              return WebViewWidget(controller: controller);
             }),
       ),
     );

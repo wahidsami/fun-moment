@@ -101,7 +101,7 @@ class TopAllServicesService with ChangeNotifier {
               j < data.topServices.data[i].reviewsForMobile.length;
               j++) {
             totalRating = totalRating +
-                data.topServices.data[i].reviewsForMobile[j].rating!.toInt();
+                (data.topServices.data[i].reviewsForMobile[j].rating?.toInt() ?? 0);
           }
           double averageRate = 0;
 

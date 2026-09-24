@@ -76,7 +76,7 @@ class SellerAllServicesService with ChangeNotifier {
               j < data.services.data[i].reviewsForMobile.length;
               j++) {
             totalRating = totalRating +
-                data.services.data[i].reviewsForMobile[j].rating!.toInt();
+                (data.services.data[i].reviewsForMobile[j].rating?.toInt() ?? 0);
           }
           double averageRate = 0;
 

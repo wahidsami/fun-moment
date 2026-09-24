@@ -66,61 +66,65 @@ class SquareUpPayment extends StatelessWidget {
                 );
               }
               if (snapshot.hasData) {
-                return WebView(
-                  initialUrl: url,
-                  javascriptMode: JavascriptMode.unrestricted,
-                  navigationDelegate: (NavigationRequest request) async {
-                    print('navigation delegate link ' + request.url);
-                    if (request.url.contains('https://funmoments.sa')) {
-                      // String status = await verifyPayment(request.url);
-                      // if (status == 'paid') {
-                      //   await Provider.of<PlaceOrderService>(context, listen: false)
-                      //       .makePaymentSuccess(context);
-                      // }
-                      // if (status == 'open') {
-                      //   await showDialog(
-                      //       context: context,
-                      //       builder: (ctx) {
-                      //         return const AlertDialog(
-                      //           title: Text('Payment cancelled!'),
-                      //           content: Text('Payment has been cancelled.'),
-                      //         );
-                      //       });
-                      //   Navigator.pop(context);
-                      // }
-                      // if (status == 'failed') {
-                      //   await showDialog(
-                      //       context: context,
-                      //       builder: (ctx) {
-                      //         return const AlertDialog(
-                      //           title: Text('Payment failed!'),
-                      //         );
-                      //       });
-                      //   Navigator.pop(context);
-                      // }
-                      // if (status == 'expired') {
-                      //   await showDialog(
-                      //       context: context,
-                      //       builder: (ctx) {
-                      //         return const AlertDialog(
-                      //           title: Text('Payment failed!'),
-                      //           content: Text('Payment has been expired.'),
-                      //         );
-                      //       });
-                      //   Navigator.pop(context);
-                      // }
+                final controller = WebViewController()
+                  ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                  ..setNavigationDelegate(
+                    NavigationDelegate(
+                      onNavigationRequest: (NavigationRequest request) async {
+                        print('navigation delegate link ' + request.url);
+                        if (request.url.contains('https://funmoments.sa')) {
+                          // String status = await verifyPayment(request.url);
+                          // if (status == 'paid') {
+                          //   await Provider.of<PlaceOrderService>(context, listen: false)
+                          //       .makePaymentSuccess(context);
+                          // }
+                          // if (status == 'open') {
+                          //   await showDialog(
+                          //       context: context,
+                          //       builder: (ctx) {
+                          //         return const AlertDialog(
+                          //           title: Text('Payment cancelled!'),
+                          //           content: Text('Payment has been cancelled.'),
+                          //         );
+                          //       });
+                          //   Navigator.pop(context);
+                          // }
+                          // if (status == 'failed') {
+                          //   await showDialog(
+                          //       context: context,
+                          //       builder: (ctx) {
+                          //         return const AlertDialog(
+                          //           title: Text('Payment failed!'),
+                          //         );
+                          //       });
+                          //   Navigator.pop(context);
+                          // }
+                          // if (status == 'expired') {
+                          //   await showDialog(
+                          //       context: context,
+                          //       builder: (ctx) {
+                          //         return const AlertDialog(
+                          //           title: Text('Payment failed!'),
+                          //           content: Text('Payment has been expired.'),
+                          //         );
+                          //       });
+                          //   Navigator.pop(context);
+                          // }
 
-                      return NavigationDecision.prevent;
-                    }
-                    if (request.url.contains('https://pub.dev/')) {
-                      Provider.of<PlaceOrderService>(context, listen: false)
-                          .doNext(context, 'failed', paymentFailed: true);
+                          return NavigationDecision.prevent;
+                        }
+                        if (request.url.contains('https://pub.dev/')) {
+                          Provider.of<PlaceOrderService>(context, listen: false)
+                              .doNext(context, 'failed', paymentFailed: true);
 
-                      return NavigationDecision.prevent;
-                    }
-                    return NavigationDecision.navigate;
-                  },
-                );
+                          return NavigationDecision.prevent;
+                        }
+                        return NavigationDecision.navigate;
+                      },
+                    ),
+                  )
+                  ..loadRequest(Uri.parse(url!));
+                return WebViewWidget(controller: controller);
               } else {
                 return const Text('Something went wrong');
               }

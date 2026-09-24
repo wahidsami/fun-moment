@@ -41,5 +41,10 @@ class AppServiceProvider extends ServiceProvider
         }
 
         $this->loadViewsFrom(__DIR__.'/../PageBuilder/views','pagebuilder');
+
+        \Illuminate\Support\Facades\Mail::extend('resend', function (array $config = []) {
+            $apiKey = $config['key'] ?? config('services.resend.key') ?? env('RESEND_API_KEY', '');
+            return new \App\Mail\Transport\ResendTransport($apiKey);
+        });
     }
 }

@@ -29,9 +29,6 @@ class DescInHtml extends StatelessWidget {
       //   return null;
       // },
 
-      // turn on selectable if required (it's disabled by default)
-      isSelectable: true,
-
       // these callbacks are called when a complicated element is loading
       // or failed to render allowing the app to render progress indicator
       // and fallback widget
@@ -49,9 +46,6 @@ class DescInHtml extends StatelessWidget {
 
       // set the default styling for text
       textStyle: TextStyle(fontSize: 15),
-
-      // turn on `webView` if you need IFRAME support (it's disabled by default)
-      webView: true,
     );
   }
 }

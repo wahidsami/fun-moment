@@ -7,7 +7,7 @@ import 'package:funmoments/service/service_details_service.dart';
 import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/view/home/components/section_title.dart';
 import 'package:funmoments/view/home/components/service_card.dart';
-import 'package:funmoments/view/home/top_all_service_page.dart';
+import 'package:funmoments/view/services/all_services_page.dart';
 import 'package:funmoments/view/services/service_details_page.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 

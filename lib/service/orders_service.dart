@@ -121,8 +121,11 @@ class OrdersService with ChangeNotifier {
 
     print(response.statusCode);
 
-    if (response.statusCode == 404) {
-      OthersHelper().showToast(decodedData['msg'], Colors.black);
+    if (response.statusCode == 200 ||
+        response.statusCode == 201 ||
+        response.statusCode == 404) {
+      final msg = decodedData['msg'] ?? decodedData['message'] ?? 'Declined successfully';
+      OthersHelper().showToast(msg, Colors.black);
 
       await Provider.of<OrderDetailsService>(context, listen: false)
           .fetchOrderDetails(orderId, context, isFromOrderComplete: true);

@@ -1,6 +1,5 @@
 // ignore_for_file: avoid_print
 
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/booking_services/place_order_service.dart';
@@ -32,16 +31,60 @@ class ZitopayPaymentPage extends StatefulWidget {
 }
 
 class _ZitopayPaymentPageState extends State<ZitopayPaymentPage> {
-  @override
-  void initState() {
-    super.initState();
-    // Enable virtual display.
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) WebView.platform = AndroidWebView();
-  }
-
   bool alreadySuccessful = false;
 
   late WebViewController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) async {
+            if (request.url.contains('https://www.google.com/')) {
+              //if payment is success, then the page is refreshing twice.
+              //which is causing the screen pop twice.
+              //So, this alreadySuccess = true trick will prevent that
+              if (alreadySuccessful != true) {
+                print('payment success');
+                if (widget.isFromOrderExtraAccept == true) {
+                  await Provider.of<OrderDetailsService>(context,
+                          listen: false)
+                      .acceptOrderExtra(context);
+                } else if (widget.isFromWalletDeposite) {
+                  await Provider.of<WalletService>(context, listen: false)
+                      .makeDepositeToWalletSuccess(context);
+                } else if (widget.isFromHireJob) {
+                  Provider.of<JobRequestService>(context, listen: false)
+                      .goToJobSuccessPage(context);
+                } else {
+                  await Provider.of<PlaceOrderService>(context, listen: false)
+                      .makePaymentSuccess(context);
+                }
+              }
+
+              setState(() {
+                alreadySuccessful = true;
+              });
+
+              return NavigationDecision.prevent;
+            }
+            if (request.url.contains('https://pub.dev/')) {
+              print('payment failed');
+              Provider.of<PlaceOrderService>(context, listen: false)
+                  .doNext(context, 'failed', paymentFailed: true);
+
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(
+          "https://zitopay.africa/sci/?currency=XAF&amount=${widget.amount}&receiver=${widget.userName}&success_url=https%3A%2F%2Fwww.google.com%2F&cancel_url=https%3A%2F%2Fpub.dev"));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,52 +109,7 @@ class _ZitopayPaymentPageState extends State<ZitopayPaymentPage> {
             Provider.of<PlaceOrderService>(context, listen: false)
                 .doNext(context, 'failed', paymentFailed: true);
           }),
-          body: WebView(
-            javascriptMode: JavascriptMode.unrestricted,
-            initialUrl:
-                "https://zitopay.africa/sci/?currency=XAF&amount=${widget.amount}&receiver=${widget.userName}&success_url=https%3A%2F%2Fwww.google.com%2F&cancel_url=https%3A%2F%2Fpub.dev",
-            onWebViewCreated: (controller) {
-              this.controller = controller;
-            },
-            navigationDelegate: (NavigationRequest request) async {
-              if (request.url.contains('https://www.google.com/')) {
-                //if payment is success, then the page is refreshing twice.
-                //which is causing the screen pop twice.
-                //So, this alreadySuccess = true trick will prevent that
-                if (alreadySuccessful != true) {
-                  print('payment success');
-                  if (widget.isFromOrderExtraAccept == true) {
-                    await Provider.of<OrderDetailsService>(context,
-                            listen: false)
-                        .acceptOrderExtra(context);
-                  } else if (widget.isFromWalletDeposite) {
-                    await Provider.of<WalletService>(context, listen: false)
-                        .makeDepositeToWalletSuccess(context);
-                  } else if (widget.isFromHireJob) {
-                    Provider.of<JobRequestService>(context, listen: false)
-                        .goToJobSuccessPage(context);
-                  } else {
-                    await Provider.of<PlaceOrderService>(context, listen: false)
-                        .makePaymentSuccess(context);
-                  }
-                }
-
-                setState(() {
-                  alreadySuccessful = true;
-                });
-
-                return NavigationDecision.prevent;
-              }
-              if (request.url.contains('https://pub.dev/')) {
-                print('payment failed');
-                Provider.of<PlaceOrderService>(context, listen: false)
-                    .doNext(context, 'failed', paymentFailed: true);
-
-                return NavigationDecision.prevent;
-              }
-              return NavigationDecision.navigate;
-            },
-          ),
+          body: WebViewWidget(controller: controller),
         ),
       ),
     );

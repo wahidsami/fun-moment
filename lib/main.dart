@@ -13,7 +13,7 @@ import 'package:funmoments/service/auth_services/apple_sign_in_sevice.dart';
 import 'package:funmoments/service/auth_services/change_pass_service.dart';
 import 'package:funmoments/service/auth_services/delete_account_service.dart';
 import 'package:funmoments/service/auth_services/email_verify_service.dart';
-import 'package:funmoments/service/auth_services/facebook_login_service.dart';
+
 import 'package:funmoments/service/auth_services/google_sign_service.dart';
 import 'package:funmoments/service/auth_services/login_service.dart';
 import 'package:funmoments/service/auth_services/logout_service.dart';
@@ -67,6 +67,7 @@ import 'package:funmoments/service/support_ticket/create_ticket_service.dart';
 import 'package:funmoments/service/support_ticket/support_messages_service.dart';
 import 'package:funmoments/service/support_ticket/support_ticket_service.dart';
 import 'package:funmoments/service/wallet_service.dart';
+import 'package:funmoments/service/provider_service_management_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/home/homepage_helper.dart';
 import 'package:funmoments/view/intro/splash.dart';
@@ -101,7 +102,7 @@ void main() async {
       flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
 
-  await androidImplementation?.requestPermission();
+  await androidImplementation?.requestNotificationsPermission();
   await HomepageHelper().locationPermissionCheck();
 
   runApp(const MyApp());
@@ -153,7 +154,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SearchBarWithDropdownService()),
         ChangeNotifierProvider(create: (_) => MyOrdersService()),
         ChangeNotifierProvider(create: (_) => PlaceOrderService()),
-        ChangeNotifierProvider(create: (_) => FacebookLoginService()),
+
         ChangeNotifierProvider(create: (_) => SupportTicketService()),
         ChangeNotifierProvider(create: (_) => SupportMessagesService()),
         ChangeNotifierProvider(create: (_) => CreateTicketService()),
@@ -187,6 +188,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GoogleLocationSearch()),
         ChangeNotifierProvider(create: (_) => FilterServicesService()),
         ChangeNotifierProvider(create: (_) => FilterCategoryService()),
+        ChangeNotifierProvider(create: (_) => ProviderServiceManagementService()),
       ],
       child: Consumer<RtlService>(
         builder: (context, rtlProvider, child) {
