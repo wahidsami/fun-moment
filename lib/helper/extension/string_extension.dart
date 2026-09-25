@@ -102,7 +102,9 @@ extension CapitalizeWordsExtension on String {
 extension PasswordValidatorExtension on String {
   String? get validPass {
     String? value;
-    if (length < 8) {
+    if (isEmpty) {
+      value = 'Please enter your password'.tr();
+    } else if (length < 8) {
       value = 'Password should be at least 8 characters long'.tr();
     } else if (!RegExp(r'[A-Z]').hasMatch(this)) {
       value = 'Password should contain at least 1 uppercase letter'.tr();
@@ -110,7 +112,7 @@ extension PasswordValidatorExtension on String {
       value = 'Password should contain at least 1 lowercase letter'.tr();
     } else if (!RegExp(r'\d').hasMatch(this)) {
       value = 'Password should contain at least 1 digit'.tr();
-    } else if (!RegExp(r'[@$!%*?&]').hasMatch(this)) {
+    } else if (!RegExp(r'[^a-zA-Z0-9\s]').hasMatch(this)) {
       value = 'Password should contain at least 1 special character'.tr();
     }
     debugPrint(value.toString());

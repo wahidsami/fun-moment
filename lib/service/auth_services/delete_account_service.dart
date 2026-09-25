@@ -135,9 +135,19 @@ class DeleteAccountService with ChangeNotifier {
     }
   }
 
-  //clear saved email, pass and token
+  //clear saved auth session keys
   clear() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.clear();
+    await prefs.remove("email");
+    await prefs.remove("pass");
+    await prefs.remove("token");
+    await prefs.remove("userId");
+    await prefs.remove("userType");
+    await prefs.remove("state");
+    await prefs.remove("countryId");
+    await prefs.remove("keepLoggedIn");
+    await prefs.remove("googleLogin");
+    await prefs.remove("fbLogin");
+    await prefs.remove("appleLogin");
   }
 }

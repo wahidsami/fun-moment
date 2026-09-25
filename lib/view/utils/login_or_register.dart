@@ -7,6 +7,7 @@ import 'package:funmoments/view/utils/responsive.dart';
 import '../auth/login/login.dart';
 import '../utils/custom_button.dart';
 import 'common_helper.dart';
+import 'language_selector_sheet.dart';
 
 class LoginOrRegister extends StatelessWidget {
   const LoginOrRegister({Key? key}) : super(key: key);
@@ -64,7 +65,9 @@ class LoginOrRegister extends StatelessWidget {
                 context.toPage(const LoginPage(hasBackButton: true));
               },
               isLoading: false,
-              width: context.width / 2)
+              width: context.width / 2),
+          const SizedBox(height: 20),
+          const LanguageSwitchPill(),
         ],
       ),
     );

@@ -200,9 +200,14 @@ class MyApp extends StatelessWidget {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            supportedLocales: [
-              Locale(rtlProvider.langSlug.substring(0, 2)),
-              const Locale('en', "US")
+            locale: Locale(rtlProvider.langSlug.length >= 2
+                ? rtlProvider.langSlug.substring(0, 2)
+                : 'en'),
+            supportedLocales: const [
+              Locale('en', 'US'),
+              Locale('ar', 'SA'),
+              Locale('en'),
+              Locale('ar'),
             ],
             builder: (context, rtlchild) {
               return Consumer<RtlService>(

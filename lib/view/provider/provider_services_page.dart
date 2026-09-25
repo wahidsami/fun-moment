@@ -26,17 +26,18 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
   }
 
   void _confirmDelete(BuildContext context, int serviceId, String title) {
+    final lnProvider = Provider.of<AppStringService>(context, listen: false);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: FMColors.surfaceDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Service', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to delete "$title"?', style: const TextStyle(color: FMColors.textMuted)),
+        title: Text(lnProvider.getString('Delete Service'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text('${lnProvider.getString('Are you sure you want to delete')} "$title"?', style: const TextStyle(color: FMColors.textMuted)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: FMColors.textMuted)),
+            child: Text(lnProvider.getString('Cancel'), style: const TextStyle(color: FMColors.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -48,7 +49,7 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
               await Provider.of<ProviderServiceManagementService>(context, listen: false)
                   .deleteService(serviceId, context);
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            child: Text(lnProvider.getString('Delete'), style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),

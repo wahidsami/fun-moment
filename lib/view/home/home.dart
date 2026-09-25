@@ -4,10 +4,6 @@ import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/filter_services_service.dart';
 import 'package:funmoments/service/common_service.dart';
 import 'package:funmoments/service/home_services/slider_service.dart';
-import 'package:funmoments/service/home_services/category_service.dart';
-import 'package:funmoments/service/home_services/recent_services_service.dart';
-import 'package:funmoments/service/home_services/top_rated_services_service.dart';
-import 'package:funmoments/service/jobs_service/recent_jobs_service.dart';
 import 'package:funmoments/service/profile_service.dart';
 import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
@@ -19,6 +15,7 @@ import 'package:funmoments/view/home/components/slider_home.dart';
 import 'package:funmoments/view/home/components/top_rated_services.dart';
 import 'package:funmoments/view/home/homepage_helper.dart';
 import 'package:funmoments/view/search/service_filter_molde.dart';
+import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/constant_styles.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
@@ -55,6 +52,7 @@ class _HomepageState extends State<Homepage> {
 
   @override
   Widget build(BuildContext context) {
+    final cc = ConstantColors();
     return Scaffold(
       backgroundColor: FMColors.background,
       body: SafeArea(
@@ -146,7 +144,7 @@ class _HomepageState extends State<Homepage> {
                   builder: (context, provider, child) =>
                       provider.sliderImageList.isNotEmpty
                           ? SliderHome(
-                              cc: null,
+                              cc: cc,
                               sliderDetailsList: provider.sliderDetailsList,
                               sliderImageList: provider.sliderImageList,
                             )
@@ -164,16 +162,16 @@ class _HomepageState extends State<Homepage> {
                       ),
                       const SizedBox(height: 14),
                       Categories(
-                        cc: null,
+                        cc: cc,
                         asProvider: asProvider,
                       ),
                       const SizedBox(height: 20),
                       TopRatedServices(
-                        cc: null,
+                        cc: cc,
                         asProvider: asProvider,
                       ),
                       RecentServices(
-                        cc: null,
+                        cc: cc,
                         asProvider: asProvider,
                       ),
                       const SizedBox(height: 12),

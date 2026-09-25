@@ -6,6 +6,8 @@ import 'package:funmoments/helper/extension/context_extension.dart';
 import 'package:funmoments/service/common_service.dart';
 import 'package:funmoments/service/profile_service.dart';
 import 'package:funmoments/view/auth/login/login.dart';
+import 'package:funmoments/view/home/landing_page.dart';
+import 'package:funmoments/view/home/homepage_helper.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -70,9 +72,17 @@ class LogoutService with ChangeNotifier {
         Provider.of<ProfileService>(context, listen: false)
             .setEverythingToDefault();
 
-        clear();
+        await clear();
         setLoadingFalse();
-        context.popTrue;
+        HomepageHelper.tabIndex.value = 0;
+        Navigator.of(context, rootNavigator: true).pop();
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute<void>(
+            builder: (BuildContext context) => const LandingPage(),
+          ),
+          (route) => false,
+        );
       } else {
         print(response.body);
         OthersHelper().showToast('Something went wrong', Colors.black);
@@ -81,9 +91,19 @@ class LogoutService with ChangeNotifier {
     }
   }
 
-  //clear saved email, pass and token
+  //clear saved auth session keys
   clear() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.clear();
+    await prefs.remove("email");
+    await prefs.remove("pass");
+    await prefs.remove("token");
+    await prefs.remove("userId");
+    await prefs.remove("userType");
+    await prefs.remove("state");
+    await prefs.remove("countryId");
+    await prefs.remove("keepLoggedIn");
+    await prefs.remove("googleLogin");
+    await prefs.remove("fbLogin");
+    await prefs.remove("appleLogin");
   }
 }

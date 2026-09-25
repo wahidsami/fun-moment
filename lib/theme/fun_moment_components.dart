@@ -363,7 +363,7 @@ class _FMSkeletonBlockState extends State<FMSkeletonBlock>
 class FMNetworkImageFrame extends StatelessWidget {
   const FMNetworkImageFrame({
     super.key,
-    required this.imageUrl,
+    this.imageUrl,
     this.borderRadius,
     this.height,
     this.width,
@@ -372,7 +372,7 @@ class FMNetworkImageFrame extends StatelessWidget {
     this.placeholder,
   });
 
-  final String imageUrl;
+  final String? imageUrl;
   final BorderRadiusGeometry? borderRadius;
   final double? height;
   final double? width;
@@ -382,23 +382,34 @@ class FMNetworkImageFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final validUrl = (imageUrl != null &&
+            imageUrl!.trim().isNotEmpty &&
+            imageUrl!.trim().startsWith('http'))
+        ? imageUrl!.trim()
+        : null;
+
+    final fallback =
+        placeholder ?? const ColoredBox(color: FMColors.surfaceElevated);
+
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.circular(FMRadii.lg),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          CachedNetworkImage(
-            imageUrl: imageUrl,
-            height: height,
-            width: width,
-            fit: fit,
-            placeholder: (_, __) =>
-                placeholder ?? const ColoredBox(color: FMColors.surfaceElevated),
-            errorWidget: (_, __, ___) =>
-                placeholder ?? const ColoredBox(color: FMColors.surfaceElevated),
-          ),
+          validUrl != null
+              ? CachedNetworkImage(
+                  imageUrl: validUrl,
+                  height: height,
+                  width: width,
+                  fit: fit,
+                  placeholder: (_, __) => fallback,
+                  errorWidget: (_, __, ___) => fallback,
+                )
+              : fallback,
           if (overlay)
-            const DecoratedBox(decoration: BoxDecoration(gradient: FMGradients.darkCinematic)),
+            const DecoratedBox(
+              decoration: BoxDecoration(gradient: FMGradients.darkCinematic),
+            ),
         ],
       ),
     );

@@ -45,25 +45,21 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   @override
   void initState() {
     super.initState();
-    countryCode = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            .userDetails
-            .countryCode ??
-        "ES";
+    final pProvider = Provider.of<ProfileService>(context, listen: false);
+    final userDetails = pProvider.profileDetails?.userDetails;
+    countryCode = userDetails?.countryCode ?? "SA";
     //set country code
     Future.delayed(const Duration(milliseconds: 600), () {
       Provider.of<ProfileEditService>(context, listen: false)
           .setCountryCode(countryCode);
     });
-    final pProvider = Provider.of<ProfileService>(context, listen: false);
-    fullNameController.text = pProvider.profileDetails.userDetails.name ?? '';
-    emailController.text = pProvider.profileDetails.userDetails.email ?? '';
+    fullNameController.text = userDetails?.name ?? '';
+    emailController.text = userDetails?.email ?? '';
 
-    phoneController.text = pProvider.profileDetails.userDetails.phone ?? '';
-    postCodeController.text =
-        pProvider.profileDetails.userDetails.postCode ?? '';
-    addressController.text = pProvider.profileDetails.userDetails.address ?? '';
-    aboutController.text = pProvider.profileDetails.userDetails.about ?? '';
+    phoneController.text = userDetails?.phone ?? '';
+    postCodeController.text = userDetails?.postCode ?? '';
+    addressController.text = userDetails?.address ?? '';
+    aboutController.text = userDetails?.about ?? '';
     Provider.of<CountryDropdownService>(context, listen: false)
         .setCountryBasedOnUserProfile(context);
     Provider.of<StateDropdownService>(context, listen: false)
@@ -71,7 +67,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     Provider.of<AreaDropdownService>(context, listen: false)
         .setAreaBasedOnUserProfile(context);
     Provider.of<ProfileEditService>(context, listen: false)
-        .setCountryCode(pProvider.profileDetails.userDetails.countryCode);
+        .setCountryCode(userDetails?.countryCode);
   }
 
   late AnimationController localAnimationController;
@@ -143,7 +139,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                       child: pickedImage == null
                                           ? profileProvider.profileImage != null
                                               ? CommonHelper().profileImage(
-                                                  profileProvider.profileImage,
+                                                   profileProvider.profileImage!,
                                                   85,
                                                   85)
                                               : Image.asset(

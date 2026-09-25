@@ -17,7 +17,7 @@ import '../../utils/constant_colors.dart';
 class ServiceCard extends StatelessWidget {
   const ServiceCard({
     Key? key,
-    required this.cc,
+    this.cc,
     required this.imageLink,
     required this.title,
     required this.sellerName,
@@ -32,7 +32,7 @@ class ServiceCard extends StatelessWidget {
     required this.sellerId,
   }) : super(key: key);
 
-  final ConstantColors cc;
+  final ConstantColors? cc;
   final serviceId;
   final imageLink;
   final title;
@@ -57,11 +57,12 @@ class ServiceCard extends StatelessWidget {
           padding: EdgeInsets.zero,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Stack(
                 children: [
                   SizedBox(
-                    height: 210,
+                    height: 185,
                     width: double.infinity,
                     child: FMNetworkImageFrame(
                       imageUrl: imageLink,
@@ -92,27 +93,30 @@ class ServiceCard extends StatelessWidget {
                 ],
               ),
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      title,
+                      title?.toString() ?? '',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontSize: 17,
-                            height: 1.25,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontSize: 16,
+                                height: 1.25,
+                              ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
-                      sellerName ?? '',
+                      sellerName?.toString() ?? '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
@@ -171,7 +175,8 @@ class ServiceCard extends StatelessWidget {
                               );
                             },
                             child: Text(
-                              asProvider.getString(buttonText),
+                              asProvider.getString(
+                                  buttonText?.toString() ?? 'Book Now'),
                               style: const TextStyle(fontSize: 13),
                             ),
                           ),

@@ -70,7 +70,7 @@ class RecentServices extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 360,
+              height: 370,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 shrinkWrap: true,
@@ -106,10 +106,10 @@ class RecentServices extends StatelessWidget {
                     pressed: () {
                       provider.saveOrUnsave(
                         provider.recentServiceMap[i]['serviceId'],
-                        provider.recentServiceMap[i]['title'],
+                        provider.recentServiceMap[i]['title'] ?? '',
                         provider.recentServiceMap[i]['image'],
                         provider.recentServiceMap[i]['price'],
-                        provider.recentServiceMap[i]['sellerName'],
+                        provider.recentServiceMap[i]['sellerName'] ?? '',
                         twoDouble(provider.recentServiceMap[i]['rating']),
                         i,
                         context,

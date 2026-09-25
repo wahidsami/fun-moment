@@ -9,6 +9,7 @@ import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/home/components/section_title.dart';
 import 'package:funmoments/view/jobs/job_details_page.dart';
+import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/constant_styles.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
@@ -31,7 +32,7 @@ class RecentJobs extends StatelessWidget {
             children: [
               const SizedBox(height: 26),
               SectionTitle(
-                cc: null,
+                cc: ConstantColors(),
                 title: asProvider.getString('Recent jobs'),
                 hasSeeAllBtn: false,
                 pressed: () {},
@@ -55,10 +56,11 @@ class RecentJobs extends StatelessWidget {
                         context,
                         MaterialPageRoute<void>(
                           builder: (BuildContext context) => JobDetailsPage(
-                            imageLink:
-                                provider.recentJobsImages.length > i
-                                    ? provider.recentJobsImages[i].imgUrl
-                                    : '',
+                            imageLink: (provider.recentJobsImages.length > i &&
+                                    provider.recentJobsImages[i]?.imgUrl !=
+                                        null)
+                                ? provider.recentJobsImages[i]!.imgUrl!
+                                : '',
                             jobId: provider.recentJobs[i].id,
                           ),
                         ),
@@ -73,9 +75,14 @@ class RecentJobs extends StatelessWidget {
                             SizedBox(
                               width: 120,
                               child: FMNetworkImageFrame(
-                                imageUrl: provider.recentJobsImages.length > i
-                                    ? provider.recentJobsImages[i].imgUrl
-                                    : '',
+                                imageUrl:
+                                    (provider.recentJobsImages.length > i &&
+                                            provider.recentJobsImages[i]
+                                                    ?.imgUrl !=
+                                                null)
+                                        ? provider
+                                            .recentJobsImages[i]!.imgUrl!
+                                        : '',
                                 overlay: true,
                                 borderRadius: const BorderRadius.horizontal(
                                   left: Radius.circular(FMRadii.lg),
@@ -95,7 +102,7 @@ class RecentJobs extends StatelessWidget {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          provider.recentJobs[i].title,
+                                          provider.recentJobs[i].title ?? '',
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: Theme.of(context)
@@ -105,7 +112,7 @@ class RecentJobs extends StatelessWidget {
                                         ),
                                         const SizedBox(height: 6),
                                         AutoSizeText(
-                                          '${provider.recentJobs[i].view} views',
+                                          '${provider.recentJobs[i].view ?? 0} views',
                                           maxLines: 1,
                                           style: Theme.of(context)
                                               .textTheme

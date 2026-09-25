@@ -309,7 +309,10 @@ class _ServiceSchedulePageState extends State<ServiceSchedulePage> {
                                     : asProvider.getString('Next'), () {
                               if (ps.profileDetails == null ||
                                   ps.profileDetails is String) {
-                                context.toPage(const LoginPage());
+                                context.toPage(const LoginPage(
+                                  hasBackButton: true,
+                                  returnToPrevious: true,
+                                ));
 
                                 return;
                               }

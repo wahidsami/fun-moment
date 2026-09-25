@@ -7,6 +7,7 @@ import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/auth/signup/pages/signup_country_states.dart';
 import 'package:funmoments/view/auth/signup/pages/signup_email_name.dart';
 import 'package:funmoments/view/auth/signup/pages/signup_phone_pass.dart';
+import 'package:funmoments/view/utils/language_selector_sheet.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({Key? key}) : super(key: key);
@@ -77,6 +78,12 @@ class _SignupPageState extends State<SignupPage> {
                 },
                 icon: const Icon(Icons.arrow_back_ios_new_rounded),
               ),
+              actions: const [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(child: LanguageSwitchPill(compact: true)),
+                ),
+              ],
             ),
             body: SafeArea(
               child: SingleChildScrollView(

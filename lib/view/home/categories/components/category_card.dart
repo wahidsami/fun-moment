@@ -35,7 +35,7 @@ class CategoryCard extends StatelessWidget {
           context,
           MaterialPageRoute<void>(
             builder: (BuildContext context) => ServicebyCategoryPage(
-              categoryName: name,
+              categoryName: name?.toString() ?? '',
               categoryId: id,
             ),
           ),
@@ -62,7 +62,7 @@ class CategoryCard extends StatelessWidget {
                         imagelink.toString().isNotEmpty &&
                         imagelink.toString() != placeHolderUrl)
                     ? CachedNetworkImage(
-                        imageUrl: imagelink,
+                        imageUrl: imagelink.toString(),
                         errorWidget: (context, url, error) => Image.asset(
                           FMAssets.categoryFallbackForIndex(index),
                           fit: BoxFit.contain,
@@ -76,7 +76,7 @@ class CategoryCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               AutoSizeText(
-                name,
+                name?.toString() ?? '',
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

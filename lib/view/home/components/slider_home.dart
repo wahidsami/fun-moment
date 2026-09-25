@@ -166,7 +166,7 @@ class SliderHome extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   FMNetworkImageFrame(
-                    imageUrl: sliderImageList[itemIndex],
+                    imageUrl: sliderImageList[itemIndex]?.toString() ?? '',
                     overlay: true,
                     borderRadius: BorderRadius.circular(FMRadii.lg),
                   ),
@@ -184,7 +184,8 @@ class SliderHome extends StatelessWidget {
                               maxWidth: MediaQuery.of(context).size.width * .58,
                             ),
                             child: Text(
-                              sliderDetailsList[itemIndex]['title'],
+                              sliderDetailsList[itemIndex]['title']?.toString() ??
+                                  '',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context)
@@ -202,7 +203,9 @@ class SliderHome extends StatelessWidget {
                               maxWidth: MediaQuery.of(context).size.width * .56,
                             ),
                             child: Text(
-                              sliderDetailsList[itemIndex]['subtitle'],
+                              sliderDetailsList[itemIndex]['subtitle']
+                                      ?.toString() ??
+                                  '',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context)

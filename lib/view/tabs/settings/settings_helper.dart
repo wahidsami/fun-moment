@@ -32,21 +32,29 @@ class SettingsHelper {
     SettingsGridCard('assets/svg/receipt-circle.svg', 'Total orders'),
   ];
 
-  settingOption(String icon, String title, VoidCallback pressed) {
+  settingOption(
+    String icon,
+    String title,
+    VoidCallback pressed, {
+    Widget? leading,
+    Widget? trailing,
+  }) {
     return ListTile(
       onTap: pressed,
-      leading: SvgPicture.asset(
-        icon,
-        height: 35,
-      ),
+      leading: leading ??
+          SvgPicture.asset(
+            icon,
+            height: 35,
+          ),
       title: Text(
         title,
         style: TextStyle(color: cc.greyFour, fontSize: 14),
       ),
-      trailing: const Icon(
-        Icons.arrow_forward_ios,
-        size: 17,
-      ),
+      trailing: trailing ??
+          const Icon(
+            Icons.arrow_forward_ios,
+            size: 17,
+          ),
     );
   }
 

@@ -9,10 +9,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app_string_service.dart';
 
 class RtlService with ChangeNotifier {
+  static const String userSelectedLangKey = 'user_selected_lang';
+
   /// RTL support
   String direction = 'ltr';
   String? langId;
   String langSlug = 'en_US';
+
+  bool get isRtl => direction == 'rtl';
+  bool get isArabic => langSlug.startsWith('ar');
 
   String currency = '\$';
   String currencyDirection = 'left';
@@ -20,6 +25,44 @@ class RtlService with ChangeNotifier {
 
   bool alreadyCurrencyLoaded = false;
   bool alreadyRtlLoaded = false;
+
+  Future<void> loadSavedLanguage(BuildContext? context) async {
+    final srf = await SharedPreferences.getInstance();
+    final savedLang = srf.getString(userSelectedLangKey);
+    if (savedLang != null && savedLang.isNotEmpty) {
+      langSlug = savedLang;
+      direction = savedLang == 'ar' ? 'rtl' : 'ltr';
+      if (context != null) {
+        try {
+          Provider.of<AppStringService>(context, listen: false).setLanguage(savedLang);
+        } catch (_) {}
+      }
+      notifyListeners();
+    }
+  }
+
+  Future<void> changeLanguage(
+    String langCode, {
+    BuildContext? context,
+    AppStringService? stringService,
+  }) async {
+    final srf = await SharedPreferences.getInstance();
+    langSlug = langCode;
+    direction = langCode == 'ar' ? 'rtl' : 'ltr';
+
+    await srf.setString(userSelectedLangKey, langCode);
+    await srf.setString('slug', langCode);
+
+    if (stringService != null) {
+      stringService.setLanguage(langCode);
+    } else if (context != null) {
+      try {
+        Provider.of<AppStringService>(context, listen: false).setLanguage(langCode);
+      } catch (_) {}
+    }
+
+    notifyListeners();
+  }
 
   fetchCurrency() async {
     if (alreadyCurrencyLoaded == false) {
@@ -42,12 +85,23 @@ class RtlService with ChangeNotifier {
   }
 
   fetchDirection(BuildContext context) async {
-    // if (alreadyRtlLoaded == false) {
+    final srf = await SharedPreferences.getInstance();
+    final userSelected = srf.getString(userSelectedLangKey);
+
+    // If the user has explicitly chosen a language, preserve it and do not overwrite with backend default
+    if (userSelected != null && userSelected.isNotEmpty) {
+      langSlug = userSelected;
+      direction = userSelected == 'ar' ? 'rtl' : 'ltr';
+      Provider.of<AppStringService>(context, listen: false).setLanguage(userSelected);
+      alreadyRtlLoaded = true;
+      notifyListeners();
+      return;
+    }
+
     var response = await http.get(Uri.parse('$baseApi/language'));
     print(response.body);
     if (response.statusCode == 201) {
       direction = jsonDecode(response.body)['language']['direction'];
-      final srf = await SharedPreferences.getInstance();
       langId = jsonDecode(response.body)['language']['id'].toString();
       langSlug = jsonDecode(response.body)['language']['slug'].toString();
       var now = DateTime.now();
@@ -87,8 +141,5 @@ class RtlService with ChangeNotifier {
       print('failed loading language direction');
       print(response.body);
     }
-    // } else {
-    //   //already loaded from server. no need to load again
-    // }
   }
 }

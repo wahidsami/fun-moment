@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:funmoments/service/auth_services/google_sign_service.dart';
 import 'package:funmoments/service/auth_services/login_service.dart';
 import 'package:funmoments/view/auth/login/login.dart';
+import 'package:funmoments/view/home/landing_page.dart';
 import 'package:funmoments/view/intro/introduction_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -67,6 +68,13 @@ class SplashService {
             context,
             MaterialPageRoute<void>(
               builder: (BuildContext context) => const LoginPage(),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement<void, void>(
+            context,
+            MaterialPageRoute<void>(
+              builder: (BuildContext context) => const LandingPage(),
             ),
           );
         }

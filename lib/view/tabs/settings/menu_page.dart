@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/permissions_service.dart';
 import 'package:funmoments/service/profile_service.dart';
+import 'package:funmoments/service/rtl_service.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
+import 'package:funmoments/view/utils/language_selector_sheet.dart';
 import 'package:funmoments/view/jobs/job_request_page.dart';
 import 'package:funmoments/view/jobs/my_jobs_page.dart';
 import 'package:funmoments/view/report/my_reports_list_page.dart';
@@ -58,12 +61,10 @@ class _MenuPageState extends State<MenuPage> {
                                 Consumer<ProfileService>(
                               builder: (context, profileProvider, child) =>
                                   profileProvider.profileDetails != null
-                                      ? profileProvider.profileDetails !=
-                                              'error'
-                                          ? Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
+                                      ? Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
                                                 //
                                                 const MenuNameImageSection(),
 
@@ -241,6 +242,49 @@ class _MenuPageState extends State<MenuPage> {
                                                         ),
                                                       );
                                                     }),
+                                                    CommonHelper()
+                                                        .dividerCommon(),
+                                                    Consumer<RtlService>(
+                                                      builder: (context, rtl, child) =>
+                                                          SettingsHelper().settingOption(
+                                                        'assets/svg/menu_job.svg',
+                                                        '${asProvider.getString("Language")} / العربية',
+                                                        () {
+                                                          showLanguageBottomSheet(context);
+                                                        },
+                                                        leading: Container(
+                                                          height: 35,
+                                                          width: 35,
+                                                          decoration: BoxDecoration(
+                                                            color: FMColors.magenta.withOpacity(0.12),
+                                                            borderRadius: BorderRadius.circular(8),
+                                                          ),
+                                                          child: const Icon(
+                                                            Icons.language_rounded,
+                                                            color: FMColors.magenta,
+                                                            size: 20,
+                                                          ),
+                                                        ),
+                                                        trailing: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Text(
+                                                              rtl.isArabic ? 'العربية' : 'English',
+                                                              style: const TextStyle(
+                                                                color: FMColors.magenta,
+                                                                fontWeight: FontWeight.bold,
+                                                                fontSize: 13,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(width: 6),
+                                                            const Icon(
+                                                              Icons.arrow_forward_ios,
+                                                              size: 14,
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
                                                   ]),
                                                 ),
 
@@ -286,8 +330,7 @@ class _MenuPageState extends State<MenuPage> {
                                                 )
                                               ],
                                             )
-                                          : OthersHelper().showError(context)
-                                      : Container(
+                                          : (profileProvider.hasError ? OthersHelper().showError(context) : Container(
                                           alignment: Alignment.center,
                                           height: MediaQuery.of(context)
                                                   .size
@@ -295,7 +338,7 @@ class _MenuPageState extends State<MenuPage> {
                                               150,
                                           child: OthersHelper()
                                               .showLoading(cc.primaryColor),
-                                        ),
+                                        )),
                             ),
                           ),
                         ),

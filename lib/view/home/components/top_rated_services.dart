@@ -57,7 +57,7 @@ class TopRatedServices extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 360,
+              height: 370,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 shrinkWrap: true,
@@ -91,10 +91,10 @@ class TopRatedServices extends StatelessWidget {
                     pressed: () {
                       provider.saveOrUnsave(
                         provider.topServiceMap[i]['serviceId'],
-                        provider.topServiceMap[i]['title'],
+                        provider.topServiceMap[i]['title'] ?? '',
                         provider.topServiceMap[i]['image'],
                         provider.topServiceMap[i]['price'],
-                        provider.topServiceMap[i]['sellerName'],
+                        provider.topServiceMap[i]['sellerName'] ?? '',
                         twoDouble(provider.topServiceMap[i]['rating']),
                         i,
                         context,

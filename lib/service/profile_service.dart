@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:funmoments/model/profile_model.dart';
 import 'package:funmoments/service/common_service.dart';
@@ -10,8 +8,18 @@ import 'package:http/http.dart' as http;
 
 class ProfileService with ChangeNotifier {
   bool isloading = false;
+  bool hasError = false;
 
-  var profileDetails;
+  ProfileModel? _profileDetails;
+  dynamic get profileDetails => _profileDetails;
+  set profileDetails(dynamic value) {
+    if (value is ProfileModel) {
+      _profileDetails = value;
+    } else {
+      _profileDetails = null;
+    }
+  }
+
   var profileImage;
 
   List ordersList = [0, 0, 0, 0];
@@ -26,8 +34,9 @@ class ProfileService with ChangeNotifier {
   }
 
   setEverythingToDefault() {
-    profileDetails = null;
+    _profileDetails = null;
     profileImage = null;
+    hasError = false;
     ordersList = [0, 0, 0, 0];
     _cachedUserType = null;
     notifyListeners();
@@ -75,15 +84,16 @@ class ProfileService with ChangeNotifier {
     if (response.statusCode == 200 || response.statusCode == 201) {
       var data = ProfileModel.fromJson(jsonDecode(response.body));
       profileDetails = data;
+      hasError = false;
       if (data.userDetails.userType != null) {
         _cachedUserType = data.userDetails.userType;
         prefs.setInt('userType', data.userDetails.userType!);
       }
 
-      ordersList[0] = profileDetails.pendingOrder;
-      ordersList[1] = profileDetails.activeOrder;
-      ordersList[2] = profileDetails.completeOrder;
-      ordersList[3] = profileDetails.totalOrder;
+      ordersList[0] = data.pendingOrder;
+      ordersList[1] = data.activeOrder;
+      ordersList[2] = data.completeOrder;
+      ordersList[3] = data.totalOrder;
 
       if (jsonDecode(response.body)['profile_image'] is List) {
         //then dont do anything because it means image is missing from database
@@ -96,7 +106,8 @@ class ProfileService with ChangeNotifier {
       return true;
     } else {
       print(response.body);
-      profileDetails = 'error';
+      profileDetails = null;
+      hasError = true;
       setLoadingFalse();
       notifyListeners();
 

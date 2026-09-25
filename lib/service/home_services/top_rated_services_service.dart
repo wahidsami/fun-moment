@@ -97,11 +97,18 @@ class TopRatedServicesSerivce with ChangeNotifier {
     notifyListeners();
   }
 
-  saveOrUnsave(int serviceId, String title, image, var price, String sellerName,
+  saveOrUnsave(int serviceId, String? title, image, var price, String? sellerName,
       double rating, int index, BuildContext context, sellerId) async {
     var newListMap = topServiceMap;
-    alreadySaved = await DbService().saveOrUnsave(serviceId, title,
-        image ?? placeHolderUrl, price, sellerName, rating, context, sellerId);
+    alreadySaved = await DbService().saveOrUnsave(
+        serviceId,
+        title ?? '',
+        image ?? placeHolderUrl,
+        price,
+        sellerName ?? '',
+        rating,
+        context,
+        sellerId);
     newListMap[index]['isSaved'] = alreadySaved;
     topServiceMap = newListMap;
     notifyListeners();

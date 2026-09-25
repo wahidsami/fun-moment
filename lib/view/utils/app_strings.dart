@@ -171,6 +171,18 @@ var appStrings = {
   "Password did not match": "Password did not match",
   "Password must be at least 6 characters":
       "Password must be at least 6 characters",
+  "Password must be at least 8 characters":
+      "Password must be at least 8 characters",
+  "Password should be at least 8 characters long":
+      "Password should be at least 8 characters long",
+  "Password should contain at least 1 uppercase letter":
+      "Password should contain at least 1 uppercase letter",
+  "Password should contain at least 1 lowercase letter":
+      "Password should contain at least 1 lowercase letter",
+  "Password should contain at least 1 digit":
+      "Password should contain at least 1 digit",
+  "Password should contain at least 1 special character":
+      "Password should contain at least 1 special character",
   "Have an account": "Have an account",
   'Menu': 'Menu',
   "My jobs": "My jobs",
@@ -512,7 +524,43 @@ var appStrings = {
   "Featured Service": "Featured Service",
   "Select subcategory": "Select subcategory",
   "Subcategory": "Subcategory",
-  "Select category": "Select category"
+  "Select category": "Select category",
+  "Dashboard": "Dashboard",
+  "Services": "Services",
+  "Jobs": "Jobs",
+  "Provider Workspace": "Provider Workspace",
+  "Pending Orders": "Pending Orders",
+  "Manage your services, client orders, and earnings":
+      "Manage your services, client orders, and earnings",
+  "Active Services": "Active Services",
+  "Total Revenue": "Total Revenue",
+  "SELLER": "SELLER",
+  "My Services": "My Services",
+  "Add Service": "Add Service",
+  "Language": "Language",
+  "English": "English",
+  "Arabic": "Arabic",
+  "Choose language": "Choose language",
+  "Welcome to FUN MOMENT": "Welcome to FUN MOMENT",
+  "Guest": "Guest",
+  "Explore the most requested moments first":
+      "Explore the most requested moments first",
+  "Active booking and updates will appear here":
+      "Active booking and updates will appear here",
+  "Personal information": "Personal information",
+  "Default": "Default",
+  "Switch to English": "Switch to English",
+  "Switch to Arabic": "Switch to Arabic",
+  "Are you sure you want to delete": "Are you sure you want to delete",
+  "Delete Service": "Delete Service",
+  "Provider Tools": "Provider Tools",
+  "Create listing": "Create listing",
+  "Client bookings": "Client bookings",
+  "Applied jobs": "Applied jobs",
+  "Direct invites": "Direct invites",
+  "Payouts & balance": "Payouts & balance",
+  "Support": "Support",
+  "Help tickets": "Help tickets"
 };
 
 var translations = {
@@ -708,6 +756,18 @@ var translations = {
   "Password did not match": "كلمة المرور غير متطابقة",
   "Password must be at least 6 characters":
       "يجب أن تكون كلمة المرور على الأقل 6 أحرف",
+  "Password must be at least 8 characters":
+      "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل",
+  "Password should be at least 8 characters long":
+      "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل",
+  "Password should contain at least 1 uppercase letter":
+      "يجب أن تحتوي كلمة المرور على حرف كبير واحد على الأقل",
+  "Password should contain at least 1 lowercase letter":
+      "يجب أن تحتوي كلمة المرور على حرف صغير واحد على الأقل",
+  "Password should contain at least 1 digit":
+      "يجب أن تحتوي كلمة المرور على رقم واحد على الأقل",
+  "Password should contain at least 1 special character":
+      "يجب أن تحتوي كلمة المرور على رمز خاص واحد على الأقل",
   "Have an account": "لديك حساب",
   "Menu": "القائمة",
   "My jobs": "وظائفي",
@@ -1020,5 +1080,44 @@ var translations = {
   "Location set successfully": "تم تعيين الموقع بنجاح",
   "Choose Current Location": "اختر الموقع الحالي",
   "Email or username": "البريد الإلكتروني أو اسم المستخدم",
-  "No message found": "لم يتم العثور على رسالة"
+  "No message found": "لم يتم العثور على رسالة",
+  "Discover": "استكشاف",
+  "Bookings": "الحجوزات",
+  "Profile": "الملف الشخصي",
+  "Dashboard": "لوحة التحكم",
+  "Services": "الخدمات",
+  "Jobs": "الوظائف",
+  "Provider Workspace": "مساحة عمل المزود",
+  "Pending Orders": "الطلبات المعلقة",
+  "Manage your services, client orders, and earnings":
+      "إدارة خدماتك وطلبات العملاء والأرباح",
+  "Active Services": "الخدمات النشطة",
+  "Total Revenue": "إجمالي الأرباح",
+  "SELLER": "مزود خدمة",
+  "My Services": "خدماتي",
+  "Add Service": "إضافة خدمة",
+  "Language": "اللغة",
+  "English": "الإنجليزية",
+  "Arabic": "العربية",
+  "Choose language": "اختر اللغة",
+  "Welcome to FUN MOMENT": "مرحبًا بك في FUN MOMENT",
+  "Guest": "ضيف",
+  "Explore the most requested moments first":
+      "استكشف اللحظات الأكثر طلبًا أولاً",
+  "Active booking and updates will appear here":
+      "ستظهر الحجوزات النشطة والتحديثات هنا",
+  "Personal information": "المعلومات الشخصية",
+  "Default": "الافتراضي",
+  "Switch to English": "التحويل إلى الإنجليزية",
+  "Switch to Arabic": "التحويل إلى العربية",
+  "Are you sure you want to delete": "هل أنت متأكد أنك تريد حذف",
+  "Delete Service": "حذف الخدمة",
+  "Provider Tools": "أدوات المزود",
+  "Create listing": "إنشاء قائمة",
+  "Client bookings": "حجوزات العملاء",
+  "Applied jobs": "الوظائف المقدم عليها",
+  "Direct invites": "دعوات مباشرة",
+  "Payouts & balance": "المدفوعات والرصيد",
+  "Support": "الدعم",
+  "Help tickets": "تذاكر المساعدة"
 };

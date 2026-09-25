@@ -14,14 +14,22 @@ import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/auth/reset_password/reset_pass_email_page.dart';
 import 'package:funmoments/view/auth/signup/signup.dart';
+import 'package:funmoments/view/home/landing_page.dart';
+import 'package:funmoments/view/home/homepage_helper.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:funmoments/view/utils/responsive.dart';
+import 'package:funmoments/view/utils/language_selector_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({Key? key, this.hasBackButton = true}) : super(key: key);
+  const LoginPage({
+    Key? key,
+    this.hasBackButton = true,
+    this.returnToPrevious = false,
+  }) : super(key: key);
 
-  final hasBackButton;
+  final bool hasBackButton;
+  final bool returnToPrevious;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -160,14 +168,19 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   if (widget.hasBackButton == true)
-                    Positioned(
+                    PositionedDirectional(
                       top: 8,
-                      left: 8,
+                      start: 8,
                       child: IconButton(
                         onPressed: () => context.popFalse,
                         icon: const Icon(Icons.arrow_back_ios_new_rounded),
                       ),
                     ),
+                  const PositionedDirectional(
+                    top: 10,
+                    end: 10,
+                    child: LanguageSwitchPill(compact: true),
+                  ),
                 ],
               ),
               const SizedBox(height: 18),
@@ -291,7 +304,13 @@ class _LoginPageState extends State<LoginPage> {
                                     )
                                         .then((value) {
                                       if (value == true) {
-                                        context.popTrue;
+                                        HomepageHelper.tabIndex.value = 0;
+                                        if (widget.returnToPrevious &&
+                                            Navigator.canPop(context)) {
+                                          context.popTrue;
+                                        } else {
+                                          context.toUntilPage(const LandingPage());
+                                        }
                                       }
                                     });
                                   }
@@ -313,7 +332,7 @@ class _LoginPageState extends State<LoginPage> {
                                     TextSpan(
                                       recognizer: TapGestureRecognizer()
                                         ..onTap = () {
-                                          Navigator.push(
+                                          Navigator.pushReplacement(
                                             context,
                                             MaterialPageRoute(
                                               builder: (context) =>

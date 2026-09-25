@@ -23,6 +23,41 @@ class AppStringService with ChangeNotifier {
     notifyListeners();
   }
 
+  void setLanguage(String langCode) async {
+    if (langCode == 'ar') {
+      tStrings = Map<String, dynamic>.from(translations);
+    } else {
+      tStrings = Map<String, dynamic>.from(appStrings);
+    }
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('translated_string', jsonEncode(tStrings));
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<void> initStrings() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      final selected = prefs.getString('user_selected_lang') ?? prefs.getString('slug');
+      if (selected == 'ar') {
+        tStrings = Map<String, dynamic>.from(translations);
+      } else {
+        final cached = prefs.getString('translated_string');
+        if (cached != null) {
+          try {
+            tStrings = jsonDecode(cached);
+          } catch (_) {
+            tStrings = Map<String, dynamic>.from(appStrings);
+          }
+        } else {
+          tStrings = Map<String, dynamic>.from(appStrings);
+        }
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
   fetchTranslatedStrings(BuildContext context, {bool doNotLoad = false}) async {
     //if already loaded. no need to load again
 
@@ -33,9 +68,18 @@ class AppStringService with ChangeNotifier {
       prefs.getString('token');
       if (doNotLoad) {
         final strings = prefs.getString('translated_string');
-        tStrings = jsonDecode(strings ?? 'null');
+        tStrings = jsonDecode(strings ?? 'null') ?? Map<String, dynamic>.from(appStrings);
         return;
       }
+
+      final userSelected = prefs.getString('user_selected_lang');
+      if (userSelected == 'ar') {
+        tStrings = Map<String, dynamic>.from(translations);
+        prefs.setString('translated_string', jsonEncode(tStrings));
+        notifyListeners();
+        return;
+      }
+
       setLoadingTrue();
 
       var data = jsonEncode({
@@ -53,11 +97,11 @@ class AppStringService with ChangeNotifier {
       try {
         if (response.statusCode == 201) {
           debugPrint(response.body.toString());
-          //TODO : FIXXXX HEREEEEEEEEEEEEEEEEEEEEEEEEEE
           print('tstring :${prefs.getString('slug')}');
 
-          tStrings = prefs.getString('slug') == 'ar'
-              ? translations
+          final activeSlug = prefs.getString('user_selected_lang') ?? prefs.getString('slug');
+          tStrings = activeSlug == 'ar'
+              ? Map<String, dynamic>.from(translations)
               : jsonDecode(response.body)['strings'];
           print('tstring :$tStrings');
           prefs.setString('translated_string', jsonEncode(tStrings));
@@ -70,7 +114,6 @@ class AppStringService with ChangeNotifier {
       }
     }
   }
-  //TODO :HERE WE CAN GET THE Language and give the translation directly from the application
 
   getString(String staticString) {
     try {
