@@ -84,13 +84,11 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
 
         if(moduleExists("Wallet")) {
             Route::group(['prefix' => 'wallet'], function () {
-                Route::get('/balance', [UserController::class, 'walletBalance']);
-                Route::get('/history', [UserController::class, 'walletHistory']);
-                Route::post('/deposit', [UserController::class, 'walletDeposit']);
-                Route::post('/deduct', [UserController::class, 'walletDeduct']);
-                Route::post('/deposit/payment-status', [UserController::class, 'walletDepositPaymentStatus']);
-                //todo:: seller subscription renew
-
+                Route::get('/balance', [\Modules\Wallet\Http\Controllers\WalletApiController::class, 'buyerBalance']);
+                Route::get('/history', [\Modules\Wallet\Http\Controllers\WalletApiController::class, 'buyerHistory']);
+                Route::post('/deposit', [\Modules\Wallet\Http\Controllers\WalletApiController::class, 'buyerDeposit']);
+                Route::post('/deduct', [\Modules\Wallet\Http\Controllers\WalletApiController::class, 'buyerDeduct']);
+                Route::post('/deposit/payment-status', [\Modules\Wallet\Http\Controllers\WalletApiController::class, 'buyerDepositPaymentStatus']);
             });
         }
 
@@ -246,10 +244,11 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
 
         if(moduleExists("Wallet")) {
             Route::group(['prefix' => 'wallet'], function () {
+                Route::get('/balance', [\Modules\Wallet\Http\Controllers\WalletApiController::class, 'sellerBalance']);
+                Route::get('/history', [\Modules\Wallet\Http\Controllers\WalletApiController::class, 'sellerHistory']);
+                Route::post('/request-payout', [\Modules\Wallet\Http\Controllers\WalletApiController::class, 'sellerRequestPayout']);
                 Route::post('/renew-subscription', [SellerController::class, 'renewSubscription']);
                 Route::post('/diposit-from-balance', [SellerController::class, 'depositFromBalance']);
-                //todo:: seller subscription renew
-
             });
         }
 
@@ -333,6 +332,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         //seller subscription
         if(moduleExists("Subscription")){
             Route::group(['prefix' => 'subscription'], function () {
+                Route::get('/plans', [SellerSubscriptionController::class, 'subscription_plans'])->name('seller.subscription.plans');
                 Route::get('/info', [SellerSubscriptionController::class, 'subscription_info'])->name('seller.subscription.info');
                 Route::get('/history', [SellerSubscriptionController::class, 'subscription_history'])->name('seller.subscription.history');
             });

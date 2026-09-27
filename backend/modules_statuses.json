@@ -1,6 +1,6 @@
 {
-    "LiveChat": false,
-    "Subscription": false,
-    "JobPost": false,
-    "Wallet": false
+    "LiveChat": true,
+    "Subscription": true,
+    "JobPost": true,
+    "Wallet": true
 }

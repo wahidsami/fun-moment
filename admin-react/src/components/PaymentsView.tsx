@@ -28,11 +28,18 @@ import {
 interface PaymentsViewProps {
   language: Language;
   activeRole: UserRole;
+  initialTab?: 'transactions' | 'payouts' | 'gateways';
 }
 
-export default function PaymentsView({ language, activeRole }: PaymentsViewProps) {
+export default function PaymentsView({ language, activeRole, initialTab = 'transactions' }: PaymentsViewProps) {
   const t = translations[language];
-  const [subTab, setSubTab] = useState<'transactions' | 'payouts' | 'gateways'>('transactions');
+  const [subTab, setSubTab] = useState<'transactions' | 'payouts' | 'gateways'>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setSubTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Transactions state
   const [payments, setPayments] = useState<Payment[]>([]);

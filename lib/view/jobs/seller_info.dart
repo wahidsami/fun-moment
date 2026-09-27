@@ -12,15 +12,15 @@ import '../utils/common_helper.dart';
 import '../utils/others_helper.dart';
 
 class SellerInfo extends StatelessWidget {
-  var imgUrl;
-  dynamic sellerId;
-  String sellerName;
-  var sellerCompleteOrder;
-  var createdAt;
-  var orderCompletionRate;
-  var sellerCountry;
-  var sellerCity;
-  var completeOrder;
+  final dynamic imgUrl;
+  final dynamic sellerId;
+  final String sellerName;
+  final dynamic sellerCompleteOrder;
+  final dynamic createdAt;
+  final dynamic orderCompletionRate;
+  final dynamic sellerCountry;
+  final dynamic sellerCity;
+  final dynamic completeOrder;
 
   SellerInfo({
     this.sellerId,

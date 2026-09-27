@@ -76,6 +76,16 @@ class AdminPayoutApiController extends Controller
 
         $payout->update($updateData);
 
+        if (\Illuminate\Support\Facades\Schema::hasTable('wallets') && in_array($validated['status'], ['completed', 'rejected'])) {
+            try {
+                $walletService = app(\Modules\Wallet\Services\WalletService::class);
+                $adminId = \Illuminate\Support\Facades\Auth::guard('admin')->id();
+                $walletService->settlePayout($payout->id, $validated['status'], $validated['admin_note'] ?? null, $adminId);
+            } catch (\Throwable $e) {
+                // Ignore if wallet is already settled or unlinked
+            }
+        }
+
         // If completed, notify seller
         if ($numericStatus === 1 && $payout->seller && !empty($payout->seller->email)) {
             try {

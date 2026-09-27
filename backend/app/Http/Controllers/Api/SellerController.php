@@ -112,33 +112,14 @@ class SellerController extends Controller
             $seller_email = Auth::guard('sanctum')->user()->email;
             $seller_name = Auth::guard('sanctum')->user()->name;
             $subscription_details = Subscription::where('id', $request->subscription_id)->first();
-            $seller_subscription = SellerSubscription::where('subscription_id', $request->subscription_id)->where('seller_id', $seller_id)->first();
-            $wallet_balance = Wallet::select('balance')->where('buyer_id', $seller_id)->first();
+            $wallet = Wallet::getOrCreateForUser($seller_id);
 
-            if ($wallet_balance->balance >= $subscription_details->price) {
-                if ($subscription_details->type == 'monthly') {
-                    $expire_date = Carbon::now()->addDays(30);
-                    $connect = $subscription_details->connect;
-                } elseif ($subscription_details->type == 'yearly') {
-                    $expire_date = Carbon::now()->addDays(365);
-                    $connect = $subscription_details->connect;
-                } elseif ($subscription_details->type == 'lifetime') {
-                    $expire_date = Carbon::now()->addDays(3650);
-                    $connect = 1000000;
-                }
-
-                SellerSubscription::where('subscription_id', $subscription_details->id)->update([
-                    'payment_status' => 'complete',
-                    'payment_gateway' => 'wallet',
-                    'expire_date' => $expire_date,
-                    'connect' => ($seller_subscription->connect + $connect),
-                    'price' => $subscription_details->price,
-                    'status' => 1,
-                ]);
-
-                Wallet::where('buyer_id', $seller_id)->update([
-                    'balance' => $wallet_balance->balance - $subscription_details->price,
-                ]);
+            if ($wallet->balance >= $subscription_details->price) {
+                app(\Modules\Subscription\Services\SubscriptionService::class)->subscribeOrRenew(
+                    $seller_id,
+                    (int) $request->subscription_id,
+                    'wallet'
+                );
 
                 //Send order email to admin and seller
                 try {

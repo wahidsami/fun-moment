@@ -466,13 +466,34 @@ class BuyerJobController extends Controller
                             'payment_status' => 'complete',
                             'payment_gateway' => 'wallet',
                         ]);
-                        Wallet::where('buyer_id', $buyer_id)->update([
-                            'balance' => $wallet_balance->balance - $order_details->total,
-                        ]);
+                        try {
+                            if (class_exists(\Modules\Wallet\Services\WalletService::class)) {
+                                app(\Modules\Wallet\Services\WalletService::class)->debit(
+                                    $buyer_id,
+                                    (float) $order_details->total,
+                                    'job_hire',
+                                    'job_' . $order_details->job_post_id . '_order_' . $last_order_id,
+                                    'Hiring payment for job #' . $order_details->job_post_id
+                                );
+                            } else {
+                                Wallet::where('buyer_id', $buyer_id)->orWhere('user_id', $buyer_id)->update([
+                                    'balance' => $wallet_balance->balance - $order_details->total,
+                                ]);
+                            }
+                        } catch (\Throwable $e) {
+                            Wallet::where('buyer_id', $buyer_id)->orWhere('user_id', $buyer_id)->update([
+                                'balance' => $wallet_balance->balance - $order_details->total,
+                            ]);
+                        }
                         JobRequest::where('job_post_id', $order_details->job_post_id)->where('seller_id', $order_details->seller_id)
                             ->update([
                                 'is_hired' => 1,
+                                'status' => 1,
                             ]);
+                        BuyerJob::where('id', $order_details->job_post_id)->update([
+                            'status' => 2,
+                            'is_job_on' => 0,
+                        ]);
                     } else {
                         $shortage_balance =  $order_details->total - $wallet_balance->balance;
                         return response()->error([

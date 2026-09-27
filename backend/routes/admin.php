@@ -50,8 +50,29 @@ Route::middleware(['setlang'])->group(function(){
     Route::get('/support-tickets-json', 'AdminTicketViewController@apiTickets')->name('admin.support.tickets.api');
     Route::post('/support-tickets-json/{id}/status', 'AdminTicketViewController@apiUpdateTicketStatus')->name('admin.support.tickets.status.api');
     Route::get('/support-tickets-json/{id}', 'AdminTicketViewController@apiTicketDetails')->name('admin.support.tickets.details.api');
-    Route::post('/support-tickets-json/{id}/reply', 'AdminTicketViewController@apiReplyTicket')->name('admin.support.tickets.reply.api');
     Route::get('/audit-logs-json', 'AdminDashboardController@apiAuditLogs')->name('admin.audit.logs.api');
+    Route::get('/wallets-json', '\\Modules\\Wallet\\Http\\Controllers\\AdminWalletApiController@apiIndex')->name('admin.wallets.api');
+    Route::get('/wallets-json/{userId}', '\\Modules\\Wallet\\Http\\Controllers\\AdminWalletApiController@apiUserWallet')->name('admin.wallets.user.api');
+    Route::post('/wallets-json/{userId}/adjust', '\\Modules\\Wallet\\Http\\Controllers\\AdminWalletApiController@apiAdjustBalance')->name('admin.wallets.adjust.api');
+    Route::post('/wallets-json/{userId}/status', '\\Modules\\Wallet\\Http\\Controllers\\AdminWalletApiController@apiUpdateStatus')->name('admin.wallets.status.api');
+
+    // Live Chat Hub API routes for React Admin
+    Route::get('/chat-hub-json', 'AdminChatHubApiController@index')->name('admin.chat_hub.api');
+    Route::get('/chat-hub-json/{id}', 'AdminChatHubApiController@show')->name('admin.chat_hub.detail.api');
+    Route::post('/chat-hub-json/{id}/status', 'AdminChatHubApiController@updateStatus')->name('admin.chat_hub.status.api');
+
+    // Jobs & Bidding API routes for React Admin
+    Route::get('/jobs-json', 'AdminJobApiController@index')->name('admin.jobs.api');
+    Route::get('/jobs-json/{id}', 'AdminJobApiController@show')->name('admin.jobs.detail.api');
+    Route::get('/jobs-json/{id}/proposals', 'AdminJobApiController@proposals')->name('admin.jobs.proposals.api');
+    Route::post('/jobs-json/{id}/status', 'AdminJobApiController@updateStatus')->name('admin.jobs.status.api');
+
+    // Subscriptions API routes for React Admin
+    Route::get('/subscriptions-json', 'AdminSubscriptionApiController@index')->name('admin.subscriptions.api');
+    Route::post('/subscriptions-json/plans', 'AdminSubscriptionApiController@storePlan')->name('admin.subscriptions.plans.store.api');
+    Route::post('/subscriptions-json/plans/{id}', 'AdminSubscriptionApiController@updatePlan')->name('admin.subscriptions.plans.update.api');
+    Route::post('/subscriptions-json/plans/{id}/status', 'AdminSubscriptionApiController@togglePlanStatus')->name('admin.subscriptions.plans.status.api');
+    Route::post('/subscriptions-json/subscribers/{sellerId}/adjust', 'AdminSubscriptionApiController@adjustSubscriber')->name('admin.subscriptions.subscribers.adjust.api');
     Route::get('/cms-inventory', 'AdminCmsController@apiInventory')->name('admin.cms.inventory.api');
     Route::post('/cms-inventory/{type}/{id}/status', 'AdminCmsController@apiUpdateContentStatus')->name('admin.cms.status.api');
     Route::post('/cms-blogs', 'AdminCmsController@apiStoreBlog')->name('admin.cms.blogs.store.api');

@@ -120,14 +120,27 @@ class FrontendUserManageController extends Controller
         $user = User::with(['country', 'sellerVerify'])->findOrFail($id);
 
         if (class_exists(\Modules\Wallet\Entities\Wallet::class) && \Illuminate\Support\Facades\Schema::hasTable('wallets')) {
-            \Modules\Wallet\Entities\Wallet::updateOrInsert(
-                ['buyer_id' => $user->id],
-                ['balance' => $validated['balance']]
-            );
+            $wallet = \Modules\Wallet\Entities\Wallet::getOrCreateForUser($user->id);
+            $targetBalance = (float) $validated['balance'];
+            $currentBalance = (float) $wallet->balance;
+            $diff = round($targetBalance - $currentBalance, 2);
+
+            if ($diff != 0.0) {
+                $direction = $diff > 0 ? 'credit' : 'debit';
+                $walletService = app(\Modules\Wallet\Services\WalletService::class);
+                $adminId = \Illuminate\Support\Facades\Auth::guard('admin')->id() ?? 1;
+                $walletService->adminAdjustment(
+                    $user->id,
+                    abs($diff),
+                    $direction,
+                    $adminId,
+                    "Admin balance adjustment from Users Directory to {$targetBalance} SAR"
+                );
+            }
 
             return response()->json([
                 'status' => 'success',
-                'message' => __('Wallet balance updated successfully'),
+                'message' => __('Wallet balance updated successfully with ledger entry'),
                 'user' => $this->formatUserPayload($user),
             ]);
         }
@@ -215,7 +228,7 @@ class FrontendUserManageController extends Controller
         $walletBalance = 0.0;
         if (class_exists(\Modules\Wallet\Entities\Wallet::class) && \Illuminate\Support\Facades\Schema::hasTable('wallets')) {
             try {
-                $walletBalance = (float) (\Modules\Wallet\Entities\Wallet::where('buyer_id', $user->id)->value('balance') ?? 0);
+                $walletBalance = (float) (\Modules\Wallet\Entities\Wallet::where('user_id', $user->id)->orWhere('buyer_id', $user->id)->value('balance') ?? 0);
             } catch (\Throwable $e) {
                 $walletBalance = 0.0;
             }

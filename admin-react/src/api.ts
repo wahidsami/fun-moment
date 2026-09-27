@@ -1145,5 +1145,297 @@ export const LaravelAPI = {
 
     const payload = await response.json();
     return Array.isArray(payload?.logs) ? payload.logs : [];
+  },
+
+  // Wallet Management & Ledger
+  async getWallets(params?: { search?: string; status?: string }): Promise<{ summary: any; wallets: any[] }> {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.status) query.set('status', params.status);
+
+    const url = `/admin-home/wallets-json${query.toString() ? `?${query.toString()}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load wallets (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return {
+      summary: payload?.summary ?? {},
+      wallets: Array.isArray(payload?.wallets) ? payload.wallets : [],
+    };
+  },
+
+  async getUserWallet(userId: number): Promise<any> {
+    const response = await fetch(`/admin-home/wallets-json/${userId}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load user wallet (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async adjustWalletBalance(userId: number, amount: number, direction: 'credit' | 'debit', reason: string): Promise<any> {
+    const response = await fetch(`/admin-home/wallets-json/${userId}/adjust`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ amount, direction, reason }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to adjust wallet balance (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async updateWalletStatus(userId: number, status: 'active' | 'suspended'): Promise<any> {
+    const response = await fetch(`/admin-home/wallets-json/${userId}/status`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ status }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to update wallet status (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  // Live Chat Hub
+  async getChatConversations(search?: string, status?: string): Promise<{ summary: import('./types').ChatHubSummary; conversations: import('./types').ChatConversationItem[] }> {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (status && status !== 'all') params.append('status', status);
+
+    const response = await fetch(`/admin-home/chat-hub-json?${params.toString()}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load chat conversations (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload.data;
+  },
+
+  async getChatConversationDetails(id: number): Promise<import('./types').ChatConversationDetail> {
+    const response = await fetch(`/admin-home/chat-hub-json/${id}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load conversation details (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload.data;
+  },
+
+  async updateChatConversationStatus(id: number, status: 'active' | 'archived'): Promise<any> {
+    const response = await fetch(`/admin-home/chat-hub-json/${id}/status`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ status }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to update conversation status (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  // Jobs & Bidding
+  async getJobs(search?: string, status?: string): Promise<{ metrics: import('./types').JobsSummary; jobs: { data: import('./types').JobPostItem[]; total: number; current_page: number } }> {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (status && status !== 'all') params.append('status', status);
+
+    const response = await fetch(`/admin-home/jobs-json?${params.toString()}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load jobs (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload.data;
+  },
+
+  async getJobDetails(id: number): Promise<import('./types').JobPostItem> {
+    const response = await fetch(`/admin-home/jobs-json/${id}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load job details (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload.data;
+  },
+
+  async getJobProposals(id: number): Promise<import('./types').JobProposalItem[]> {
+    const response = await fetch(`/admin-home/jobs-json/${id}/proposals`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load job proposals (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload.data;
+  },
+
+  async updateJobStatus(id: number, payload: { status?: number; is_job_on?: number }): Promise<any> {
+    const response = await fetch(`/admin-home/jobs-json/${id}/status`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to update job status (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  // Subscriptions & Monetization
+  async getSubscriptions(): Promise<{
+    metrics: import('./types').SubscriptionSummary;
+    plans: import('./types').SubscriptionPlanItem[];
+    subscribers: { data: import('./types').SellerSubscriberItem[]; total: number; current_page: number };
+    recent_histories: import('./types').SubscriptionHistoryItem[];
+  }> {
+    const response = await fetch('/admin-home/subscriptions-json', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load subscriptions (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload.data;
+  },
+
+  async createSubscriptionPlan(payload: Partial<import('./types').SubscriptionPlanItem>): Promise<any> {
+    const response = await fetch('/admin-home/subscriptions-json/plans', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to create subscription plan (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async updateSubscriptionPlan(id: number, payload: Partial<import('./types').SubscriptionPlanItem>): Promise<any> {
+    const response = await fetch(`/admin-home/subscriptions-json/plans/${id}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to update subscription plan (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async toggleSubscriptionPlanStatus(id: number): Promise<any> {
+    const response = await fetch(`/admin-home/subscriptions-json/plans/${id}/status`, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to toggle plan status (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async adjustSubscriber(sellerId: number, payload: { connect?: number; service?: number; job?: number; days_to_add?: number; admin_note: string }): Promise<any> {
+    const response = await fetch(`/admin-home/subscriptions-json/subscribers/${sellerId}/adjust`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to adjust subscriber (${response.status})`);
+    }
+
+    return response.json();
   }
 };

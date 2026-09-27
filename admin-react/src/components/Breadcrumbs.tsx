@@ -41,17 +41,22 @@ export default function Breadcrumbs({ currentView, language }: BreadcrumbsProps)
         ];
       case 'payments':
         return [
-          { label: isRtl ? 'النظام الأساسي' : 'Core Platform', active: false },
+          { label: t.nav_financials, active: false },
           { label: t.nav_payments, active: true }
+        ];
+      case 'payouts':
+        return [
+          { label: t.nav_financials, active: false },
+          { label: t.nav_payouts, active: true }
         ];
       case 'support':
         return [
-          { label: isRtl ? 'النظام الأساسي' : 'Core Platform', active: false },
+          { label: t.nav_support_section, active: false },
           { label: t.nav_support, active: true }
         ];
       case 'cms':
         return [
-          { label: isRtl ? 'النظام الأساسي' : 'Core Platform', active: false },
+          { label: isRtl ? 'إعدادات النظام' : 'System Config', active: false },
           { label: t.nav_cms, active: true }
         ];
       case 'localization':
@@ -66,22 +71,22 @@ export default function Breadcrumbs({ currentView, language }: BreadcrumbsProps)
         ];
       case 'wallet':
         return [
-          { label: isRtl ? 'الخدمات المضافة' : 'Add-on Modules', active: false },
+          { label: t.nav_financials, active: false },
           { label: t.nav_wallet, active: true }
         ];
       case 'chat':
         return [
-          { label: isRtl ? 'الخدمات المضافة' : 'Add-on Modules', active: false },
+          { label: t.nav_support_section, active: false },
           { label: t.nav_chat, active: true }
         ];
       case 'jobs':
         return [
-          { label: isRtl ? 'الخدمات المضافة' : 'Add-on Modules', active: false },
+          { label: t.nav_marketplace_section, active: false },
           { label: t.nav_jobs, active: true }
         ];
       case 'subscription':
         return [
-          { label: isRtl ? 'الخدمات المضافة' : 'Add-on Modules', active: false },
+          { label: t.nav_monetization_section, active: false },
           { label: t.nav_subscription, active: true }
         ];
       default:

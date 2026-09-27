@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  Banknote,
   X
 } from 'lucide-react';
 import logo from '../../thelogo.png';
@@ -52,27 +53,100 @@ export default function Sidebar({
   const t = translations[language];
   const isRtl = language === 'ar';
 
-  // Core platform features
-  const menuItems = [
+  // Core operations
+  const coreItems = [
     { view: 'dashboard', label: t.nav_dashboard, icon: LayoutDashboard },
     { view: 'services', label: t.nav_services, icon: Briefcase },
     { view: 'users', label: t.nav_users, icon: Users },
     { view: 'orders', label: t.nav_orders, icon: ShoppingBag },
+  ];
+
+  // Financials
+  const financialItems = [
     { view: 'payments', label: t.nav_payments, icon: CreditCard },
+    { view: 'payouts', label: t.nav_payouts, icon: Banknote },
+    { view: 'wallet', label: t.nav_wallet, icon: Wallet, moduleKey: 'wallet' as AddonModuleKey },
+  ];
+
+  // Support
+  const supportItems = [
     { view: 'support', label: t.nav_support, icon: LifeBuoy },
+    { view: 'chat', label: t.nav_chat, icon: MessageSquare, moduleKey: 'chat' as AddonModuleKey },
+  ];
+
+  // Marketplace
+  const marketplaceItems = [
+    { view: 'jobs', label: t.nav_jobs, icon: Hammer, moduleKey: 'jobs' as AddonModuleKey },
+  ];
+
+  // Monetization
+  const monetizationItems = [
+    { view: 'subscription', label: t.nav_subscription, icon: Award, moduleKey: 'subscription' as AddonModuleKey },
+  ];
+
+  // Platform & Configuration
+  const platformItems = [
     { view: 'cms', label: t.nav_cms, icon: FileText },
     { view: 'localization', label: t.nav_localization, icon: Languages },
     { view: 'settings', label: t.nav_settings, icon: Settings2 },
     { view: 'audit', label: isRtl ? 'الأمان وسجل التدقيق' : 'Security & Audit Logs', icon: ShieldCheck },
   ];
 
-  // Add-on modules
-  const addonItems = [
-    { view: 'wallet', label: t.nav_wallet, icon: Wallet, moduleKey: 'wallet' as AddonModuleKey },
-    { view: 'chat', label: t.nav_chat, icon: MessageSquare, moduleKey: 'chat' as AddonModuleKey },
-    { view: 'jobs', label: t.nav_jobs, icon: Hammer, moduleKey: 'jobs' as AddonModuleKey },
-    { view: 'subscription', label: t.nav_subscription, icon: Award, moduleKey: 'subscription' as AddonModuleKey },
-  ];
+  const renderNavSection = (
+    title: string,
+    items: Array<{ view: string; label: string; icon: any; moduleKey?: AddonModuleKey }>,
+    lockedBadge?: boolean
+  ) => (
+    <div>
+      {!isCollapsed ? (
+        <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase px-3 flex items-center justify-between">
+          <span>{title}</span>
+          {lockedBadge && (
+            <span className="bg-slate-800 text-[8px] text-slate-400 rounded px-1 py-0.5">LOCKED</span>
+          )}
+        </span>
+      ) : (
+        <div className="border-t border-slate-800/60 my-2 mx-1" />
+      )}
+      <ul className="mt-2 space-y-1">
+        {items.map(item => {
+          const Icon = item.icon;
+          const isLocked = item.moduleKey ? lockedModules[item.moduleKey] : false;
+          const isActive = currentView === item.view;
+          return (
+            <li key={item.view}>
+              <button
+                onClick={() => {
+                  setCurrentView(item.view);
+                  onCloseMobile();
+                }}
+                className={`flex w-full items-center justify-between rounded-lg py-2.5 text-xs font-semibold transition duration-150 focus:outline-none ${
+                  isCollapsed ? 'justify-center px-0' : 'px-3'
+                } ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                }`}
+                title={isCollapsed ? item.label : undefined}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Icon className={`h-4.5 w-4.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                  {!isCollapsed && <span className="truncate">{item.label}</span>}
+                </div>
+                {!isCollapsed && item.moduleKey && (
+                  isLocked ? (
+                    <Lock className="h-3 w-3 text-slate-500 shrink-0 ml-1 mr-1" />
+                  ) : (
+                    <Unlock className="h-3 w-3 text-emerald-400 shrink-0 ml-1 mr-1" />
+                  )
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-slate-900 text-white select-none">
@@ -118,97 +192,24 @@ export default function Sidebar({
       </div>
 
       {/* Main navigation list */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-6">
-        {/* Core Platform Section */}
-        <div>
-          {!isCollapsed ? (
-            <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase px-3 block">
-              {isRtl ? 'النظام الأساسي' : 'Core Platform'}
-            </span>
-          ) : (
-            <div className="border-t border-slate-800/60 my-2 mx-1" />
-          )}
-          <ul className="mt-2 space-y-1">
-            {menuItems.map(item => {
-              const Icon = item.icon;
-              const isActive = currentView === item.view;
-              return (
-                <li key={item.view}>
-                  <button
-                    onClick={() => {
-                      setCurrentView(item.view);
-                      onCloseMobile();
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-lg py-2.5 text-xs font-semibold transition duration-150 focus:outline-none ${
-                      isCollapsed ? 'justify-center px-0' : 'px-3'
-                    } ${
-                      isActive
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
-                        : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
-                    }`}
-                    title={isCollapsed ? item.label : undefined}
-                  >
-                    <Icon className={`h-4.5 w-4.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                    {!isCollapsed && <span className="truncate">{item.label}</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-5">
+        {/* Core Operations */}
+        {renderNavSection(isRtl ? 'النظام الأساسي' : 'Core Platform', coreItems)}
 
-        {/* Add-on Modules Section */}
-        <div>
-          {!isCollapsed ? (
-            <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase px-3 flex items-center justify-between">
-              <span>{isRtl ? 'الخدمات المضافة' : 'Add-on Modules'}</span>
-              <span className="bg-slate-800 text-[8px] text-slate-400 rounded px-1 py-0.5">LOCKED</span>
-            </span>
-          ) : (
-            <div className="border-t border-slate-800/60 my-2 mx-1" />
-          )}
-          <ul className="mt-2 space-y-1">
-            {addonItems.map(item => {
-              const Icon = item.icon;
-              const isLocked = lockedModules[item.moduleKey];
-              const isActive = currentView === item.view;
-              return (
-                <li key={item.view}>
-                  <button
-                    onClick={() => {
-                      setCurrentView(item.view);
-                      onCloseMobile();
-                    }}
-                    className={`flex w-full items-center justify-between rounded-lg py-2.5 text-xs font-semibold transition duration-150 focus:outline-none ${
-                      isCollapsed ? 'justify-center px-0' : 'px-3'
-                    } ${
-                      isActive
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
-                        : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
-                    }`}
-                    title={isCollapsed ? item.label : undefined}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Icon className={`h-4.5 w-4.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                      {!isCollapsed && (
-                        <span className="truncate">
-                          {item.label}
-                        </span>
-                      )}
-                    </div>
-                    {!isCollapsed && (
-                      isLocked ? (
-                        <Lock className="h-3 w-3 text-slate-500 shrink-0 ml-1 mr-1" />
-                      ) : (
-                        <Unlock className="h-3 w-3 text-emerald-400 shrink-0 ml-1 mr-1" />
-                      )
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        {/* Financials */}
+        {renderNavSection(t.nav_financials, financialItems)}
+
+        {/* Support */}
+        {renderNavSection(t.nav_support_section, supportItems)}
+
+        {/* Marketplace */}
+        {renderNavSection(t.nav_marketplace_section, marketplaceItems)}
+
+        {/* Monetization */}
+        {renderNavSection(t.nav_monetization_section, monetizationItems)}
+
+        {/* Platform & Configuration */}
+        {renderNavSection(isRtl ? 'إعدادات النظام' : 'System Config', platformItems)}
       </div>
 
       {/* Footer System Status Badge */}

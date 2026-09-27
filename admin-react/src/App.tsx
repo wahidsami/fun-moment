@@ -19,6 +19,10 @@ import LocalizationView from './components/LocalizationView';
 import SettingsView from './components/SettingsView';
 import AddonLockedView from './components/AddonLockedView';
 import AuditView from './components/AuditView';
+import WalletView from './components/WalletView';
+import ChatHubView from './components/ChatHubView';
+import JobsView from './components/JobsView';
+import SubscriptionsView from './components/SubscriptionsView';
 import AdminLoginScreen from './components/AdminLoginScreen';
 import { AddonsService } from './services/api';
 import { checkPermission, saveAuditLog, ROLE_NAMES } from './utils/auditLogger';
@@ -227,6 +231,11 @@ export default function App() {
     users: 'manage_users',
     orders: 'manage_orders',
     payments: 'manage_payments',
+    payouts: 'manage_payments',
+    wallet: 'manage_payments',
+    chat: 'manage_support',
+    jobs: 'manage_services',
+    subscription: 'manage_payments',
     support: 'manage_support',
     cms: 'manage_cms',
     localization: 'manage_cms', // CMS control or translation key control
@@ -251,7 +260,9 @@ export default function App() {
       case 'orders':
         return <OrdersView language={language} activeRole={activeRole} />;
       case 'payments':
-        return <PaymentsView language={language} activeRole={activeRole} />;
+        return <PaymentsView language={language} activeRole={activeRole} initialTab="transactions" />;
+      case 'payouts':
+        return <PaymentsView language={language} activeRole={activeRole} initialTab="payouts" />;
       case 'support':
         return <SupportView language={language} activeRole={activeRole} />;
       case 'cms':
@@ -263,16 +274,58 @@ export default function App() {
       case 'audit':
         return <AuditView language={language} activeRole={activeRole} />;
       
-      // Add-on modules (which display locked state)
+      // Wallet module
       case 'wallet':
-      case 'chat':
-      case 'jobs':
-      case 'subscription':
+        if (!lockedModules.wallet) {
+          return <WalletView language={language} activeRole={activeRole} />;
+        }
         return (
           <AddonLockedView
-            moduleKey={currentView as AddonModuleKey}
+            moduleKey="wallet"
             language={language}
-            isLocked={lockedModules[currentView as AddonModuleKey]}
+            isLocked={lockedModules.wallet}
+            onToggleLock={handleToggleLock}
+          />
+        );
+
+      // Live Chat Hub module
+      case 'chat':
+        if (!lockedModules.chat) {
+          return <ChatHubView language={language} activeRole={activeRole} />;
+        }
+        return (
+          <AddonLockedView
+            moduleKey="chat"
+            language={language}
+            isLocked={lockedModules.chat}
+            onToggleLock={handleToggleLock}
+          />
+        );
+
+      // Jobs & Bidding module
+      case 'jobs':
+        if (!lockedModules.jobs) {
+          return <JobsView language={language} activeRole={activeRole} />;
+        }
+        return (
+          <AddonLockedView
+            moduleKey="jobs"
+            language={language}
+            isLocked={lockedModules.jobs}
+            onToggleLock={handleToggleLock}
+          />
+        );
+
+      // Subscription module
+      case 'subscription':
+        if (!lockedModules.subscription) {
+          return <SubscriptionsView language={language} activeRole={activeRole} />;
+        }
+        return (
+          <AddonLockedView
+            moduleKey="subscription"
+            language={language}
+            isLocked={lockedModules.subscription}
             onToggleLock={handleToggleLock}
           />
         );

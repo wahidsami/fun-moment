@@ -63,19 +63,22 @@ class WalletService with ChangeNotifier {
 
     print('wallet history response ${response.body}');
 
-    if (response.statusCode == 200 && decodedData['history'].isNotEmpty) {
-      final data = WalletHistoryModel.fromJson(jsonDecode(response.body));
-      walletHistory = data.history;
+    if (response.statusCode == 200 && decodedData['history'] != null) {
+      if (decodedData['history'].isNotEmpty) {
+        final data = WalletHistoryModel.fromJson(jsonDecode(response.body));
+        walletHistory = data.history;
+        hasWalletHistory = true;
+      } else {
+        walletHistory = [];
+        hasWalletHistory = false;
+      }
       notifyListeners();
     } else {
       print('Error fetching wallet history' + response.body);
 
       hasWalletHistory = false;
+      walletHistory = [];
       notifyListeners();
-
-      Future.delayed(const Duration(seconds: 1), () {
-        hasWalletHistory = true;
-      });
     }
   }
 

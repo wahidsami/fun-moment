@@ -338,3 +338,262 @@ export interface ApprovalTask {
   payload: any;
   status: 'pending' | 'approved' | 'rejected';
 }
+
+export interface WalletItem {
+  id: number;
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  user_phone: string;
+  role: 'buyer' | 'seller';
+  balance: number;
+  pending_balance: number;
+  total_earned: number;
+  total_spent: number;
+  status: 'active' | 'suspended';
+  currency: string;
+  updated_at: string;
+}
+
+export interface WalletSummary {
+  total_wallets: number;
+  active_wallets: number;
+  frozen_wallets: number;
+  total_circulation: number;
+  total_pending: number;
+  total_earned: number;
+  total_spent: number;
+  currency: string;
+}
+
+export interface WalletLedgerItem {
+  id: number;
+  transaction_id: string;
+  entry_type: 'credit' | 'debit' | 'hold' | 'release' | 'refund' | 'adjustment' | 'payout';
+  amount: number;
+  balance_before: number;
+  balance_after: number;
+  payment_gateway: string;
+  payment_status: string;
+  reference_type: string;
+  reference_id: string;
+  description_en: string;
+  description_ar: string;
+  admin_name?: string;
+  admin_note?: string;
+  created_at: string;
+}
+
+export interface UserWalletDetail {
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+    role: 'buyer' | 'seller';
+  };
+  wallet: {
+    id: number;
+    balance: number;
+    pending_balance: number;
+    total_earned: number;
+    total_spent: number;
+    status: 'active' | 'suspended';
+    currency: string;
+  };
+  ledger: WalletLedgerItem[];
+}
+
+export interface ChatParticipant {
+  id: number;
+  name: string;
+  email?: string;
+}
+
+export interface ChatConversationItem {
+  id: number;
+  buyer: ChatParticipant;
+  seller: ChatParticipant;
+  last_message: string;
+  last_message_at: string;
+  total_messages: number;
+  buyer_unread: number;
+  seller_unread: number;
+  status: 'active' | 'archived';
+}
+
+export interface ChatMessageItem {
+  id: number;
+  from_user: number;
+  sender_name: string;
+  sender_role: 'buyer' | 'seller';
+  message: string;
+  image?: string;
+  image_url?: string;
+  is_read: boolean;
+  created_at: string;
+  time_str: string;
+}
+
+export interface ChatHubSummary {
+  total_conversations: number;
+  total_messages: number;
+  messages_today: number;
+  active_conversations: number;
+}
+
+export interface ChatConversationDetail {
+  conversation: {
+    id: number;
+    buyer: ChatParticipant;
+    seller: ChatParticipant;
+    status: 'active' | 'archived';
+    created_at: string;
+  };
+  messages: ChatMessageItem[];
+}
+
+export interface JobProposalItem {
+  id: number;
+  job_post_id: number;
+  buyer_id: number;
+  seller_id: number;
+  seller?: {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string;
+  };
+  expected_salary: number;
+  cover_letter: string;
+  is_hired: number;
+  status: number;
+  created_at: string;
+  conversations?: Array<{
+    id: number;
+    type: 'buyer' | 'seller';
+    message: string;
+    created_at: string;
+  }>;
+}
+
+export interface JobPostItem {
+  id: number;
+  category_id: number;
+  subcategory_id?: number;
+  buyer_id: number;
+  buyer?: {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string;
+  };
+  category?: {
+    id: number;
+    name: string;
+  };
+  subcategory?: {
+    id: number;
+    name: string;
+  };
+  city?: {
+    id: number;
+    service_city: string;
+  };
+  title: string;
+  slug: string;
+  description: string;
+  price: number;
+  is_job_online: number;
+  dead_line?: string;
+  view: number;
+  is_job_on: number;
+  status: number;
+  job_requests_count?: number;
+  created_at: string;
+}
+
+export interface JobsSummary {
+  total_jobs: number;
+  open_jobs: number;
+  hired_jobs: number;
+  total_proposals: number;
+  hired_proposals: number;
+}
+
+export interface SubscriptionPlanItem {
+  id: number;
+  title: string;
+  type: 'monthly' | 'yearly' | 'lifetime';
+  price: number;
+  connect: number;
+  service: number;
+  job: number;
+  description?: string;
+  status: number;
+  created_at: string;
+}
+
+export interface SellerSubscriberItem {
+  id: number;
+  seller_id: number;
+  subscription_id?: number;
+  type: string;
+  price: number;
+  connect: number;
+  service: number;
+  job: number;
+  initial_connect: number;
+  initial_service: number;
+  initial_job: number;
+  expire_date?: string;
+  payment_gateway?: string;
+  payment_status: string;
+  status: number;
+  created_at: string;
+  seller?: {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string;
+  };
+  subscription?: {
+    id: number;
+    title: string;
+  };
+}
+
+export interface SubscriptionHistoryItem {
+  id: number;
+  seller_id: number;
+  subscription_id?: number;
+  type?: string;
+  price: number;
+  connect: number;
+  service: number;
+  job: number;
+  expire_date?: string;
+  payment_gateway?: string;
+  payment_status: string;
+  status: number;
+  created_at: string;
+  seller?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  subscription?: {
+    id: number;
+    title: string;
+  };
+}
+
+export interface SubscriptionSummary {
+  total_plans: number;
+  active_subscribers: number;
+  expired_subscribers: number;
+  total_revenue: number;
+}
+
+
+

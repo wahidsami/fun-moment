@@ -27,8 +27,8 @@ class SellerSubscriptionController extends Controller
      public function subscription_history()
      {
          $seller_id = auth('sanctum')->id();
-         $subscription_history = SubscriptionHistory::where('seller_id',$seller_id)->get();
-         if($subscription_history){
+         $subscription_history = SubscriptionHistory::with('subscription')->where('seller_id',$seller_id)->orderBy('id', 'desc')->get();
+         if($subscription_history && $subscription_history->count() > 0){
              return response()->success([
                  'subscription_history'=>$subscription_history,
              ]);
@@ -37,5 +37,13 @@ class SellerSubscriptionController extends Controller
                  'subscription_history'=>__('No History Found'),
              ]);
          }
+     }
+
+     public function subscription_plans()
+     {
+         $plans = \Modules\Subscription\Entities\Subscription::where('status', 1)->orderBy('price', 'asc')->get();
+         return response()->success([
+             'subscription_plans' => $plans,
+         ]);
      }
 }

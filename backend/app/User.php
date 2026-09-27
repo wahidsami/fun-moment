@@ -126,4 +126,13 @@ class User extends Authenticatable
         return $this->hasOne(UserUniqueKey::class, 'user_id', 'id');
     }
 
+    public function buyer_jobs()
+    {
+        return $this->hasMany(\Modules\JobPost\Entities\BuyerJob::class, 'buyer_id', 'id');
+    }
+
+    public function job_requests()
+    {
+        return $this->hasMany(\Modules\JobPost\Entities\JobRequest::class, 'seller_id', 'id');
+    }
 }
