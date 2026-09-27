@@ -20,7 +20,7 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<ProviderServiceManagementService>(context, listen: false)
-          .fetchMyServices();
+          .fetchMyServices(isRefresh: true);
     });
   }
 
@@ -72,22 +72,30 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline, color: FMColors.magenta),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ProviderAddServicePage(fromMyServices: true)),
               );
+              if (mounted) {
+                Provider.of<ProviderServiceManagementService>(context, listen: false)
+                    .fetchMyServices(isRefresh: true);
+              }
             },
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: FMColors.magenta,
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const ProviderAddServicePage(fromMyServices: true)),
           );
+          if (mounted) {
+            Provider.of<ProviderServiceManagementService>(context, listen: false)
+                .fetchMyServices(isRefresh: true);
+          }
         },
         icon: const Icon(Icons.add, color: Colors.white),
         label: Text(

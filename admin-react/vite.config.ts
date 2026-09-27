@@ -19,19 +19,19 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         '/admin-home': {
-          target: 'http://127.0.0.1:8000',
+          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'http://127.0.0.1:8000',
           changeOrigin: true,
         },
         '/login': {
-          target: 'http://127.0.0.1:8000',
+          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'http://127.0.0.1:8000',
           changeOrigin: true,
         },
         '/logout': {
-          target: 'http://127.0.0.1:8000',
+          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'http://127.0.0.1:8000',
           changeOrigin: true,
         },
         '/sanctum/csrf-cookie': {
-          target: 'http://127.0.0.1:8000',
+          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'http://127.0.0.1:8000',
           changeOrigin: true,
         },
       },
