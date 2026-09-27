@@ -98,6 +98,10 @@ class SellerServiceController extends Controller
             $user = Auth::guard('sanctum')->user();
             $city_id = $request->input('service_city_id') ?: $user->service_city;
             if (empty($city_id) || !\App\ServiceCity::where('id', $city_id)->exists()) {
+                $defaultCity = \App\ServiceCity::where('status', 1)->first() ?: \App\ServiceCity::first();
+                $city_id = $defaultCity ? $defaultCity->id : null;
+            }
+            if (empty($city_id)) {
                 return response()->json([
                     'message' => __('Please complete your service city/location in your profile settings before creating a service.'),
                     'errors' => [
@@ -109,7 +113,7 @@ class SellerServiceController extends Controller
             $request->validate([
                 'category_id' => 'required',
                 'title' => 'required|max:191|unique:services',
-                'description' => 'required|min:150',
+                'description' => 'required|min:10',
                 'price' => 'required|numeric|min:0',
             ]);
             
@@ -120,12 +124,17 @@ class SellerServiceController extends Controller
             if($request->file('image')){
                 $media = MediaHelper::insert_media_image($request,'web','image');
                 $image_id = $media ? $media->id : null;
+            } elseif ($request->has('image') && is_numeric($request->image)) {
+                $image_id = (int) $request->image;
             }
             
             if($request->file('image_gallery')){
                 $media = MediaHelper::insert_media_image($request,'web','image_gallery');
                 $image_id = $media ? $media->id : $image_id;
             }
+
+            $durationInput = $request->input('duration') ?: $request->input('delivery_days', 1);
+            $deliveryDays = (int) preg_replace('/[^0-9]/', '', (string)$durationInput) ?: 1;
 
             $service = new Service();
             $service->category_id = $request->category_id;
@@ -136,11 +145,13 @@ class SellerServiceController extends Controller
             $service->description = $request->description;
             $service->image = $image_id;
             $service->price = (float) $request->price;
+            $service->delivery_days = $deliveryDays;
             $service->video = $request->video;
             $service->seller_id = $user->id;
             $service->service_city_id = $city_id;
             $service->service_area_id = $request->input('service_area_id') ?: $user->service_area;
             $service->status = 0;
+            $service->is_service_on = 1;
             $service->tax = $country_tax->tax ?? 0;
             $service->is_service_all_cities = $request->is_service_all_cities ?? 0;
 
@@ -161,6 +172,25 @@ class SellerServiceController extends Controller
             $last_service_id = $service->id;
             $service->metaData()->create($Metas);
 
+            // Handle optional includes passed with create request
+            if ($request->has('includes')) {
+                $includesData = is_string($request->includes) ? json_decode($request->includes, true) : $request->includes;
+                if (is_array($includesData)) {
+                    foreach ($includesData as $inc) {
+                        $incTitle = is_array($inc) ? ($inc['title'] ?? '') : (string)$inc;
+                        if (!empty(trim($incTitle))) {
+                            Serviceinclude::create([
+                                'service_id' => $service->id,
+                                'seller_id' => $user->id,
+                                'include_service_title' => trim($incTitle),
+                                'include_service_price' => (float) (is_array($inc) ? ($inc['price'] ?? 0) : 0),
+                                'include_service_quantity' => (int) (is_array($inc) ? ($inc['quantity'] ?? 1) : 1),
+                            ]);
+                        }
+                    }
+                }
+            }
+
             try {
                 $message = get_static_option('service_approve_message');
                 $message = str_replace(["@service_id"],[$last_service_id],$message);
@@ -172,89 +202,131 @@ class SellerServiceController extends Controller
                 //
             }
 
-            return response()->success(['msg'=> __('Service Successfully Add'), "id" => $last_service_id]);
+            $imgData = get_attachment_image_by_id($service->image);
+            $imageUrl = !empty($imgData) ? ($imgData['img_url'] ?? null) : null;
+
+            return response()->success([
+                'msg'=> __('Service Successfully Add'),
+                'id' => $last_service_id,
+                'image_url' => $imageUrl,
+                'service' => $service
+            ]);
         }
+    }
+
+    public function serviceDetails($id)
+    {
+        $seller_id = Auth::guard('sanctum')->id();
+        $service = Service::with(['category', 'subcategory', 'childcategory', 'serviceInclude', 'serviceAdditional'])
+            ->where('id', $id)
+            ->where('seller_id', $seller_id)
+            ->first();
+
+        if (!$service) {
+            return response()->error(['message' => __('Service not found or unauthorized')]);
+        }
+
+        $imgData = get_attachment_image_by_id($service->image);
+        $imageUrl = !empty($imgData) ? ($imgData['img_url'] ?? null) : null;
+
+        return response()->success([
+            'service' => $service,
+            'image_url' => $imageUrl,
+            'includes' => $service->serviceInclude,
+            'additionals' => $service->serviceAdditional,
+        ]);
     }
     
     public function updateService(Request $request)
     {
         if ($request->isMethod('post')) {
+            $service_id = $request->input('service_id') ?: $request->input('id');
+            $seller_id = Auth::guard('sanctum')->id();
+
+            $service = Service::where('id', $service_id)->where('seller_id', $seller_id)->first();
+            if (empty($service)) {
+                return response()->error(['message' => __('Service not found or unauthorized')]);
+            }
+
             $request->validate([
-                'category_id' => 'required',
-                'title' => 'required|max:191|unique:services,id,'.$request->service_id,
-                'description' => 'required|min:150',
+                'category_id' => 'nullable',
+                'title' => 'required|max:191|unique:services,title,'.$service->id,
+                'description' => 'required|min:10',
+                'price' => 'nullable|numeric|min:0',
             ]);
 
-            $seller_country = User::select(['id','country_id'])->where('country_id',Auth::guard('sanctum')->user()->country_id)->first();
-            $country_tax = Tax::select('tax')->where('country_id',optional($seller_country)->country_id)->first();
-
-            $old_image = Service::select(['image','image_gallery'])->where('id',$request->service_id)->first();
-            $old_slug = Service::select('slug')->where('id',$request->service_id)->first();
-
-            $image_id = null;
+            $image_id = $service->image;
             if($request->file('image')){
                 $media = MediaHelper::insert_media_image($request,'web','image');
-                $image_id = $media ? $media->id : null;
+                $image_id = $media ? $media->id : $image_id;
             }
             if($request->file('image_gallery')){
                 $media = MediaHelper::insert_media_image($request,'web','image_gallery');
                 $image_id = $media ? $media->id : $image_id;
             }
 
-            $seller_id = Auth::guard('sanctum')->id();
-            $service = Service::where('id', $request->service_id)->where('seller_id', $seller_id)->first();
-            if (empty($service)) {
-                return response()->error(['message' => __('Service not found or unauthorized')]);
-            }
+            $durationInput = $request->input('duration') ?: $request->input('delivery_days');
+            $deliveryDays = $durationInput !== null ? ((int) preg_replace('/[^0-9]/', '', (string)$durationInput) ?: 1) : $service->delivery_days;
 
-            $service->update([
-                'category_id' => $request->category_id ?? $request->category,
-                'subcategory_id' => $request->subcategory_id ?? $request->subcategory,
-                'child_category_id' => $request->child_category_id ?? $request->child_category,
+            $updateData = [
                 'title' => $request->title,
-                'slug' => $request->slug ?? optional($old_slug)->slug,
+                'slug' => ($request->title !== $service->title) ? createSlug($request->title, "service") : $service->slug,
                 'description' => $request->description,
-                'image' => $image_id ?? optional($old_image)->image,
-                'image_gallery' => $image_id ?? optional($old_image)->image_gallery,
-                'video' => $request->video,
-                'tax' => $country_tax->tax ?? 0,
-                'status' => 0,
-                'is_service_all_cities' => $request->is_service_all_cities,
-            ]);
-
-            $service_meta_update =  Service::findOrFail($request->service_id);
-            $Metas = [
-                'meta_title'=> purify_html($request->meta_title),
-                'meta_tags'=> $request->meta_tags,
-                'meta_description'=> purify_html($request->meta_description),
-
-                'facebook_meta_tags'=> purify_html($request->facebook_meta_tags),
-                'facebook_meta_description'=> purify_html($request->facebook_meta_description),
-                'facebook_meta_image'=> $request->facebook_meta_image,
-
-                'twitter_meta_tags'=> purify_html($request->twitter_meta_tags),
-                'twitter_meta_description'=> purify_html($request->twitter_meta_description),
-                'twitter_meta_image'=> $request->twitter_meta_image,
+                'image' => $image_id,
+                'delivery_days' => $deliveryDays,
+                'status' => 0, // Reset to pending approval on edit
             ];
 
-            DB::beginTransaction();
+            if ($request->filled('price')) {
+                $updateData['price'] = (float) $request->price;
+            }
+            if ($request->filled('category_id')) {
+                $updateData['category_id'] = $request->category_id;
+            }
+            if ($request->filled('subcategory_id')) {
+                $updateData['subcategory_id'] = $request->subcategory_id;
+            }
+            if ($request->filled('child_category_id')) {
+                $updateData['child_category_id'] = $request->child_category_id;
+            }
 
-            try {
-                $service_meta_update->metaData()->update($Metas);
-                DB::commit();
-            }catch (\Throwable $th){
-                DB::rollBack();
+            $service->update($updateData);
+
+            // Handle updated includes if provided
+            if ($request->has('includes')) {
+                $includesData = is_string($request->includes) ? json_decode($request->includes, true) : $request->includes;
+                if (is_array($includesData)) {
+                    Serviceinclude::where('service_id', $service->id)->delete();
+                    foreach ($includesData as $inc) {
+                        $incTitle = is_array($inc) ? ($inc['title'] ?? '') : (string)$inc;
+                        if (!empty(trim($incTitle))) {
+                            Serviceinclude::create([
+                                'service_id' => $service->id,
+                                'seller_id' => $seller_id,
+                                'include_service_title' => trim($incTitle),
+                                'include_service_price' => (float) (is_array($inc) ? ($inc['price'] ?? 0) : 0),
+                                'include_service_quantity' => (int) (is_array($inc) ? ($inc['quantity'] ?? 1) : 1),
+                            ]);
+                        }
+                    }
+                }
             }
 
             EditServiceHistory::create([
-                'service_id' => $request->service_id,
-                'seller_id' => Auth::guard('sanctum')->user()->id,
+                'service_id' => $service->id,
+                'seller_id' => $seller_id,
                 'service_title' => $request->title,
                 'service_description' => $request->description,
             ]);
 
+            $imgData = get_attachment_image_by_id($service->image);
+            $imageUrl = !empty($imgData) ? ($imgData['img_url'] ?? null) : null;
+
             return response()->success([
-                'message'=> __('Service updated success'),
+                'status' => 'success',
+                'message'=> __('Service updated successfully and submitted for admin review.'),
+                'service' => $service->fresh(),
+                'image_url' => $imageUrl,
             ]);
         }
     }

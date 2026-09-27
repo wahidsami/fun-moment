@@ -186,6 +186,8 @@ export interface Service {
   created_at: string;
   description_en: string;
   description_ar: string;
+  image?: number | string;
+  image_url?: string;
 }
 
 export interface Order {

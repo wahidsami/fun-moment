@@ -493,25 +493,52 @@ class ServiceController extends Controller
     //get schedule by seller
     public function scheduleByDay($day,$seller_id)
     {
-        $get_day = Day::select('id', 'day','total_day')
-            ->where('day', $day)
+        if (empty($day) || empty($seller_id)) {
+            return response()->json(['status' => __('no schedule')]);
+        }
+
+        $dayMap = [
+            'sunday' => 'Sun', 'sun' => 'Sun',
+            'monday' => 'Mon', 'mon' => 'Mon',
+            'tuesday' => 'Tue', 'tue' => 'Tue',
+            'wednesday' => 'Wed', 'wed' => 'Wed',
+            'thursday' => 'Thu', 'thu' => 'Thu',
+            'friday' => 'Fri', 'fri' => 'Fri',
+            'saturday' => 'Sat', 'sat' => 'Sat',
+        ];
+
+        $cleanDay = strtolower(trim($day));
+        $shortDay = $dayMap[$cleanDay] ?? substr(ucfirst($cleanDay), 0, 3);
+
+        $get_day = Day::select('id', 'day','total_day', 'status')
+            ->where(function ($q) use ($day, $shortDay) {
+                $q->where('day', $day)
+                  ->orWhere('day', $shortDay);
+            })
             ->where('seller_id', $seller_id)
             ->first();
 
-        if (!is_null($get_day)) {
-            $schedules = Schedule::select('schedule')
-                ->where('seller_id', $seller_id)
-                ->where('day_id', $get_day->id)
-                ->get();
-
-            if($schedules->count() >= 1){
-                return response()->json([
-                    'day' => $get_day,
-                    'schedules' => $schedules,
-                ]);
-            }
+        if (!$get_day || (int) $get_day->status === 0) {
             return response()->json([
                 'status' => __('no schedule'),
+            ]);
+        }
+
+        $schedules = Schedule::select('id', 'schedule', 'status')
+            ->where('seller_id', $seller_id)
+            ->where('day_id', $get_day->id)
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', 1)
+                  ->orWhere('status', '1');
+            })
+            ->orderBy('id', 'asc')
+            ->get();
+
+        if ($schedules->count() >= 1) {
+            return response()->json([
+                'day' => $get_day,
+                'schedules' => $schedules,
             ]);
         }
         return response()->json([
@@ -913,7 +940,8 @@ class ServiceController extends Controller
                     ->first();
 
                 if (!is_null($alreadyBooked)) {
-                    return response()->error([
+                    return response()->json([
+                        'error' => true,
                         'message' => __('This schedule has already been booked. Please choose another time slot.'),
                     ], 422);
                 }
@@ -933,11 +961,11 @@ class ServiceController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
-            'post_code' => !$is_service_online_bool ? $request->post_code : '0000',
-            'address' => !$is_service_online_bool ? $request->address : 'n/a',
-            'city' => $request->choose_service_city,
-            'area' => $request->choose_service_area,
-            'country' => $request->choose_service_country,
+            'post_code' => $request->post_code ?: '00000',
+            'address' => $request->address ?: 'N/A',
+            'city' => (int) ($request->choose_service_city ?: ($request->city ?: 1)),
+            'area' => (int) ($request->choose_service_area ?: ($request->area ?: 1)),
+            'country' => (int) ($request->choose_service_country ?: ($request->country ?: 1)),
             'date' => !$is_service_online_bool ? $request->date : '00.00.00',
             'schedule' => !$is_service_online_bool ? $request->schedule : '00.00.00',
             'package_fee' => 0,

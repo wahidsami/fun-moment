@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/home_services/category_service.dart';
@@ -20,9 +22,16 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _priceController = TextEditingController();
+  final _durationController = TextEditingController(text: '1');
   final _descController = TextEditingController();
+
   int? _selectedCategoryId;
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
   bool _isSubmitting = false;
+
+  // Dynamic includes list
+  final List<Map<String, dynamic>> _includes = [];
 
   @override
   void initState() {
@@ -36,8 +45,110 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
   void dispose() {
     _titleController.dispose();
     _priceController.dispose();
+    _durationController.dispose();
     _descController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 88,
+      );
+      if (picked != null) {
+        setState(() {
+          _selectedImage = File(picked.path);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+    });
+  }
+
+  void _addIncludeDialog(BuildContext context) {
+    final lnProvider = Provider.of<AppStringService>(context, listen: false);
+    final titleCtrl = TextEditingController();
+    final priceCtrl = TextEditingController(text: '0');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: FMColors.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: FMColors.magenta.withOpacity(0.3)),
+        ),
+        title: Text(
+          lnProvider.getString("Add What's Included"),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: lnProvider.getString('Item title (e.g. Standard Setup)'),
+                hintStyle: const TextStyle(color: FMColors.textMuted),
+                filled: true,
+                fillColor: FMColors.background,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: priceCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: lnProvider.getString('Price (0 if included in base)'),
+                hintStyle: const TextStyle(color: FMColors.textMuted),
+                filled: true,
+                fillColor: FMColors.background,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(lnProvider.getString('Cancel'), style: const TextStyle(color: FMColors.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: FMColors.magenta,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              final t = titleCtrl.text.trim();
+              if (t.isNotEmpty) {
+                final p = double.tryParse(priceCtrl.text.trim()) ?? 0.0;
+                setState(() {
+                  _includes.add({
+                    'title': t,
+                    'price': p,
+                    'quantity': 1,
+                  });
+                });
+                Navigator.pop(ctx);
+              }
+            },
+            child: Text(lnProvider.getString('Add'), style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _submit() async {
@@ -58,19 +169,23 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
 
     try {
       final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
+      final deliveryDays = int.tryParse(_durationController.text.trim()) ?? 1;
       final providerService = Provider.of<ProviderServiceManagementService>(context, listen: false);
+
       final success = await providerService.createService(
         context: context,
         title: _titleController.text.trim(),
         description: _descController.text.trim(),
         categoryId: _selectedCategoryId!,
         price: price,
+        deliveryDays: deliveryDays,
+        imageFile: _selectedImage,
+        includes: _includes.isNotEmpty ? _includes : null,
       );
 
       if (!mounted) return;
 
       if (success) {
-        // Show clear success confirmation dialog styled with FUN MOMENT dark/neon UI
         await showDialog(
           context: context,
           barrierDismissible: false,
@@ -147,7 +262,6 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
 
         if (!mounted) return;
 
-        // Navigate automatically to Provider Services / My Services
         if (widget.fromMyServices) {
           Navigator.pop(context);
         } else {
@@ -212,6 +326,92 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
                 ),
               ),
               const SizedBox(height: 24),
+
+              // Service Image / Thumbnail
+              Text(
+                lnProvider.getString('Service Thumbnail'),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _pickImage,
+                child: Container(
+                  height: 170,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: FMColors.surfaceDark,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: _selectedImage != null ? FMColors.magenta : FMColors.border.withOpacity(0.6),
+                      width: _selectedImage != null ? 1.5 : 1,
+                    ),
+                  ),
+                  child: _selectedImage != null
+                      ? Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(13),
+                              child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                            ),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: GestureDetector(
+                                onTap: _removeImage,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black87,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close, color: Colors.white, size: 18),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.edit, size: 14, color: Colors.white),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      lnProvider.getString('Change'),
+                                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_photo_alternate_outlined, size: 48, color: FMColors.magenta.withOpacity(0.8)),
+                            const SizedBox(height: 8),
+                            Text(
+                              lnProvider.getString('Upload Service Thumbnail'),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              lnProvider.getString('Tap to select from gallery'),
+                              style: const TextStyle(color: FMColors.textMuted, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(height: 20),
 
               // Title
               Text(
@@ -278,47 +478,91 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
               ),
               const SizedBox(height: 20),
 
-              // Price
-              Text(
-                '${lnProvider.getString('Price')} (${rtl.currency})',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _priceController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: '0.00',
-                  hintStyle: const TextStyle(color: FMColors.textMuted),
-                  filled: true,
-                  fillColor: FMColors.surfaceDark,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Price is required';
-                  }
-                  if (double.tryParse(val.trim()) == null) {
-                    return 'Please enter a valid price';
-                  }
-                  return null;
-                },
+              // Price & Duration Row
+              Row(
+                children: [
+                  // Price
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${lnProvider.getString('Price')} (${rtl.currency})',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _priceController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: '0.00',
+                            hintStyle: const TextStyle(color: FMColors.textMuted),
+                            filled: true,
+                            fillColor: FMColors.surfaceDark,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) {
+                              return 'Price is required';
+                            }
+                            if (double.tryParse(val.trim()) == null) {
+                              return 'Invalid price';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  // Duration / Delivery Days
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          lnProvider.getString('Delivery Days'),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _durationController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: '1',
+                            hintStyle: const TextStyle(color: FMColors.textMuted),
+                            filled: true,
+                            fillColor: FMColors.surfaceDark,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          ),
+                          validator: (val) {
+                            if (val != null && val.isNotEmpty && int.tryParse(val) == null) {
+                              return 'Must be number';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
 
               // Description
               Text(
-                lnProvider.getString('Description (min 150 characters)'),
+                lnProvider.getString('Description (min 10 characters)'),
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
               ),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _descController,
-                maxLines: 6,
+                maxLines: 5,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: lnProvider.getString('Describe your service in detail (required by platform standards)...'),
+                  hintText: lnProvider.getString('Describe your service in detail...'),
                   hintStyle: const TextStyle(color: FMColors.textMuted),
                   filled: true,
                   fillColor: FMColors.surfaceDark,
@@ -328,12 +572,89 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
                   if (val == null || val.trim().isEmpty) {
                     return 'Description is required';
                   }
-                  if (val.trim().length < 150) {
-                    return 'Description must be at least 150 characters (${val.trim().length}/150)';
+                  if (val.trim().length < 10) {
+                    return 'Description must be at least 10 characters (${val.trim().length}/10)';
                   }
                   return null;
                 },
               ),
+              const SizedBox(height: 24),
+
+              // What's Included Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    lnProvider.getString("What's Included"),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _addIncludeDialog(context),
+                    icon: const Icon(Icons.add, color: FMColors.magenta, size: 18),
+                    label: Text(
+                      lnProvider.getString('Add Item'),
+                      style: const TextStyle(color: FMColors.magenta, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              if (_includes.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: FMColors.surfaceDark.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: FMColors.border.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    lnProvider.getString('No included items added yet. Click "+ Add Item" to specify deliverables.'),
+                    style: const TextStyle(color: FMColors.textMuted, fontSize: 12),
+                  ),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _includes.length,
+                  itemBuilder: (ctx, idx) {
+                    final item = _includes[idx];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: FMColors.surfaceDark,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: FMColors.border.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, size: 16, color: FMColors.magenta),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              item['title'] ?? '',
+                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                            ),
+                          ),
+                          if ((item['price'] ?? 0) > 0)
+                            Text(
+                              '+${rtl.currency}${item['price']}',
+                              style: const TextStyle(color: FMColors.magenta, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 16, color: FMColors.textMuted),
+                            onPressed: () {
+                              setState(() {
+                                _includes.removeAt(idx);
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               const SizedBox(height: 32),
 
               // Submit Button

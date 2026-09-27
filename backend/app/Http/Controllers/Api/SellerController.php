@@ -1258,51 +1258,45 @@ class SellerController extends Controller
     public function availableDaysList()
     {
         return response()->json([
-            "Sat",
             "Sun",
             "Mon",
             "Tue",
             "Wed",
             "Thu",
-            "Fri"
+            "Fri",
+            "Sat"
         ]);
     }
 
     public function scheduleList()
     {
-        $schedules = Schedule::with('days')->where('seller_id', Auth::guard('sanctum')->user()->id)->paginate(10)->withQueryString();
-        $days = Day::where('seller_id', Auth::guard('sanctum')->user()->id)->get();
-        //todo: insert days programmatically if no days available
-        $days_lists = $days->pluck('day')->toArray();
-        $days_need_to_add = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-        if (!empty($days_lists)) {
-            foreach ($days_need_to_add as $dlit) {
-                if (!in_array($dlit, $days_lists)) {
-                    Day::create([
-                        'day' => $dlit,
-                        'status' => 0,
-                        'seller_id' => Auth::guard('sanctum')->user()->id,
-                        'total_day' => 7,
-                    ]);
-                }
-            }
-        }
-
-        $days = Day::with('schedules')->where('seller_id', Auth::guard('sanctum')->user()->id)->get();
+        $seller_id = Auth::guard('sanctum')->user()->id;
+        $schedules = Schedule::with('days')->where('seller_id', $seller_id)->paginate(10)->withQueryString();
+        $days = Day::with('schedules')->where('seller_id', $seller_id)->get();
         return response()->json(["schedule" => $schedules, "days" => $days]);
     }
 
     public function scheduleDaysList()
     {
-        $days = Day::with('schedules')->where('seller_id', Auth::guard('sanctum')->user()->id)->get();
-        return response()->json($days);
+        $seller_id = Auth::guard('sanctum')->user()->id;
+        $days = Day::with(['schedules' => function ($query) {
+            $query->orderBy('id', 'asc');
+        }])->where('seller_id', $seller_id)->get();
+
+        // Sort days logically Sun -> Sat
+        $order = ['Sun' => 1, 'Mon' => 2, 'Tue' => 3, 'Wed' => 4, 'Thu' => 5, 'Fri' => 6, 'Sat' => 7];
+        $sorted = $days->sortBy(function ($day) use ($order) {
+            $short = substr($day->day, 0, 3);
+            return $order[$short] ?? 99;
+        })->values();
+
+        return response()->json($sorted);
     }
 
     public function createDay(Request $request)
     {
-
         $validator = Validator::make($request->all(), [
-            'day' => 'required',
+            'day' => 'required|string',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -1311,29 +1305,83 @@ class SellerController extends Controller
             ], 422);
         }
 
-        $day = Day::select('day', 'seller_id')
-            ->where('seller_id', Auth::guard('sanctum')->user()->id)
-            ->where('day', $request->day)
+        $seller_id = Auth::guard('sanctum')->user()->id;
+        $dayInput = trim($request->day);
+
+        // Normalize to standard 3-letter representation
+        $dayMap = [
+            'sunday' => 'Sun', 'sun' => 'Sun',
+            'monday' => 'Mon', 'mon' => 'Mon',
+            'tuesday' => 'Tue', 'tue' => 'Tue',
+            'wednesday' => 'Wed', 'wed' => 'Wed',
+            'thursday' => 'Thu', 'thu' => 'Thu',
+            'friday' => 'Fri', 'fri' => 'Fri',
+            'saturday' => 'Sat', 'sat' => 'Sat',
+        ];
+        $normalizedDay = $dayMap[strtolower($dayInput)] ?? substr(ucfirst($dayInput), 0, 3);
+
+        $existingDay = Day::where('seller_id', $seller_id)
+            ->where(function ($q) use ($dayInput, $normalizedDay) {
+                $q->where('day', $dayInput)->orWhere('day', $normalizedDay);
+            })
             ->first();
-        if (!empty($day)) {
-            return  response()->json(["message" => __('Day Already Exists---')], 422);
+
+        if ($existingDay) {
+            $existingDay->status = 1;
+            $existingDay->save();
+            return response()->json([
+                'status' => 'success',
+                'message' => __('Working day activated successfully'),
+                'day' => $existingDay
+            ]);
         }
 
-        Day::create([
-            'day' => $request->day,
-            'status' => 0,
-            'seller_id' => Auth::guard('sanctum')->user()->id,
+        $created = Day::create([
+            'day' => $normalizedDay,
+            'status' => 1,
+            'seller_id' => $seller_id,
             'total_day' => 7,
         ]);
 
-
         return response()->json([
-            "message" => __('Day Added Success---')
+            'status' => 'success',
+            'message' => __('Working day added successfully'),
+            'day' => $created
         ]);
     }
+
+    public function toggleDay(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'id' => 'required',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['error' => true, 'message' => $validator->errors()], 422);
+        }
+
+        $seller_id = Auth::guard('sanctum')->user()->id;
+        $day = Day::where('seller_id', $seller_id)
+            ->where(function ($q) use ($request) {
+                $q->where('id', $request->id)->orWhere('day', $request->id);
+            })
+            ->first();
+
+        if (!$day) {
+            return response()->json(['error' => true, 'message' => __('Day not found or unauthorized')], 404);
+        }
+
+        $day->status = ((int) $day->status === 1) ? 0 : 1;
+        $day->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $day->status == 1 ? __('Working day enabled') : __('Working day disabled'),
+            'day' => $day
+        ]);
+    }
+
     public function deleteDay(Request $request)
     {
-
         $validator = Validator::make($request->all(), [
             'id' => 'required',
         ]);
@@ -1344,33 +1392,44 @@ class SellerController extends Controller
             ], 422);
         }
 
-        Day::where('seller_id', Auth::guard('sanctum')->user()->id)
-            ->where('id', $request->id)
-            ->delete();
+        $seller_id = Auth::guard('sanctum')->user()->id;
+        $day = Day::where('seller_id', $seller_id)->where('id', $request->id)->first();
+        if (!$day) {
+            return response()->json(['error' => true, 'message' => __('Day not found or unauthorized')], 404);
+        }
+
+        Schedule::where('day_id', $day->id)->where('seller_id', $seller_id)->delete();
+        $day->delete();
 
         return response()->json([
-            "message" => __('Day Delete Success---')
+            "message" => __('Day deleted successfully')
         ]);
     }
 
-    public function scheduleDelete(Request $request)
+    private function parseTimeRange($rangeString)
     {
+        $parts = explode('-', $rangeString);
+        if (count($parts) !== 2) {
+            return null;
+        }
+        $startStr = trim($parts[0]);
+        $endStr = trim($parts[1]);
 
-        $validator = Validator::make($request->all(), [
-            'id' => 'required',
-        ]);
-        if ($validator->fails()) {
-            return response()->json([
-                'error' => true,
-                'message' => $validator->errors()
-            ], 422);
+        $startTime = strtotime($startStr);
+        $endTime = strtotime($endStr);
+
+        if ($startTime === false || $endTime === false) {
+            return null;
         }
 
-        Schedule::where('id', $request->id)->where('seller_id', Auth::guard('sanctum')->user()->id)->delete();
+        $startSec = (int) date('H', $startTime) * 3600 + (int) date('i', $startTime) * 60;
+        $endSec = (int) date('H', $endTime) * 3600 + (int) date('i', $endTime) * 60;
 
-        return response()->json([
-            "message" => __('Day Delete Success---')
-        ]);
+        return [
+            'start' => $startSec,
+            'end' => $endSec,
+            'formatted' => date('h:i A', $startTime) . ' - ' . date('h:i A', $endTime),
+        ];
     }
 
     public function scheduleCreate(Request $request)
@@ -1378,8 +1437,7 @@ class SellerController extends Controller
         $rule = $request->has('schedule_for_all_days') ? 'nullable' : 'required';
         $validator = Validator::make($request->all(), [
             'day_id' => $rule . '|integer',
-            'schedule' => 'required',
-
+            'schedule' => 'required|string',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -1388,36 +1446,111 @@ class SellerController extends Controller
             ], 422);
         }
 
-        if ($request->has('schedule_for_all_days')) {
-            $days = Day::where('seller_id', Auth::guard('sanctum')->user()->id)->get();
-            foreach ($days as $day) {
-                Schedule::create([
-                    'day_id' => $day->id,
-                    'seller_id' => Auth::guard('sanctum')->user()->id,
-                    'schedule' => $request->schedule,
-                    'status' => 0,
-                    'allow_multiple_schedule' => 'no',
-                ]);
+        $seller_id = Auth::guard('sanctum')->user()->id;
+        $parsed = $this->parseTimeRange($request->schedule);
+        if (!$parsed) {
+            return response()->json([
+                'error' => true,
+                'message' => __('Invalid time slot format. Please use format: 09:00 AM - 10:00 AM')
+            ], 422);
+        }
+
+        if ($parsed['end'] <= $parsed['start']) {
+            return response()->json([
+                'error' => true,
+                'message' => __('Slot end time must be after start time.')
+            ], 422);
+        }
+
+        $formattedSlot = $parsed['formatted'];
+
+        if ($request->has('schedule_for_all_days') && $request->schedule_for_all_days) {
+            $days = Day::where('seller_id', $seller_id)->where('status', 1)->get();
+            if ($days->isEmpty()) {
+                return response()->json([
+                    'error' => true,
+                    'message' => __('Please enable at least one working day first.')
+                ], 422);
             }
 
-            return response()->json(["message" => __('Schedule Added Success---')]);
+            foreach ($days as $day) {
+                // Check duplicate
+                $exists = Schedule::where('day_id', $day->id)
+                    ->where('seller_id', $seller_id)
+                    ->where('schedule', $formattedSlot)
+                    ->exists();
+                if (!$exists) {
+                    Schedule::create([
+                        'day_id' => $day->id,
+                        'seller_id' => $seller_id,
+                        'schedule' => $formattedSlot,
+                        'status' => 1,
+                        'allow_multiple_schedule' => 'no',
+                    ]);
+                }
+            }
+
+            return response()->json(["message" => __('Schedule added for all active days.')]);
         }
-        Schedule::create([
-            'day_id' => $request->day_id,
-            'seller_id' => Auth::guard('sanctum')->user()->id,
-            'schedule' => $request->schedule,
-            'status' => 0,
+
+        // Verify day ownership
+        $day = Day::where('id', $request->day_id)->where('seller_id', $seller_id)->first();
+        if (!$day) {
+            return response()->json([
+                'error' => true,
+                'message' => __('Selected day not found or unauthorized.')
+            ], 403);
+        }
+
+        // Check duplicate
+        $duplicate = Schedule::where('day_id', $day->id)
+            ->where('seller_id', $seller_id)
+            ->where('schedule', $formattedSlot)
+            ->exists();
+        if ($duplicate) {
+            return response()->json([
+                'error' => true,
+                'message' => __('This schedule slot already exists for this day.')
+            ], 422);
+        }
+
+        // Check overlap with existing slots on the same day
+        $existingSchedules = Schedule::where('day_id', $day->id)
+            ->where('seller_id', $seller_id)
+            ->get();
+
+        foreach ($existingSchedules as $existing) {
+            $ep = $this->parseTimeRange($existing->schedule);
+            if ($ep) {
+                if ($parsed['start'] < $ep['end'] && $parsed['end'] > $ep['start']) {
+                    return response()->json([
+                        'error' => true,
+                        'message' => __('Schedule overlaps with existing slot: ') . $existing->schedule
+                    ], 422);
+                }
+            }
+        }
+
+        $created = Schedule::create([
+            'day_id' => $day->id,
+            'seller_id' => $seller_id,
+            'schedule' => $formattedSlot,
+            'status' => 1,
             'allow_multiple_schedule' => 'no',
         ]);
-        return response()->json(["message" => __('Schedule Added Success---')]);
+
+        return response()->json([
+            "message" => __('Schedule Added Successfully'),
+            "schedule" => $created
+        ]);
     }
+
     public function scheduleUpdate(Request $request)
     {
-
         $validator = Validator::make($request->all(), [
-            'day_id' => 'required',
-            'schedule' => 'required',
-
+            'up_id' => 'required|integer',
+            'day_id' => 'required|integer',
+            'schedule' => 'required|string',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -1426,11 +1559,76 @@ class SellerController extends Controller
             ], 422);
         }
 
-        Schedule::where('id', $request->up_id)->where('seller_id', Auth::guard('sanctum')->user()->id)->update([
-            'day_id' => $request->day_id,
-            'schedule' => $request->schedule,
+        $seller_id = Auth::guard('sanctum')->user()->id;
+
+        // Verify ownership
+        $schedule = Schedule::where('id', $request->up_id)->where('seller_id', $seller_id)->first();
+        if (!$schedule) {
+            return response()->json(['error' => true, 'message' => __('Schedule not found or unauthorized')], 404);
+        }
+
+        $day = Day::where('id', $request->day_id)->where('seller_id', $seller_id)->first();
+        if (!$day) {
+            return response()->json(['error' => true, 'message' => __('Day not found or unauthorized')], 403);
+        }
+
+        $parsed = $this->parseTimeRange($request->schedule);
+        if (!$parsed) {
+            return response()->json(['error' => true, 'message' => __('Invalid time slot format.')], 422);
+        }
+        if ($parsed['end'] <= $parsed['start']) {
+            return response()->json(['error' => true, 'message' => __('Slot end time must be after start time.')], 422);
+        }
+
+        $formattedSlot = $parsed['formatted'];
+
+        // Overlap check excluding self
+        $existingSchedules = Schedule::where('day_id', $day->id)
+            ->where('seller_id', $seller_id)
+            ->where('id', '!=', $schedule->id)
+            ->get();
+
+        foreach ($existingSchedules as $existing) {
+            $ep = $this->parseTimeRange($existing->schedule);
+            if ($ep && ($parsed['start'] < $ep['end'] && $parsed['end'] > $ep['start'])) {
+                return response()->json([
+                    'error' => true,
+                    'message' => __('Schedule overlaps with existing slot: ') . $existing->schedule
+                ], 422);
+            }
+        }
+
+        $schedule->update([
+            'day_id' => $day->id,
+            'schedule' => $formattedSlot,
         ]);
-        return response()->json(["message" => __('Schedule Update Success---')]);
+
+        return response()->json([
+            "message" => __('Schedule Updated Successfully'),
+            "schedule" => $schedule
+        ]);
+    }
+
+    public function scheduleDelete(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'id' => 'required',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => true,
+                'message' => $validator->errors()
+            ], 422);
+        }
+
+        $seller_id = Auth::guard('sanctum')->user()->id;
+        $deleted = Schedule::where('id', $request->id)->where('seller_id', $seller_id)->delete();
+
+        if ($deleted) {
+            return response()->json(["message" => __('Schedule deleted successfully')]);
+        }
+
+        return response()->json(['error' => true, 'message' => __('Schedule not found or unauthorized')], 404);
     }
 
 

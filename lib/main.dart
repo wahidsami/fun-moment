@@ -68,6 +68,7 @@ import 'package:funmoments/service/support_ticket/support_messages_service.dart'
 import 'package:funmoments/service/support_ticket/support_ticket_service.dart';
 import 'package:funmoments/service/wallet_service.dart';
 import 'package:funmoments/service/provider_service_management_service.dart';
+import 'package:funmoments/service/provider_availability_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/home/homepage_helper.dart';
 import 'package:funmoments/view/intro/splash.dart';
@@ -178,6 +179,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FilterServicesService()),
         ChangeNotifierProvider(create: (_) => FilterCategoryService()),
         ChangeNotifierProvider(create: (_) => ProviderServiceManagementService()),
+        ChangeNotifierProvider(create: (_) => ProviderAvailabilityService()),
       ],
       child: Consumer<RtlService>(
         builder: (context, rtlProvider, child) {

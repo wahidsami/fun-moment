@@ -23,6 +23,7 @@ import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:funmoments/view/wallet/wallet_page.dart';
 import 'package:funmoments/view/provider/provider_services_page.dart';
 import 'package:funmoments/view/provider/provider_add_service_page.dart';
+import 'package:funmoments/view/provider/provider_availability_page.dart';
 
 import '../../auth/delete_account_page.dart';
 import '../../utils/login_or_register.dart';
@@ -109,6 +110,20 @@ class _MenuPageState extends State<MenuPage> {
                                                         );
                                                       }),
                                                       CommonHelper().dividerCommon(),
+                                                       SettingsHelper().settingOption(
+                                                           'assets/svg/calendar.svg',
+                                                           asProvider.getString(
+                                                               "My Availability"), () {
+                                                         Navigator.push(
+                                                           context,
+                                                           MaterialPageRoute<void>(
+                                                             builder: (BuildContext
+                                                                     context) =>
+                                                                 const ProviderAvailabilityPage(),
+                                                           ),
+                                                         );
+                                                       }),
+                                                       CommonHelper().dividerCommon(),
                                                       SettingsHelper().settingOption(
                                                           'assets/svg/menu_job.svg',
                                                           asProvider.getString(

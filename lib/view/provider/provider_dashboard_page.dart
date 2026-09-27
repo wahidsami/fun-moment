@@ -8,6 +8,7 @@ import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/jobs/job_request_page.dart';
 import 'package:funmoments/view/jobs/my_jobs_page.dart';
 import 'package:funmoments/view/provider/provider_add_service_page.dart';
+import 'package:funmoments/view/provider/provider_availability_page.dart';
 import 'package:funmoments/view/provider/provider_services_page.dart';
 import 'package:funmoments/view/tabs/orders/orders_page.dart';
 import 'package:funmoments/view/tabs/settings/supports/my_tickets_page.dart';
@@ -181,6 +182,15 @@ class _ProviderDashboardPageState extends State<ProviderDashboardPage> {
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => const ProviderServicesPage()),
+                        ),
+                      ),
+                      _actionTile(
+                        icon: Icons.calendar_month_outlined,
+                        title: lnProvider.getString('Availability'),
+                        subtitle: lnProvider.getString('Working days & slots'),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ProviderAvailabilityPage()),
                         ),
                       ),
                       _actionTile(

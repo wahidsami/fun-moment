@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:funmoments/service/common_service.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
@@ -17,6 +18,10 @@ class ProviderServiceItem {
   final int? completeOrderCount;
   final int? cancelOrderCount;
   final int? view;
+  final String? description;
+  final int? categoryId;
+  final int? subcategoryId;
+  final int? deliveryDays;
 
   ProviderServiceItem({
     required this.id,
@@ -30,6 +35,10 @@ class ProviderServiceItem {
     this.completeOrderCount,
     this.cancelOrderCount,
     this.view,
+    this.description,
+    this.categoryId,
+    this.subcategoryId,
+    this.deliveryDays,
   });
 
   bool get isPendingApproval => status == 0;
@@ -48,6 +57,10 @@ class ProviderServiceItem {
       completeOrderCount: json['complete_order_count'] is int ? json['complete_order_count'] : int.tryParse(json['complete_order_count']?.toString() ?? ''),
       cancelOrderCount: json['cancel_order_count'] is int ? json['cancel_order_count'] : int.tryParse(json['cancel_order_count']?.toString() ?? ''),
       view: json['view'] is int ? json['view'] : int.tryParse(json['view']?.toString() ?? ''),
+      description: json['description']?.toString(),
+      categoryId: json['category_id'] is int ? json['category_id'] : int.tryParse(json['category_id']?.toString() ?? ''),
+      subcategoryId: json['subcategory_id'] is int ? json['subcategory_id'] : int.tryParse(json['subcategory_id']?.toString() ?? ''),
+      deliveryDays: json['delivery_days'] is int ? json['delivery_days'] : int.tryParse(json['delivery_days']?.toString() ?? ''),
     );
   }
 }
@@ -79,6 +92,7 @@ class ProviderServiceManagementService with ChangeNotifier {
   List<ProviderServiceItem> services = [];
   bool isLoading = false;
   bool isCreating = false;
+  bool isUpdating = false;
   bool isToggling = false;
   ProviderDashboardData? dashboardData;
 
@@ -165,6 +179,29 @@ class ProviderServiceManagementService with ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> fetchServiceDetails(int serviceId) async {
+    final token = await _getToken();
+    if (token == null) return null;
+
+    try {
+      final url = Uri.parse('$baseApi/seller/service/details/$serviceId');
+      final res = await http.get(url, headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final body = jsonDecode(res.body);
+        if (body is Map<String, dynamic>) {
+          return body;
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchServiceDetails error: $e');
+    }
+    return null;
+  }
+
   Future<bool> toggleServiceStatus(int serviceId) async {
     final token = await _getToken();
     if (token == null) return false;
@@ -181,7 +218,6 @@ class ProviderServiceManagementService with ChangeNotifier {
 
       isToggling = false;
       if (res.statusCode == 200 || res.statusCode == 201) {
-        // Toggle locally
         final index = services.indexWhere((s) => s.id == serviceId);
         if (index != -1) {
           final current = services[index];
@@ -197,6 +233,10 @@ class ProviderServiceManagementService with ChangeNotifier {
             completeOrderCount: current.completeOrderCount,
             cancelOrderCount: current.cancelOrderCount,
             view: current.view,
+            description: current.description,
+            categoryId: current.categoryId,
+            subcategoryId: current.subcategoryId,
+            deliveryDays: current.deliveryDays,
           );
           services[index] = updated;
           notifyListeners();
@@ -245,6 +285,9 @@ class ProviderServiceManagementService with ChangeNotifier {
     required int categoryId,
     required double price,
     int? subcategoryId,
+    int? deliveryDays,
+    File? imageFile,
+    List<Map<String, dynamic>>? includes,
   }) async {
     final token = await _getToken();
     if (token == null) return false;
@@ -254,18 +297,34 @@ class ProviderServiceManagementService with ChangeNotifier {
 
     try {
       final url = Uri.parse('$baseApi/seller/service/add-service');
-      final Map<String, String> body = {
-        'title': title,
-        'description': description,
-        'category_id': categoryId.toString(),
-        'price': price.toString(),
-        if (subcategoryId != null) 'subcategory_id': subcategoryId.toString(),
-      };
+      final request = http.MultipartRequest('POST', url);
 
-      final res = await http.post(url, headers: {
+      request.headers.addAll({
         'Accept': 'application/json',
         'Authorization': 'Bearer $token',
-      }, body: body);
+      });
+
+      request.fields['title'] = title;
+      request.fields['description'] = description;
+      request.fields['category_id'] = categoryId.toString();
+      request.fields['price'] = price.toString();
+
+      if (subcategoryId != null) {
+        request.fields['subcategory_id'] = subcategoryId.toString();
+      }
+      if (deliveryDays != null && deliveryDays > 0) {
+        request.fields['delivery_days'] = deliveryDays.toString();
+      }
+      if (includes != null && includes.isNotEmpty) {
+        request.fields['includes'] = jsonEncode(includes);
+      }
+
+      if (imageFile != null && await imageFile.exists()) {
+        request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+      }
+
+      final streamedResponse = await request.send();
+      final res = await http.Response.fromStream(streamedResponse);
 
       isCreating = false;
       notifyListeners();
@@ -275,30 +334,7 @@ class ProviderServiceManagementService with ChangeNotifier {
         await fetchMyServices(isRefresh: true);
         return true;
       } else {
-        try {
-          final parsed = jsonDecode(res.body);
-          String errorMessage = '';
-          if (parsed is Map && parsed['errors'] is Map) {
-            final errors = parsed['errors'] as Map;
-            final errorList = <String>[];
-            errors.forEach((key, val) {
-              if (val is List && val.isNotEmpty) {
-                errorList.add(val.first.toString());
-              } else if (val is String) {
-                errorList.add(val);
-              }
-            });
-            if (errorList.isNotEmpty) {
-              errorMessage = errorList.join('\n');
-            }
-          }
-          if (errorMessage.isEmpty && parsed is Map) {
-            errorMessage = parsed['message']?.toString() ?? parsed['msg']?.toString() ?? 'Could not create service';
-          }
-          OthersHelper().showToast(errorMessage.isNotEmpty ? errorMessage : 'Server Error (${res.statusCode})', Colors.black);
-        } catch (_) {
-          OthersHelper().showToast('Server Error (${res.statusCode})', Colors.black);
-        }
+        _handleApiError(res);
         return false;
       }
     } catch (e) {
@@ -306,6 +342,106 @@ class ProviderServiceManagementService with ChangeNotifier {
       notifyListeners();
       OthersHelper().showToast('Connection error: $e', Colors.black);
       return false;
+    }
+  }
+
+  Future<bool> updateService({
+    required BuildContext context,
+    required int serviceId,
+    required String title,
+    required String description,
+    int? categoryId,
+    double? price,
+    int? subcategoryId,
+    int? deliveryDays,
+    File? imageFile,
+    List<Map<String, dynamic>>? includes,
+  }) async {
+    final token = await _getToken();
+    if (token == null) return false;
+
+    isUpdating = true;
+    notifyListeners();
+
+    try {
+      final url = Uri.parse('$baseApi/seller/service/update-service');
+      final request = http.MultipartRequest('POST', url);
+
+      request.headers.addAll({
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      request.fields['service_id'] = serviceId.toString();
+      request.fields['title'] = title;
+      request.fields['description'] = description;
+
+      if (categoryId != null) {
+        request.fields['category_id'] = categoryId.toString();
+      }
+      if (price != null) {
+        request.fields['price'] = price.toString();
+      }
+      if (subcategoryId != null) {
+        request.fields['subcategory_id'] = subcategoryId.toString();
+      }
+      if (deliveryDays != null && deliveryDays > 0) {
+        request.fields['delivery_days'] = deliveryDays.toString();
+      }
+      if (includes != null) {
+        request.fields['includes'] = jsonEncode(includes);
+      }
+
+      if (imageFile != null && await imageFile.exists()) {
+        request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+      }
+
+      final streamedResponse = await request.send();
+      final res = await http.Response.fromStream(streamedResponse);
+
+      isUpdating = false;
+      notifyListeners();
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        OthersHelper().showToast('Service updated! Resubmitted for review.', Colors.green);
+        await fetchMyServices(isRefresh: true);
+        return true;
+      } else {
+        _handleApiError(res);
+        return false;
+      }
+    } catch (e) {
+      isUpdating = false;
+      notifyListeners();
+      OthersHelper().showToast('Connection error: $e', Colors.black);
+      return false;
+    }
+  }
+
+  void _handleApiError(http.Response res) {
+    try {
+      final parsed = jsonDecode(res.body);
+      String errorMessage = '';
+      if (parsed is Map && parsed['errors'] is Map) {
+        final errors = parsed['errors'] as Map;
+        final errorList = <String>[];
+        errors.forEach((key, val) {
+          if (val is List && val.isNotEmpty) {
+            errorList.add(val.first.toString());
+          } else if (val is String) {
+            errorList.add(val);
+          }
+        });
+        if (errorList.isNotEmpty) {
+          errorMessage = errorList.join('\n');
+        }
+      }
+      if (errorMessage.isEmpty && parsed is Map) {
+        errorMessage = parsed['message']?.toString() ?? parsed['msg']?.toString() ?? 'Error occurred';
+      }
+      OthersHelper().showToast(errorMessage.isNotEmpty ? errorMessage : 'Server Error (${res.statusCode})', Colors.black);
+    } catch (_) {
+      OthersHelper().showToast('Server Error (${res.statusCode})', Colors.black);
     }
   }
 }

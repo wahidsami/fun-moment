@@ -131,9 +131,10 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
   const [formCategoryId, setFormCategoryId] = useState<number | ''>('');
   const [formSellerId, setFormSellerId] = useState<number | ''>('');
   const [formPrice, setFormPrice] = useState<number>(100);
-  const [formDuration, setFormDuration] = useState('');
   const [formDescEn, setFormDescEn] = useState('');
   const [formDescAr, setFormDescAr] = useState('');
+  const [formImageFile, setFormImageFile] = useState<File | null>(null);
+  const [formImagePreview, setFormImagePreview] = useState<string>('');
 
   // Sellers and Categories lists loaded from backend
   const [sellers, setSellers] = useState<{ id: number; name: string; email: string }[]>([]);
@@ -400,6 +401,8 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     setFormDuration('1 day');
     setFormDescEn('');
     setFormDescAr('');
+    setFormImageFile(null);
+    setFormImagePreview('');
   };
 
   const handleOpenEditForm = (service: Service) => {
@@ -417,6 +420,8 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     setFormDuration(service.duration);
     setFormDescEn(service.description_en || '');
     setFormDescAr(service.description_ar || '');
+    setFormImageFile(null);
+    setFormImagePreview(service.image_url || '');
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
@@ -452,7 +457,8 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
           status: 'active' as const,
           seller_id: Number(formSellerId),
           description_en: formDescEn,
-          description_ar: formDescAr
+          description_ar: formDescAr,
+          imageFile: formImageFile || undefined,
         };
         const created = await LaravelAPI.createService(payload);
         setServices([created, ...services]);
@@ -470,6 +476,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
           description_ar: formDescAr,
           seller_id: Number(formSellerId),
           status: services.find(s => s.id === editingServiceId)?.status ?? 'active',
+          imageFile: formImageFile || undefined,
         });
         setServices(services.map(s => s.id === editingServiceId ? updatedService : s));
         showSuccess(language === 'en' ? "Service updated and synced with Laravel database!" : "تم تحديث بيانات الخدمة وحفظ التغييرات بالكامل!");
@@ -873,10 +880,21 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                             </td>
                             <td className="px-6 py-4 text-slate-400 font-bold">#{service.id}</td>
                             <td className="px-6 py-4 max-w-[200px]">
-                              <div className="font-bold text-slate-800 line-clamp-1">
-                                {language === 'en' ? service.title_en : service.title_ar}
+                              <div className="flex items-center gap-2.5">
+                                {service.image_url ? (
+                                  <img src={service.image_url} alt="" className="w-8 h-8 rounded-md object-cover border border-slate-200 shrink-0" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-md bg-slate-100 flex items-center justify-center text-slate-400 shrink-0">
+                                    <ImageIcon className="w-4 h-4" />
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-bold text-slate-800 line-clamp-1">
+                                    {language === 'en' ? service.title_en : service.title_ar}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 mt-0.5">{service.duration}</div>
+                                </div>
                               </div>
-                              <div className="text-[10px] text-slate-400 mt-0.5">{service.duration}</div>
                             </td>
                             <td className="px-6 py-4 text-slate-500">
                               {language === 'en' ? service.category_en : service.category_ar}
@@ -1093,6 +1111,54 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                     className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs outline-hidden focus:border-indigo-500 text-right"
                     placeholder="اكتب شرح كامل للخدمة، المخرجات، والضمانات الفنية لمزود الخدمة..."
                   />
+                </div>
+                {/* Service Thumbnail / Main Image */}
+                <div className="md:col-span-2">
+                  <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                    {language === 'en' ? 'Service Image / Thumbnail' : 'صورة / غلاف الخدمة'}
+                  </label>
+                  <div className="flex items-center gap-4">
+                    {formImagePreview ? (
+                      <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center group">
+                        <img src={formImagePreview} alt="Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => { setFormImageFile(null); setFormImagePreview(''); }}
+                          className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 rounded-lg border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 bg-slate-50">
+                        <ImageIcon className="w-6 h-6 mb-1 text-slate-300" />
+                        <span className="text-[10px]">{language === 'en' ? 'No Image' : 'لا توجد صورة'}</span>
+                      </div>
+                    )}
+                    <div>
+                      <input
+                        type="file"
+                        id="service-image-upload"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setFormImageFile(file);
+                            setFormImagePreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor="service-image-upload"
+                        className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        {formImagePreview ? (language === 'en' ? 'Change Image' : 'تغيير الصورة') : (language === 'en' ? 'Upload Image' : 'رفع صورة')}
+                      </label>
+                      <p className="text-[10px] text-slate-400 mt-1">PNG, JPG, WEBP up to 5MB</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -222,20 +222,11 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         Route::post('recent-orders', [SellerController::class,'recentOrders']);
         
         
-         //Available Day list api
+        // Available Day & Schedule APIs
         Route::get('available-days-list', [SellerController::class,'availableDaysList']);
         Route::get('schedule-days-list', [SellerController::class,'scheduleDaysList']);
         Route::post('create-day', [SellerController::class,'createDay']);
-        Route::post('day-delete', [SellerController::class,'deleteDay']);
-        Route::get('schedule-list', [SellerController::class,'scheduleList']);
-        Route::post('schedule/create', [SellerController::class,'scheduleCreate']);
-        Route::post('schedule/update', [SellerController::class,'scheduleUpdate']);
-        Route::post('schedule/delete', [SellerController::class,'scheduleDelete']);
-
-        //Available Day list api
-        Route::get('available-days-list', [SellerController::class,'availableDaysList']);
-        Route::get('schedule-days-list', [SellerController::class,'scheduleDaysList']);
-        Route::post('create-day', [SellerController::class,'createDay']);
+        Route::post('toggle-day', [SellerController::class,'toggleDay']);
         Route::post('day-delete', [SellerController::class,'deleteDay']);
         Route::get('schedule-list', [SellerController::class,'scheduleList']);
         Route::post('schedule/create', [SellerController::class,'scheduleCreate']);
@@ -263,6 +254,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         //Services
         Route::group(['prefix' => 'service'],function(){
             Route::get('/my-services',[SellerServiceController::class,'myService']);
+            Route::get('/details/{id}',[SellerServiceController::class,'serviceDetails']);
             Route::get('/category-wise-sub-category/{id}',[SellerServiceController::class,'subCategoryByCategory']);
             Route::get('/subcategory-wise-child-category/{id}',[SellerServiceController::class,'childCategoryBySubcategory']);
             Route::post('/add-service',[SellerServiceController::class,'addService']);

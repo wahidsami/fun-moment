@@ -350,39 +350,39 @@ function get_attachment_image_by_id($id, $size = null, $default = false)
     $image_details = MediaUpload::find($id);
     $return_val = [];
     $image_url = '';
-    if (file_exists('assets/uploads/media-uploader/' . optional($image_details)->path)) {
+    if (file_exists('assets/uploads/media-uploader/' . optional($image_details)->path) || file_exists(public_path('assets/uploads/media-uploader/' . optional($image_details)->path))) {
         $image_url = asset('assets/uploads/media-uploader/' . optional($image_details)->path);
     }
 
     if (!empty($id) && !empty($image_details)) {
         switch ($size) {
             case "large":
-                if (file_exists('assets/uploads/media-uploader/large-' . $image_details->path)) {
+                if (file_exists('assets/uploads/media-uploader/large-' . $image_details->path) || file_exists(public_path('assets/uploads/media-uploader/large-' . $image_details->path))) {
                     $image_url = asset('assets/uploads/media-uploader/large-' . $image_details->path);
                 }
                 break;
             case "grid":
-                if (file_exists('assets/uploads/media-uploader/grid-' . $image_details->path)) {
+                if (file_exists('assets/uploads/media-uploader/grid-' . $image_details->path) || file_exists(public_path('assets/uploads/media-uploader/grid-' . $image_details->path))) {
                     $image_url = asset('assets/uploads/media-uploader/grid-' . $image_details->path);
                 }
                 break;
 
             case "semi-large":
-                if (file_exists('assets/uploads/media-uploader/semi-large-' . $image_details->path)) {
+                if (file_exists('assets/uploads/media-uploader/semi-large-' . $image_details->path) || file_exists(public_path('assets/uploads/media-uploader/semi-large-' . $image_details->path))) {
                     $image_url = asset('assets/uploads/media-uploader/semi-large-' . $image_details->path);
                 }
                 break;
             case "thumb":
-                if (file_exists('assets/uploads/media-uploader/thumb-' . $image_details->path)) {
+                if (file_exists('assets/uploads/media-uploader/thumb-' . $image_details->path) || file_exists(public_path('assets/uploads/media-uploader/thumb-' . $image_details->path))) {
                     $image_url = asset('assets/uploads/media-uploader/thumb-' . $image_details->path);
                 }else {
-                    if (file_exists('assets/uploads/media-uploader/' . $image_details->path)) {
+                    if (file_exists('assets/uploads/media-uploader/' . $image_details->path) || file_exists(public_path('assets/uploads/media-uploader/' . $image_details->path))) {
                         $image_url = asset('assets/uploads/media-uploader/' . $image_details->path);
                     }
                 }
                 break;
             default:
-                if (file_exists('assets/uploads/media-uploader/' . $image_details->path)) {
+                if (file_exists('assets/uploads/media-uploader/' . $image_details->path) || file_exists(public_path('assets/uploads/media-uploader/' . $image_details->path))) {
                     $image_url = asset('assets/uploads/media-uploader/' . $image_details->path);
                 }
                 break;

@@ -142,14 +142,17 @@ class MediaHelper
             $image_thumb = 'thumb-' . $image_db;
             $image_semi_large = 'semi-large-' . $image_db;
 
-            $folder_path = 'assets/uploads/media-uploader/';
+            $folder_path = public_path('assets/uploads/media-uploader/');
+            if (!file_exists($folder_path)) {
+                @mkdir($folder_path, 0777, true);
+            }
+
             $resize_grid_image = Image::make($image)->resize(350, null, function ($constraint) {
                 $constraint->aspectRatio();
             });
             $resize_large_image = Image::make($image)->resize(740, null, function ($constraint) {
                 $constraint->aspectRatio();
             });
-
             $resize_semi_large_image = Image::make($image)->resize(540, 350, function ($constraint) {
                 $constraint->aspectRatio();
             });
@@ -158,16 +161,16 @@ class MediaHelper
             $resize_full_image = Image::make($request->$file_field_name)->resize($image_width, $image_height,function ($constraint) {
                 $constraint->aspectRatio();
             });
+            $resize_full_image->save($folder_path . $image_db);
 
-            $resize_full_image->save($folder_path .'/'. $image_db);
-
+            $userId = auth($type)->id() ?: (auth('sanctum')->id() ?: auth()->id());
             $mediaUpload = MediaUpload::create([
                 'title' => $image_name_with_ext,
                 'size' => formatBytes($image_size_for_db),
                 'path' => $image_db,
                 'dimensions' => $image_dimension_for_db,
                 'type' => $type,
-                'user_id' => auth($type)->id(),
+                'user_id' => $userId,
             ]);
 
             if ($image_width > 150) {

@@ -203,15 +203,25 @@ export const LaravelAPI = {
       throw new Error(payload?.message || 'Service status update failed');
     },
   
-    async createService(serviceData: Omit<Service, 'id' | 'seller_name' | 'rating' | 'sales_count' | 'created_at'>): Promise<Service> {
-      const response = await fetch('/admin-home/services-json', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
+    async createService(serviceData: Omit<Service, 'id' | 'seller_name' | 'rating' | 'sales_count' | 'created_at'> & { imageFile?: File }): Promise<Service> {
+      let body: any;
+      const headers: Record<string, string> = { 'Accept': 'application/json' };
+
+      if (serviceData.imageFile) {
+        const fd = new FormData();
+        fd.append('title_en', serviceData.title_en);
+        fd.append('title_ar', serviceData.title_ar);
+        fd.append('category_id', String(serviceData.category_id || 1));
+        fd.append('seller_id', String(serviceData.seller_id));
+        fd.append('price', String(serviceData.price));
+        fd.append('duration', serviceData.duration || '');
+        fd.append('description_en', serviceData.description_en);
+        fd.append('description_ar', serviceData.description_ar);
+        fd.append('image', serviceData.imageFile);
+        body = fd;
+      } else {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify({
           title_en: serviceData.title_en,
           title_ar: serviceData.title_ar,
           category_id: serviceData.category_id || 1,
@@ -220,7 +230,15 @@ export const LaravelAPI = {
           duration: serviceData.duration,
           description_en: serviceData.description_en,
           description_ar: serviceData.description_ar,
-        }),
+          image: serviceData.image,
+        });
+      }
+
+      const response = await fetch('/admin-home/services-json', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body,
       });
 
       if (!response.ok) {
@@ -244,15 +262,25 @@ export const LaravelAPI = {
       throw new Error(payload?.message || 'Service creation failed');
     },
 
-    async updateService(id: number, serviceData: Omit<Service, 'id' | 'seller_name' | 'rating' | 'sales_count' | 'created_at'>): Promise<Service> {
-      const response = await fetch(`/admin-home/services-json/${id}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
+    async updateService(id: number, serviceData: Omit<Service, 'id' | 'seller_name' | 'rating' | 'sales_count' | 'created_at'> & { imageFile?: File }): Promise<Service> {
+      let body: any;
+      const headers: Record<string, string> = { 'Accept': 'application/json' };
+
+      if (serviceData.imageFile) {
+        const fd = new FormData();
+        fd.append('title_en', serviceData.title_en);
+        fd.append('title_ar', serviceData.title_ar);
+        fd.append('category_id', String(serviceData.category_id || 1));
+        fd.append('seller_id', String(serviceData.seller_id));
+        fd.append('price', String(serviceData.price));
+        fd.append('duration', serviceData.duration || '');
+        fd.append('description_en', serviceData.description_en);
+        fd.append('description_ar', serviceData.description_ar);
+        fd.append('image', serviceData.imageFile);
+        body = fd;
+      } else {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify({
           title_en: serviceData.title_en,
           title_ar: serviceData.title_ar,
           category_id: serviceData.category_id || 1,
@@ -261,7 +289,15 @@ export const LaravelAPI = {
           duration: serviceData.duration,
           description_en: serviceData.description_en,
           description_ar: serviceData.description_ar,
-        }),
+          image: serviceData.image,
+        });
+      }
+
+      const response = await fetch(`/admin-home/services-json/${id}`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body,
       });
 
       if (!response.ok) {

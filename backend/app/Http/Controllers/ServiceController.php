@@ -91,6 +91,14 @@ class ServiceController extends Controller
         $durationInput = $validated['duration'] ?? null;
         $deliveryDays = $durationInput ? ((int) preg_replace('/[^0-9]/', '', $durationInput) ?: 1) : 0;
 
+        $imageId = $request->input('image');
+        if ($request->hasFile('image')) {
+            $media = \App\Actions\Media\MediaHelper::insert_media_image($request, 'admin', 'image');
+            if ($media) {
+                $imageId = $media->id;
+            }
+        }
+
         $service = Service::create([
             'category_id' => $category->id,
             'subcategory_id' => $request->integer('subcategory_id') ?: null,
@@ -101,7 +109,7 @@ class ServiceController extends Controller
             'title' => $validated['title_en'],
             'slug' => $slug,
             'description' => $validated['description_en'],
-            'image' => $request->input('image'),
+            'image' => $imageId,
             'image_gallery' => $request->input('image_gallery'),
             'video' => $request->input('video'),
             'status' => 1,
@@ -144,6 +152,14 @@ class ServiceController extends Controller
         $durationInput = $validated['duration'] ?? null;
         $deliveryDays = $durationInput !== null ? ((int) preg_replace('/[^0-9]/', '', $durationInput) ?: 1) : $service->delivery_days;
 
+        $imageId = $request->input('image', $service->image);
+        if ($request->hasFile('image')) {
+            $media = \App\Actions\Media\MediaHelper::insert_media_image($request, 'admin', 'image');
+            if ($media) {
+                $imageId = $media->id;
+            }
+        }
+
         $service->update([
             'category_id' => $category->id,
             'subcategory_id' => $request->integer('subcategory_id') ?: null,
@@ -154,7 +170,7 @@ class ServiceController extends Controller
             'title' => $validated['title_en'],
             'slug' => $validated['title_en'] !== $service->title ? createSlug($validated['title_en'], 'Service') : $service->slug,
             'description' => $validated['description_en'],
-            'image' => $request->input('image', $service->image),
+            'image' => $imageId,
             'image_gallery' => $request->input('image_gallery', $service->image_gallery),
             'video' => $request->input('video', $service->video),
             'price' => $validated['price'],
@@ -267,6 +283,9 @@ class ServiceController extends Controller
         $subcategoryName = optional($service->subcategory)->name ?? '';
         $sellerName = optional($service->seller)->name ?? '';
 
+        $imgData = get_attachment_image_by_id($service->image);
+        $imageUrl = !empty($imgData) ? ($imgData['img_url'] ?? null) : null;
+
         return [
             'id' => $service->id,
             'title_en' => $title,
@@ -285,6 +304,8 @@ class ServiceController extends Controller
             'created_at' => optional($service->created_at)->toDateString(),
             'description_en' => $description,
             'description_ar' => $description,
+            'image' => $service->image,
+            'image_url' => $imageUrl,
         ];
     }
 
