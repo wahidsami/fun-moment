@@ -23,7 +23,7 @@ class _ChatListPageState extends State<ChatListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       body: SafeArea(
         child: SingleChildScrollView(
           physics: physicsCommon,
@@ -46,8 +46,10 @@ class _ChatListPageState extends State<ChatListPage> {
                             ),
                             Text(
                               lnProvider.getString("Conversations"),
-                              style: const TextStyle(
-                                  fontSize: 27, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                  color: cc.greyPrimary,
+                                  fontSize: 27,
+                                  fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),

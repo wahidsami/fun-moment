@@ -57,7 +57,7 @@ class _ReportChatPageState extends State<ReportChatPage> {
         appBar: AppBar(
           elevation: 0,
           automaticallyImplyLeading: false,
-          backgroundColor: Colors.white,
+          backgroundColor: cc.bgColor,
           flexibleSpace: SafeArea(
             child: Container(
               padding: const EdgeInsets.only(right: 16, left: 8),
@@ -310,7 +310,7 @@ class _ReportChatPageState extends State<ReportChatPage> {
                       left: 20, bottom: 10, top: 10, right: 10),
                   height: 60,
                   width: double.infinity,
-                  color: Colors.white,
+                  color: cc.black9,
                   child: Row(
                     children: <Widget>[
                       pickedImage != null
@@ -359,10 +359,11 @@ class _ReportChatPageState extends State<ReportChatPage> {
                       Expanded(
                         child: TextField(
                           controller: sendMessageController,
+                          style: TextStyle(color: cc.greyPrimary),
                           decoration: InputDecoration(
                               hintText:
                                   lnProvider.getString("Write message") + "...",
-                              hintStyle: const TextStyle(color: Colors.black54),
+                              hintStyle: TextStyle(color: cc.greyFour),
                               border: InputBorder.none),
                         ),
                       ),

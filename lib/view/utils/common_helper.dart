@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/app_string_service.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:funmoments/view/utils/responsive.dart';
@@ -17,23 +18,22 @@ class CommonHelper {
       {actions}) {
     return AppBar(
       centerTitle: true,
-      surfaceTintColor: cc.white,
-      iconTheme: IconThemeData(color: cc.greyPrimary),
-      systemOverlayStyle: SystemUiOverlayStyle.dark,
+      surfaceTintColor: FMColors.background,
+      iconTheme: const IconThemeData(color: FMColors.textPrimary),
+      systemOverlayStyle: SystemUiOverlayStyle.light,
       title: Consumer<AppStringService>(
         builder: (context, asProvider, child) => Text(
           asProvider.getString(title),
-          style: TextStyle(
-              color: cc.greyPrimary, fontSize: 16, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+              color: FMColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
-      backgroundColor: cc.white,
+      backgroundColor: FMColors.background,
       elevation: 0,
       leading: InkWell(
         onTap: pressed,
         child: const Icon(
-          Icons.arrow_back_ios,
-          // size: 24,
+          Icons.arrow_back_ios_new_rounded,
         ),
       ),
       actions: actions,
@@ -86,14 +86,15 @@ class CommonHelper {
           alignment: Alignment.center,
           padding: EdgeInsets.symmetric(vertical: paddingVerticle),
           decoration: BoxDecoration(
-              color: bgColor ?? cc.primaryColor,
-              borderRadius: BorderRadius.circular(8)),
+              color: bgColor ?? FMColors.magenta,
+              borderRadius: BorderRadius.circular(FMRadii.md)),
           child: isloading == false
               ? Text(
                   lnProvider.getString(title),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
+                    fontWeight: FontWeight.w700,
                   ),
                 )
               : OthersHelper().showLoading(Colors.white)),
@@ -109,13 +110,14 @@ class CommonHelper {
           alignment: Alignment.center,
           padding: EdgeInsets.symmetric(vertical: paddingVerticle),
           decoration: BoxDecoration(
-              border: Border.all(color: bgColor ?? cc.primaryColor),
-              borderRadius: BorderRadius.circular(8)),
+              border: Border.all(color: bgColor ?? FMColors.magenta),
+              borderRadius: BorderRadius.circular(FMRadii.md)),
           child: Text(
             title,
             style: TextStyle(
-              color: bgColor ?? cc.primaryColor,
+              color: bgColor ?? FMColors.magenta,
               fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
           )),
     );
@@ -126,8 +128,8 @@ class CommonHelper {
       margin: margin ?? const EdgeInsets.only(bottom: 15),
       child: Text(
         lnProvider.getString(title),
-        style: TextStyle(
-          color: cc.greyThree,
+        style: const TextStyle(
+          color: FMColors.textPrimary,
           fontSize: 14,
           fontWeight: FontWeight.w600,
         ),
@@ -145,7 +147,7 @@ class CommonHelper {
       title,
       textAlign: textAlign,
       style: TextStyle(
-        color: color ?? cc.greyParagraph,
+        color: color ?? FMColors.textSecondary,
         height: 1.4,
         fontSize: fontsize,
         fontWeight: FontWeight.w400,
@@ -160,7 +162,7 @@ class CommonHelper {
       maxLines: maxLines,
       textAlign: textAlign,
       style: TextStyle(
-          color: color ?? cc.greyPrimary,
+          color: color ?? FMColors.textPrimary,
           fontSize: fontsize,
           height: lineheight,
           fontWeight: FontWeight.bold),
@@ -168,22 +170,22 @@ class CommonHelper {
   }
 
   dividerCommon() {
-    return Divider(
+    return const Divider(
       thickness: 1,
       height: 2,
-      color: cc.borderColor,
+      color: FMColors.border,
     );
   }
 
   checkCircle() {
     return Container(
       padding: const EdgeInsets.all(3),
+      decoration: const BoxDecoration(shape: BoxShape.circle, color: FMColors.magenta),
       child: const Icon(
         Icons.check,
         size: 13,
         color: Colors.white,
       ),
-      decoration: BoxDecoration(shape: BoxShape.circle, color: cc.primaryColor),
     );
   }
 
@@ -221,17 +223,17 @@ class CommonHelper {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.hourglass_empty,
-              size: 26,
-              color: cc.greyFour,
+            const Icon(
+              Icons.hourglass_empty_rounded,
+              size: 28,
+              color: FMColors.textMuted,
             ),
             const SizedBox(
-              height: 7,
+              height: 10,
             ),
             Text(
               lnProvider.getString(title),
-              style: TextStyle(color: cc.greyFour),
+              style: const TextStyle(color: FMColors.textMuted, fontSize: 14),
             ),
           ],
         ));

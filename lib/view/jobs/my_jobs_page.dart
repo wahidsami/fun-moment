@@ -39,7 +39,7 @@ class _MyJobsPageState extends State<MyJobsPage> {
     ConstantColors cc = ConstantColors();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       appBar: const PreferredSize(
         preferredSize: Size.fromHeight(60),
         child: MyJobsPageAppbar(),
@@ -131,7 +131,7 @@ class _MyJobsPageState extends State<MyJobsPage> {
                                               margin: const EdgeInsets.only(
                                                   bottom: 20),
                                               width: double.infinity,
-                                              decoration: BoxDecoration(
+                                              decoration: BoxDecoration(color: cc.black9,
                                                   border: Border.all(
                                                       color: cc.borderColor),
                                                   borderRadius:

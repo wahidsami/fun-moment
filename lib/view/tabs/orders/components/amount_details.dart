@@ -10,6 +10,7 @@ import 'package:funmoments/service/order_details_service.dart';
 import 'package:funmoments/view/booking/booking_helper.dart';
 import 'package:funmoments/view/booking/payment_choose_page.dart';
 import 'package:funmoments/view/utils/common_helper.dart';
+import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
 class AmountDetails extends StatelessWidget {
@@ -17,6 +18,7 @@ class AmountDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cc = ConstantColors();
     return Consumer<AppStringService>(
       builder: (context, asProvider, child) => Consumer<OrderDetailsService>(
         builder: (context, provider, child) => Column(
@@ -25,7 +27,9 @@ class AmountDetails extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 25),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(9)),
+                  color: cc.black9,
+                  border: Border.all(color: cc.borderColor),
+                  borderRadius: BorderRadius.circular(12)),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

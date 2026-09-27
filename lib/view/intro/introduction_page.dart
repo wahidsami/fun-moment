@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:funmoments/helper/extension/context_extension.dart';
 import 'package:funmoments/helper/extension/int_extension.dart';
-import 'package:funmoments/view/auth/login/login.dart';
+import 'package:funmoments/service/app_string_service.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/intro/intro_helper.dart';
 import 'package:funmoments/view/utils/common_helper.dart';
 import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/responsive.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../home/landing_page.dart';
@@ -27,11 +29,13 @@ class _IntroductionPageState extends State<IntroductionPage> {
     // var screenWidth = MediaQuery.of(context).size.width;
     // var screenHeight = MediaQuery.of(context).size.height;
     print(screenWidth);
-    return Scaffold(
-      body: Container(
-        clipBehavior: Clip.none,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+    return Consumer<AppStringService>(
+      builder: (context, asProvider, child) {
+        return Scaffold(
+          body: Container(
+            clipBehavior: Clip.none,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
           //Slider =============>
           SizedBox(
             height: screenHeight < fourinchScreenHeight
@@ -66,7 +70,8 @@ class _IntroductionPageState extends State<IntroductionPage> {
                           ),
                         ),
                         Text(
-                          IntroHelper().geTitle(i),
+                          asProvider.getString(IntroHelper().geTitle(i)),
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                               color: cc.greyPrimary,
                               fontSize: 19,
@@ -78,7 +83,7 @@ class _IntroductionPageState extends State<IntroductionPage> {
 
                         // Subtitle =============>
                         CommonHelper().paragraphCommon(
-                            IntroHelper().geSubTitle(i),
+                            asProvider.getString(IntroHelper().geSubTitle(i)),
                             textAlign: TextAlign.center)
                       ],
                     ),
@@ -111,7 +116,7 @@ class _IntroductionPageState extends State<IntroductionPage> {
                     decoration: BoxDecoration(
                         color: _selectedSlide == i
                             ? cc.primaryColor
-                            : const Color(0xffD0D5DD),
+                            : FMColors.border,
                         shape: BoxShape.circle),
                   ),
                 )
@@ -137,12 +142,12 @@ class _IntroductionPageState extends State<IntroductionPage> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 15, vertical: 16),
                     decoration: BoxDecoration(
-                        border: Border.all(color: cc.primaryColor, width: 1.5),
-                        borderRadius: BorderRadius.circular(7)),
+                        border: Border.all(color: FMColors.border, width: 1.5),
+                        borderRadius: BorderRadius.circular(FMRadii.md)),
                     child: Text(
-                      lnProvider.getString('Skip'),
-                      style: TextStyle(
-                          color: cc.primaryColor,
+                      asProvider.getString('Skip'),
+                      style: const TextStyle(
+                          color: FMColors.textSecondary,
                           fontSize: 15,
                           fontWeight: FontWeight.w600),
                     ),
@@ -171,14 +176,14 @@ class _IntroductionPageState extends State<IntroductionPage> {
                       alignment: Alignment.center,
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       decoration: BoxDecoration(
-                          color: cc.primaryColor,
-                          borderRadius: BorderRadius.circular(8)),
+                          color: FMColors.magenta,
+                          borderRadius: BorderRadius.circular(FMRadii.md)),
                       child: Text(
-                        lnProvider.getString('Continue'),
+                        asProvider.getString('Continue'),
                         style: const TextStyle(
                             color: Colors.white,
                             fontSize: 15,
-                            fontWeight: FontWeight.w600),
+                            fontWeight: FontWeight.w700),
                       )),
                 ),
               ),
@@ -187,6 +192,8 @@ class _IntroductionPageState extends State<IntroductionPage> {
           20.toHeight,
         ]),
       ),
+    );
+      },
     );
   }
 }

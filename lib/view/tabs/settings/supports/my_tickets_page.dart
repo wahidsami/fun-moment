@@ -35,10 +35,10 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
     ConstantColors cc = ConstantColors();
 
     return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         appBar: AppBar(
           iconTheme: IconThemeData(color: cc.greyPrimary),
-          systemOverlayStyle: SystemUiOverlayStyle.dark,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
           title: Consumer<AppStringService>(
             builder: (context, asProvider, child) => Text(
               asProvider.getString('Support tickets'),

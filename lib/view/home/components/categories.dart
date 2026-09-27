@@ -42,7 +42,7 @@ class Categories extends StatelessWidget {
         }
 
         return SizedBox(
-          height: 124,
+          height: 140,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             shrinkWrap: true,
@@ -70,7 +70,7 @@ class _CategorySkeletonRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 124,
+      height: 140,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: 4,

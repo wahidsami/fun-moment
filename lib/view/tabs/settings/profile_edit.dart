@@ -47,14 +47,17 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     super.initState();
     final pProvider = Provider.of<ProfileService>(context, listen: false);
     final userDetails = pProvider.profileDetails?.userDetails;
-    countryCode = userDetails?.countryCode ?? "SA";
+    if (userDetails == null) {
+      return;
+    }
+    countryCode = userDetails.countryCode ?? "SA";
     //set country code
     Future.delayed(const Duration(milliseconds: 600), () {
       Provider.of<ProfileEditService>(context, listen: false)
           .setCountryCode(countryCode);
     });
-    fullNameController.text = userDetails?.name ?? '';
-    emailController.text = userDetails?.email ?? '';
+    fullNameController.text = userDetails.name ?? '';
+    emailController.text = userDetails.email ?? '';
 
     phoneController.text = userDetails?.phone ?? '';
     postCodeController.text = userDetails?.postCode ?? '';
@@ -76,7 +79,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       appBar: CommonHelper().appbarCommon('Edit profile', context, () {
         if (Provider.of<ProfileEditService>(context, listen: false).isloading ==
             false) {
@@ -162,9 +165,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                 child: Container(
                                   alignment: Alignment.center,
                                   padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
+                                  decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Colors.white,
+                                    color: cc.black9,
+                                    border: Border.all(color: cc.borderColor),
                                   ),
                                   child: ClipRRect(
                                       child: Icon(

@@ -19,6 +19,8 @@ use App\Http\Controllers\Api\SellerChatController;
 use App\Http\Controllers\Api\SellerSubscriptionController;
 use App\Http\Controllers\Api\OrderReportController;
 use App\Http\Controllers\Api\SellerServiceController;
+use App\Http\Controllers\Api\PayTabsApiController;
+use App\Http\Controllers\Api\NotificationApiController;
 
 Route::middleware('auth:api')->get('/user', function (Request $request) {
     return $request->user();
@@ -40,6 +42,10 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
     Route::post('/translate-string',[LanguageController::class,'translateString']);
     Route::get('/mollie-ipn',[PaymentController::class,'mollieIpn'])->name('mollie.api.ipn')->middleware(['api']);
     Route::post('/mollie-charge-customer',[PaymentController::class,'mollieChargeCustomer'])->middleware(['auth:sanctum','api']);
+    
+    // PayTabs IPN and Return routes
+    Route::post('/paytabs/ipn', [PayTabsApiController::class, 'ipn'])->name('api.paytabs.ipn');
+    Route::match(['get', 'post'], '/paytabs/return/{order_id}', [PayTabsApiController::class, 'returnPage'])->name('api.paytabs.return');
     
     Route::get('/country',[UserController::class,'country']);
     Route::get('country/service-city/{id}',[UserController::class,'serviceCity']);
@@ -117,9 +123,22 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         Route::post('/send-otp-in-mail/success',[UserController::class,'sendOTPSuccess']);
         Route::post('ticket/create',[UserController::class,'createTicket']);
         Route::post('payment-status-update',[ServiceController::class,'paymentStatusUpdate']);
+        // PayTabs payment endpoints
+        Route::post('paytabs/initiate', [PayTabsApiController::class, 'initiate']);
+        Route::post('paytabs/verify-transaction', [PayTabsApiController::class, 'verify']);
         
         //payment gateway list
         Route::post('payment-gateway-list',[PaymentGatewayController::class,'gatewayList']);
+
+        // Device token registration & notifications
+        Route::post('device-token', [NotificationApiController::class, 'registerDeviceToken']);
+        Route::delete('device-token', [NotificationApiController::class, 'removeDeviceToken']);
+        Route::group(['prefix' => 'notifications'], function () {
+            Route::get('/', [NotificationApiController::class, 'index']);
+            Route::get('unread-count', [NotificationApiController::class, 'unreadCount']);
+            Route::post('{id}/read', [NotificationApiController::class, 'markAsRead']);
+            Route::post('mark-all-read', [NotificationApiController::class, 'markAllRead']);
+        });
 
         //buyer chat
         if(moduleExists("LiveChat")) {

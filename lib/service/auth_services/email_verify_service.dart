@@ -9,6 +9,7 @@ import 'package:funmoments/service/auth_services/login_service.dart';
 import 'package:funmoments/service/auth_services/reset_password_service.dart';
 import 'package:funmoments/service/profile_service.dart';
 import 'package:funmoments/view/home/landing_page.dart';
+import 'package:funmoments/view/home/homepage_helper.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:http/http.dart' as http;
 
@@ -107,8 +108,14 @@ class EmailVerifyService with ChangeNotifier {
           await Provider.of<PushNotificationService>(context, listen: false)
               .fetchPusherCredential(context: context);
 
-          context.popTrue;
-          context.popTrue;
+          HomepageHelper.tabIndex.value = 0;
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute<void>(
+              builder: (BuildContext context) => const LandingPage(),
+            ),
+            (route) => false,
+          );
         } else {
           print(response.body);
           OthersHelper().showToast(

@@ -1,7 +1,6 @@
-// ignore_for_file: must_be_immutable
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 import '../../service/app_string_service.dart';
 import '../../service/auth_services/delete_account_service.dart';
@@ -27,7 +26,7 @@ class DeleteAccountPage extends StatelessWidget {
           .appbarCommon(lnProvider.tStrings['Delete account'], context, () {
         Navigator.pop(context);
       }),
-      backgroundColor: Colors.white,
+      backgroundColor: FMColors.background,
       body: SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(
@@ -49,19 +48,19 @@ class DeleteAccountPage extends StatelessWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 15),
                         decoration: BoxDecoration(
-                          border: Border.all(color: cc.greyFive),
-                          borderRadius: BorderRadius.circular(6),
+                          color: FMColors.inputSurface,
+                          border: Border.all(color: FMColors.border),
+                          borderRadius: BorderRadius.circular(FMRadii.md),
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
-                            // menuMaxHeight: 200,
-                            // isExpanded: true,
+                            dropdownColor: FMColors.surfaceElevated,
                             value: provider.selecteddeactivateReason,
-                            icon: Icon(Icons.keyboard_arrow_down_rounded,
-                                color: cc.greyFour),
+                            icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                                color: FMColors.magenta),
                             iconSize: 26,
-                            elevation: 17,
-                            style: TextStyle(color: cc.greyFour),
+                            elevation: 4,
+                            style: const TextStyle(color: FMColors.textPrimary, fontSize: 14),
                             onChanged: (newValue) {
                               provider.setdeactivateReasonValue(newValue);
 
@@ -77,8 +76,8 @@ class DeleteAccountPage extends StatelessWidget {
                                 value: value,
                                 child: Text(
                                   ln.getString(value),
-                                  style: TextStyle(
-                                      color: cc.greyPrimary.withOpacity(.8)),
+                                  style: const TextStyle(
+                                      color: FMColors.textPrimary),
                                 ),
                               );
                             }).toList(),

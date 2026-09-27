@@ -34,7 +34,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
     ConstantColors cc = ConstantColors();
 
     return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         appBar: CommonHelper().appbarCommon('Create ticket', context, () {
           Navigator.pop(context);
         }),

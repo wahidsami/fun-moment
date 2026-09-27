@@ -27,14 +27,16 @@ class ServiceDetailsService with ChangeNotifier {
 
   fetchServiceDetails(serviceId) async {
     setLoadingTrue();
-    var connection = await checkConnection();
-    if (connection) {
-      // reviewList = [];
-      //internet connection is on
+    try {
+      var connection = await checkConnection();
+      if (!connection) {
+        serviceAllDetails = 'error';
+        OthersHelper().showToast('Please check your internet connection', Colors.black);
+        return;
+      }
+
       var header = {
-        //if header type is application/json then the data should be in jsonEncode method
         "Accept": "application/json",
-        // "Content-Type": "application/json"
       };
 
       print('$baseApi/service-details/$serviceId');
@@ -45,27 +47,23 @@ class ServiceDetailsService with ChangeNotifier {
 
       print(response.body);
       print(response.statusCode);
-      if (response.statusCode == 201) {
-        // serviceAllDetails =
-        //     ServiceDetailsModel.fromJson(jsonDecode(response.body));
+      if (response.statusCode == 200 || response.statusCode == 201) {
         var data = ServiceDetailsModel.fromJson(jsonDecode(response.body));
 
         serviceAllDetails = data;
         sellerId = jsonDecode(response.body)['service_details']
             ['seller_for_mobile']['id'];
-        // for (int i = 0; i < data.serviceReviews.length; i++) {
-        //   reviewList.add({'rating': data.serviceReviews[i].rating, 'message':data.serviceReviews[i].message,});
-        // }
-        notifyListeners();
-        setLoadingFalse();
       } else {
         serviceAllDetails = 'error';
-
-        print(serviceAllDetails);
-        setLoadingFalse();
         OthersHelper().showToast('Something went wrong', Colors.black);
-        notifyListeners();
       }
+    } catch (e, st) {
+      debugPrint('Error in fetchServiceDetails: $e\n$st');
+      serviceAllDetails = 'error';
+      OthersHelper().showToast('Failed to load service details', Colors.black);
+    } finally {
+      setLoadingFalse();
+      notifyListeners();
     }
   }
 }

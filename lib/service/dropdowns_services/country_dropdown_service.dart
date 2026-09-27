@@ -115,17 +115,10 @@ class CountryDropdownService with ChangeNotifier {
 //==============================>
 
   setCountryBasedOnUserProfile(BuildContext context) {
-    selectedCountry = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            .userDetails
-            .country
-            ?.country ??
-        'Select Country';
-    selectedCountryId = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            .userDetails
-            .countryId ??
-        defaultId;
+    final profile = Provider.of<ProfileService>(context, listen: false).profileDetails;
+    if (profile == null) return;
+    selectedCountry = profile.userDetails.country?.country ?? 'Select Country';
+    selectedCountryId = profile.userDetails.countryId ?? defaultId;
 
     Future.delayed(const Duration(milliseconds: 500), () {
       notifyListeners();

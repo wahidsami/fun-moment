@@ -20,7 +20,7 @@ class SearchBarPageWithDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       appBar: CommonHelper().appbarCommon(
         lnProvider.getString('Search'),
         context,

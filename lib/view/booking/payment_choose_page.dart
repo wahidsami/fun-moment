@@ -55,7 +55,7 @@ class _PaymentChoosePageState extends State<PaymentChoosePage> {
         .fetchGatewayList(context);
 
     return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         appBar: CommonHelper().appbarCommon('Payment', context, () {
           Navigator.pop(context);
         }),
@@ -142,7 +142,7 @@ class _PaymentChoosePageState extends State<PaymentChoosePage> {
                                           width: double.infinity,
                                           height: 60,
                                           padding: const EdgeInsets.all(10),
-                                          decoration: BoxDecoration(
+                                          decoration: BoxDecoration(color: cc.black9,
                                             borderRadius:
                                                 BorderRadius.circular(8),
                                             border: Border.all(

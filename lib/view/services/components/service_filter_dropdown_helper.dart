@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/all_services_service.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/common_helper.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
@@ -22,19 +23,20 @@ class ServiceFilterDropdownHelper {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 15),
                   decoration: BoxDecoration(
-                    border: Border.all(color: cc.greyFive),
-                    borderRadius: BorderRadius.circular(6),
+                    color: FMColors.inputSurface,
+                    border: Border.all(color: FMColors.border),
+                    borderRadius: BorderRadius.circular(FMRadii.md),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      // menuMaxHeight: 200,
+                      dropdownColor: FMColors.surfaceElevated,
                       isExpanded: true,
                       value: provider.selectedCategory,
-                      icon: Icon(Icons.keyboard_arrow_down_rounded,
-                          color: cc.greyFour),
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                          color: FMColors.magenta),
                       iconSize: 26,
-                      elevation: 17,
-                      style: TextStyle(color: cc.greyFour),
+                      elevation: 4,
+                      style: const TextStyle(color: FMColors.textPrimary, fontSize: 14),
                       onChanged: (newValue) {
                         provider.setCategoryValue(newValue);
 
@@ -54,8 +56,8 @@ class ServiceFilterDropdownHelper {
                           value: value,
                           child: Text(
                             value,
-                            style: TextStyle(
-                                color: cc.greyPrimary.withOpacity(.8)),
+                            style: const TextStyle(
+                                color: FMColors.textPrimary),
                           ),
                         );
                       }).toList(),
@@ -84,19 +86,20 @@ class ServiceFilterDropdownHelper {
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 15),
                       decoration: BoxDecoration(
-                        border: Border.all(color: cc.greyFive),
-                        borderRadius: BorderRadius.circular(6),
+                        color: FMColors.inputSurface,
+                        border: Border.all(color: FMColors.border),
+                        borderRadius: BorderRadius.circular(FMRadii.md),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          // menuMaxHeight: 200,
+                          dropdownColor: FMColors.surfaceElevated,
                           isExpanded: true,
                           value: provider.selectedSubcat,
-                          icon: Icon(Icons.keyboard_arrow_down_rounded,
-                              color: cc.greyFour),
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                              color: FMColors.magenta),
                           iconSize: 26,
-                          elevation: 17,
-                          style: TextStyle(color: cc.greyFour),
+                          elevation: 4,
+                          style: const TextStyle(color: FMColors.textPrimary, fontSize: 14),
                           onChanged: (newValue) {
                             provider.setSubcatValue(newValue);
 
@@ -116,8 +119,8 @@ class ServiceFilterDropdownHelper {
                               value: value,
                               child: Text(
                                 value,
-                                style: TextStyle(
-                                    color: cc.greyPrimary.withOpacity(.8)),
+                                style: const TextStyle(
+                                    color: FMColors.textPrimary),
                               ),
                             );
                           }).toList(),
@@ -128,7 +131,7 @@ class ServiceFilterDropdownHelper {
                 )
               : Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [OthersHelper().showLoading(cc.primaryColor)],
+                  children: [OthersHelper().showLoading(FMColors.magenta)],
                 ),
     );
   }
@@ -146,19 +149,20 @@ class ServiceFilterDropdownHelper {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 15),
                   decoration: BoxDecoration(
-                    border: Border.all(color: cc.greyFive),
-                    borderRadius: BorderRadius.circular(6),
+                    color: FMColors.inputSurface,
+                    border: Border.all(color: FMColors.border),
+                    borderRadius: BorderRadius.circular(FMRadii.md),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      // menuMaxHeight: 200,
+                      dropdownColor: FMColors.surfaceElevated,
                       isExpanded: true,
                       value: provider.selectedRating,
-                      icon: Icon(Icons.keyboard_arrow_down_rounded,
-                          color: cc.greyFour),
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                          color: FMColors.magenta),
                       iconSize: 26,
-                      elevation: 17,
-                      style: TextStyle(color: cc.greyFour),
+                      elevation: 4,
+                      style: const TextStyle(color: FMColors.textPrimary, fontSize: 14),
                       onChanged: (newValue) {
                         provider.setRatingValue(newValue);
 
@@ -181,8 +185,8 @@ class ServiceFilterDropdownHelper {
                                 .replaceAll(
                                     "Star", lnProvider.getString("Star"))
                                 .replaceAll("All", lnProvider.getString("All")),
-                            style: TextStyle(
-                                color: cc.greyPrimary.withOpacity(.8)),
+                            style: const TextStyle(
+                                color: FMColors.textPrimary),
                           ),
                         );
                       }).toList(),
@@ -193,7 +197,7 @@ class ServiceFilterDropdownHelper {
             )
           : Row(
               crossAxisAlignment: CrossAxisAlignment.center,
-              children: [OthersHelper().showLoading(cc.primaryColor)],
+              children: [OthersHelper().showLoading(FMColors.magenta)],
             ),
     );
   }
@@ -211,19 +215,20 @@ class ServiceFilterDropdownHelper {
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 15),
                       decoration: BoxDecoration(
-                        border: Border.all(color: cc.greyFive),
-                        borderRadius: BorderRadius.circular(6),
+                        color: FMColors.inputSurface,
+                        border: Border.all(color: FMColors.border),
+                        borderRadius: BorderRadius.circular(FMRadii.md),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          // menuMaxHeight: 200,
+                          dropdownColor: FMColors.surfaceElevated,
                           isExpanded: true,
                           value: provider.selectedSortby,
-                          icon: Icon(Icons.keyboard_arrow_down_rounded,
-                              color: cc.greyFour),
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                              color: FMColors.magenta),
                           iconSize: 26,
-                          elevation: 17,
-                          style: TextStyle(color: cc.greyFour),
+                          elevation: 4,
+                          style: const TextStyle(color: FMColors.textPrimary, fontSize: 14),
                           onChanged: (newValue) {
                             provider.setSortbyValue(newValue);
 
@@ -244,8 +249,8 @@ class ServiceFilterDropdownHelper {
                               value: value,
                               child: Text(
                                 lnProvider.getString(value),
-                                style: TextStyle(
-                                    color: cc.greyPrimary.withOpacity(.8)),
+                                style: const TextStyle(
+                                    color: FMColors.textPrimary),
                               ),
                             );
                           }).toList(),

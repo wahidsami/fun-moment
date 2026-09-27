@@ -26,7 +26,7 @@ class _OrderExtraAcceptSuccessPageState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         appBar: CommonHelper().appbarCommon('Success', context, () {
           Navigator.pop(context);
         }),
@@ -49,7 +49,7 @@ class _OrderExtraAcceptSuccessPageState
                   Text(
                     lnProvider.getString('Order extra accepted'),
                     style: TextStyle(
-                        color: cc.greyFour,
+                        color: cc.greyPrimary,
                         fontSize: 21,
                         fontWeight: FontWeight.w600),
                   ),

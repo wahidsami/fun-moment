@@ -16,8 +16,8 @@ class ServicesOfUser extends StatelessWidget {
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: CommonHelper().appbarCommon('Leslie Alexander', context, () {
+      backgroundColor: cc.bgColor,
+      appBar: CommonHelper().appbarCommon(sellerName?.toString() ?? 'Services', context, () {
         Navigator.pop(context);
       }),
       body: ListView.separated(

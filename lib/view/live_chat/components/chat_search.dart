@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/live_chat/chat_list_service.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
 class ChatSearch extends StatelessWidget {
@@ -12,8 +13,9 @@ class ChatSearch extends StatelessWidget {
     return Consumer<ChatListService>(
       builder: (context, provider, child) => Container(
           decoration: BoxDecoration(
-              color: const Color(0xffF5F5F5),
-              borderRadius: BorderRadius.circular(5)),
+              color: FMColors.surfaceElevated,
+              border: Border.all(color: FMColors.border),
+              borderRadius: BorderRadius.circular(10)),
           child: TextFormField(
             controller: searchController,
             onFieldSubmitted: (value) {
@@ -26,12 +28,12 @@ class ChatSearch extends StatelessWidget {
                 provider.setLoadedChatList();
               }
             },
-            style: const TextStyle(fontSize: 14),
+            style: const TextStyle(fontSize: 14, color: Colors.white),
             decoration: InputDecoration(
                 border: InputBorder.none,
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search, color: FMColors.textMuted),
                 hintText: lnProvider.getString('Search'),
-                hintStyle: const TextStyle(color: Colors.grey),
+                hintStyle: const TextStyle(color: FMColors.textMuted),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 15)),
           )),

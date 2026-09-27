@@ -104,9 +104,13 @@ class FMShadows {
 }
 
 class FMTheme {
-  static ThemeData dark() {
-    final base = ThemeData.dark(useMaterial3: true);
-    final textTheme = base.textTheme.copyWith(
+  static ThemeData dark({bool isArabic = false}) {
+    final base = ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      fontFamily: isArabic ? 'Cairo' : null,
+    );
+    final rawTextTheme = base.textTheme.copyWith(
       displayLarge: const TextStyle(
         color: FMColors.textPrimary,
         fontSize: 34,
@@ -163,7 +167,14 @@ class FMTheme {
       ),
     );
 
+    final textTheme = isArabic
+        ? rawTextTheme.apply(fontFamily: 'Cairo')
+        : rawTextTheme;
+
     return base.copyWith(
+      primaryTextTheme: isArabic
+          ? base.primaryTextTheme.apply(fontFamily: 'Cairo')
+          : base.primaryTextTheme,
       primaryColor: FMColors.magenta,
       scaffoldBackgroundColor: FMColors.background,
       colorScheme: const ColorScheme.dark(
@@ -178,16 +189,17 @@ class FMTheme {
         onError: Colors.white,
       ),
       textTheme: textTheme,
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: FMColors.background,
         surfaceTintColor: FMColors.background,
         elevation: 0,
         centerTitle: false,
-        iconTheme: IconThemeData(color: FMColors.textPrimary),
+        iconTheme: const IconThemeData(color: FMColors.textPrimary),
         titleTextStyle: TextStyle(
           color: FMColors.textPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
+          fontFamily: isArabic ? 'Cairo' : null,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -195,8 +207,15 @@ class FMTheme {
         fillColor: FMColors.inputSurface,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        hintStyle: const TextStyle(color: FMColors.textMuted, fontSize: 14),
-        labelStyle: const TextStyle(color: FMColors.textMuted),
+        hintStyle: TextStyle(
+          color: FMColors.textMuted,
+          fontSize: 14,
+          fontFamily: isArabic ? 'Cairo' : null,
+        ),
+        labelStyle: TextStyle(
+          color: FMColors.textMuted,
+          fontFamily: isArabic ? 'Cairo' : null,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(FMRadii.md),
           borderSide: const BorderSide(color: FMColors.border),
@@ -227,16 +246,20 @@ class FMTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(FMRadii.md),
           ),
-          textStyle: const TextStyle(
+          textStyle: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
+            fontFamily: isArabic ? 'Cairo' : null,
           ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: FMColors.magentaLight,
-          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          textStyle: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontFamily: isArabic ? 'Cairo' : null,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -282,6 +305,19 @@ class FMTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(5),
         ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: FMColors.surfaceElevated,
+        surfaceTintColor: FMColors.surfaceElevated,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(FMRadii.md),
+          side: const BorderSide(color: FMColors.border),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: FMColors.surfaceElevated,
+        surfaceTintColor: FMColors.surfaceElevated,
+        modalBackgroundColor: FMColors.surfaceElevated,
       ),
       snackBarTheme: const SnackBarThemeData(
         backgroundColor: FMColors.surfaceElevated,

@@ -109,8 +109,11 @@ class _SignupPhonePassState extends State<SignupPhonePass> {
                   ),
                 ),
                 validator: (value) {
-                  if (widget.passController.text != value) {
+                  if (value == null || value.isEmpty) {
                     return asProvider.getString("Please retype your password");
+                  }
+                  if (widget.passController.text != value) {
+                    return asProvider.getString("Password did not match");
                   }
                   return null;
                 },
@@ -128,10 +131,10 @@ class _SignupPhonePassState extends State<SignupPhonePass> {
                         asProvider.getString("Password did not match"),
                         Colors.black,
                       );
-                    } else if (widget.passController.text.length < 6) {
+                    } else if (widget.passController.text.length < 8) {
                       OthersHelper().showToast(
                         asProvider.getString(
-                            "Password must be at least 6 characters"),
+                            "Password must be at least 8 characters"),
                         Colors.black,
                       );
                     } else {

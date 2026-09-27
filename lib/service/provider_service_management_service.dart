@@ -11,6 +11,7 @@ class ProviderServiceItem {
   final num price;
   final String? imageUrl;
   final int isServiceOn;
+  final int status;
   final int? reviewsCount;
   final int? pendingOrderCount;
   final int? completeOrderCount;
@@ -23,12 +24,16 @@ class ProviderServiceItem {
     required this.price,
     this.imageUrl,
     required this.isServiceOn,
+    this.status = 0,
     this.reviewsCount,
     this.pendingOrderCount,
     this.completeOrderCount,
     this.cancelOrderCount,
     this.view,
   });
+
+  bool get isPendingApproval => status == 0;
+  bool get isApproved => status == 1;
 
   factory ProviderServiceItem.fromJson(Map<String, dynamic> json, String? imgUrl) {
     return ProviderServiceItem(
@@ -37,6 +42,7 @@ class ProviderServiceItem {
       price: json['price'] is num ? json['price'] : (num.tryParse(json['price']?.toString() ?? '') ?? 0),
       imageUrl: imgUrl,
       isServiceOn: json['is_service_on'] is int ? json['is_service_on'] : (int.tryParse(json['is_service_on']?.toString() ?? '') ?? 1),
+      status: json['status'] is int ? json['status'] : (int.tryParse(json['status']?.toString() ?? '') ?? 0),
       reviewsCount: json['reviews_count'] is int ? json['reviews_count'] : int.tryParse(json['reviews_count']?.toString() ?? ''),
       pendingOrderCount: json['pending_order_count'] is int ? json['pending_order_count'] : int.tryParse(json['pending_order_count']?.toString() ?? ''),
       completeOrderCount: json['complete_order_count'] is int ? json['complete_order_count'] : int.tryParse(json['complete_order_count']?.toString() ?? ''),
@@ -185,6 +191,7 @@ class ProviderServiceManagementService with ChangeNotifier {
             price: current.price,
             imageUrl: current.imageUrl,
             isServiceOn: current.isServiceOn == 1 ? 0 : 1,
+            status: current.status,
             reviewsCount: current.reviewsCount,
             pendingOrderCount: current.pendingOrderCount,
             completeOrderCount: current.completeOrderCount,
@@ -251,6 +258,7 @@ class ProviderServiceManagementService with ChangeNotifier {
         'title': title,
         'description': description,
         'category_id': categoryId.toString(),
+        'price': price.toString(),
         if (subcategoryId != null) 'subcategory_id': subcategoryId.toString(),
       };
 
@@ -267,9 +275,30 @@ class ProviderServiceManagementService with ChangeNotifier {
         await fetchMyServices(isRefresh: true);
         return true;
       } else {
-        final parsed = jsonDecode(res.body);
-        final msg = parsed['message'] ?? parsed['msg'] ?? 'Could not create service';
-        OthersHelper().showToast(msg.toString(), Colors.black);
+        try {
+          final parsed = jsonDecode(res.body);
+          String errorMessage = '';
+          if (parsed is Map && parsed['errors'] is Map) {
+            final errors = parsed['errors'] as Map;
+            final errorList = <String>[];
+            errors.forEach((key, val) {
+              if (val is List && val.isNotEmpty) {
+                errorList.add(val.first.toString());
+              } else if (val is String) {
+                errorList.add(val);
+              }
+            });
+            if (errorList.isNotEmpty) {
+              errorMessage = errorList.join('\n');
+            }
+          }
+          if (errorMessage.isEmpty && parsed is Map) {
+            errorMessage = parsed['message']?.toString() ?? parsed['msg']?.toString() ?? 'Could not create service';
+          }
+          OthersHelper().showToast(errorMessage.isNotEmpty ? errorMessage : 'Server Error (${res.statusCode})', Colors.black);
+        } catch (_) {
+          OthersHelper().showToast('Server Error (${res.statusCode})', Colors.black);
+        }
         return false;
       }
     } catch (e) {

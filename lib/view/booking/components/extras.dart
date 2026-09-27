@@ -138,9 +138,9 @@ class _ExtrasState extends State<Extras> {
                                   height: 40,
                                   margin: const EdgeInsets.only(top: 3),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    // border: Border.all(
-                                    //     color: widget.cc.borderColor, width: 1),
+                                    color: widget.cc.black9,
+                                    border: Border.all(
+                                        color: widget.cc.borderColor, width: 1),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Row(

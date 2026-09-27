@@ -1047,6 +1047,26 @@ class SellerController extends Controller
                         'decline_reason' => __('Not decline or complete yet. Please wait'),
                         'image' => $last_image_id ?? '',
                     ]);
+
+                    // Send customer notification for completion request
+                    try {
+                        $buyer = User::find($order_details->buyer_id);
+                        if ($buyer) {
+                            $buyer->notify(new \App\Notifications\OrderNotification(
+                                $order_details->id,
+                                $order_details->service_id,
+                                $order_details->seller_id,
+                                $order_details->buyer_id,
+                                __('Provider has requested to complete booking #') . $order_details->id,
+                                'order_alert',
+                                2,
+                                'buyer'
+                            ));
+                        }
+                    } catch (\Throwable $e) {
+                        \Log::warning('Completion request notification failed: ' . $e->getMessage());
+                    }
+
                     //Send email after change status
                     try {
                         $message_body_buyer = __('Hello,') . $payment_status->name . __('A new request is created for complete an order.') . '</br>' . ' <span class="verify-code">' . __('Order ID is:') . $payment_status->id . '</span>';
@@ -1174,36 +1194,84 @@ class SellerController extends Controller
         if (is_null($orderInfo)) {
             return response(['msg' => __("order not found or unauthorized")], 422);
         }
-        $orderInfo->status = 4;
+
+        // Support explicit status: 1=active/accepted, 2=completed, 3=delivered, 4=cancelled/declined
+        // Defaults to 4 (cancelled) if not provided for backward compatibility
+        $new_status = $request->has('status') ? (int) $request->status : 4;
+        $orderInfo->status = $new_status;
         $orderInfo->save();
+
+        // Customer status notifications:
+        // provider accepts -> notify customer (booking_accepted)
+        // provider completes -> notify customer (booking_completed)
+        // provider cancels -> notify customer (booking_cancelled)
+        try {
+            $buyer = User::find($orderInfo->buyer_id);
+            if ($buyer) {
+                $statusType = match ($new_status) {
+                    1 => 'booking_accepted',
+                    2 => 'booking_completed',
+                    4 => 'booking_cancelled',
+                    default => 'order_alert',
+                };
+
+                $statusMsg = match ($new_status) {
+                    1 => __('Your booking #') . $orderInfo->id . __(' has been accepted and is now in progress.'),
+                    2 => __('Your booking #') . $orderInfo->id . __(' has been marked as completed.'),
+                    4 => __('Your booking #') . $orderInfo->id . __(' has been cancelled by the service provider.'),
+                    default => __('Your booking #') . $orderInfo->id . __(' status has been updated to: ') . $this->orderStatusText($new_status),
+                };
+
+                $buyer->notify(new \App\Notifications\OrderNotification(
+                    $orderInfo->id,
+                    $orderInfo->service_id,
+                    $orderInfo->seller_id,
+                    $orderInfo->buyer_id,
+                    $statusMsg,
+                    $statusType,
+                    $new_status,
+                    'buyer'
+                ));
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Customer notification dispatch failed in OrderStatusChange: ' . $e->getMessage());
+        }
+
         $user_info = auth('sanctum')->user();
         $user_type =  $user_info->user_type ===  1 ? 'seller_' : '';
 
-        $smsService=new SMSService();
-        //send sms to buyer
-        $message_body_buyer = __(" Your order status changed to complete") . __('Order ID is:') . $request->id;
-        
-            $buyer_phone= User::select('phone')->where('id',$orderInfo->buyer_id)->first();
-            
-            //send sms to buyer
-            if ($buyer_phone) {
+        $smsService = new SMSService();
+        $buyer_phone = User::select('phone')->where('id', $orderInfo->buyer_id)->first();
+        if ($buyer_phone && !empty($buyer_phone->phone)) {
+            $message_body_buyer = __(' Your order status changed to ') . $this->orderStatusText($new_status) . __('. Order ID is: ') . $request->id;
+            try {
                 $smsService->send_sms($buyer_phone->phone, $message_body_buyer);
-            }
+            } catch (\Exception $e) {}
+        }
 
         $admins = Admin::all();
-        $message_body_admin = __(" order status changed to complete") . __('Order ID is:') . $request->id;
+        $message_body_admin = __(' Order status changed to ') . $this->orderStatusText($new_status) . __('. Order ID is: ') . $request->id;
         foreach ($admins as $admin) {
-            if ($admin->role == "Super Admin") {
-                $message_for_super_admin = $message_body_admin;
-
-                 $smsService->send_sms($admin->phone,  $message_for_super_admin);
-              // $smsService->send_sms($number,  $message_for_super_admin);
+            if ($admin->role == "Super Admin" && !empty($admin->phone)) {
+                try {
+                    $smsService->send_sms($admin->phone, $message_body_admin);
+                } catch (\Exception $e) {}
             }
         }
 
+        $statusMessage = match ($new_status) {
+            1 => __('Order status changed to active/accepted'),
+            2 => __('Order status changed to completed'),
+            4 => __('Order status changed to cancel'),
+            default => __('Order status updated successfully'),
+        };
 
-
-        return response()->json(['msg' => __("order status changed to cancel")], 200);
+        return response()->json([
+            'status' => 'success',
+            'msg' => $statusMessage,
+            'order_id' => $orderInfo->id,
+            'order_status' => $new_status,
+        ], 200);
     }
 
     public function availableDaysList()

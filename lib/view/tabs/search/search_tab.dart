@@ -36,7 +36,7 @@ class _SearchTabState extends State<SearchTab> {
         }
       },
       child: Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: cc.bgColor,
           body: SafeArea(
             child: Container(
               clipBehavior: Clip.none,

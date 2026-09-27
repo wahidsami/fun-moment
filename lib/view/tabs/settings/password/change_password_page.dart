@@ -45,7 +45,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       appBar: CommonHelper().appbarCommon('Change password', context, () {
         Navigator.pop(context);
       }),
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       body: Listener(
         onPointerDown: (_) {
           FocusScopeNode currentFocus = FocusScope.of(context);

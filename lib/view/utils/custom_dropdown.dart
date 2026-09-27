@@ -1,7 +1,7 @@
 // ignore_for_file: must_be_immutable
 
 import 'package:flutter/material.dart';
-import 'package:funmoments/view/utils/constant_colors.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
 class CustomDropdown extends StatelessWidget {
@@ -15,40 +15,42 @@ class CustomDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ConstantColors cc = ConstantColors();
     return Container(
       height: 56,
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 5),
-      padding: const EdgeInsets.symmetric(horizontal: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
+        color: FMColors.inputSurface,
+        borderRadius: BorderRadius.circular(FMRadii.md),
         border: Border.all(
-          color: cc.borderColor,
+          color: FMColors.border,
           width: 1,
         ),
       ),
       child: DropdownButton(
+        dropdownColor: FMColors.surfaceElevated,
         hint: Text(
           hintText,
-          style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                color: cc.greyParagraph,
-                fontSize: 14,
-              ),
+          style: const TextStyle(
+            color: FMColors.textMuted,
+            fontSize: 14,
+          ),
         ),
         underline: Container(),
         isExpanded: true,
-        elevation: 1,
+        elevation: 4,
         isDense: true,
         value: value,
-        style: Theme.of(context).textTheme.titleSmall!.copyWith(
-              color: cc.greyParagraph,
-              fontSize: 14,
-            ),
-        icon: Icon(
-          Icons.keyboard_arrow_down_sharp,
-          color: cc.greyParagraph,
+        style: const TextStyle(
+          color: FMColors.textPrimary,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+        icon: const Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: FMColors.magenta,
         ),
         onChanged: onChanged,
         items: (listData).map((value) {

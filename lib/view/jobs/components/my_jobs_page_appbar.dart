@@ -15,7 +15,7 @@ class MyJobsPageAppbar extends StatelessWidget {
     ConstantColors cc = ConstantColors();
     return AppBar(
       iconTheme: IconThemeData(color: cc.greyPrimary),
-      systemOverlayStyle: SystemUiOverlayStyle.dark,
+      systemOverlayStyle: SystemUiOverlayStyle.light,
       title: Consumer<AppStringService>(
         builder: (context, ln, child) => Text(
           ln.getString('My jobs'),
@@ -56,7 +56,7 @@ class MyJobsPageAppbar extends StatelessWidget {
                   alignment: Alignment.center,
                   // padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
-                      color: cc.successColor,
+                      color: cc.primaryColor,
                       borderRadius: BorderRadius.circular(8)),
                   child: AutoSizeText(
                     ln.getString('Create'),

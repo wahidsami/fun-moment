@@ -22,7 +22,9 @@ class DeclineHistory extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
               decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(9)),
+                  color: cc.black9,
+                  border: Border.all(color: cc.borderColor),
+                  borderRadius: BorderRadius.circular(12)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

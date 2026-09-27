@@ -31,7 +31,7 @@ class _MyReportListPageState extends State<MyReportListPage> {
     ConstantColors cc = ConstantColors();
 
     return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         appBar: CommonHelper().appbarCommon('Reports', context, () {
           Navigator.pop(context);
           Provider.of<ReportService>(context, listen: false)

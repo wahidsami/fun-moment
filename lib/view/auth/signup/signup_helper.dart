@@ -16,7 +16,7 @@ class SignupHelper {
             TextSpan(
               recognizer: TapGestureRecognizer()
                 ..onTap = () {
-                  Navigator.push(
+                  Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const LoginPage(),

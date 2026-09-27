@@ -54,7 +54,8 @@ class LocationFromGoogle extends StatelessWidget {
 
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
-                    color: Colors.white,
+                    color: cc.black9,
+                    border: Border.all(color: cc.borderColor),
                   ),
 
                   constraints: BoxConstraints(

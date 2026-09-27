@@ -33,7 +33,7 @@ class ServiceDetailsTop extends StatelessWidget {
               ServiceTitleAndUser(
                 cc: cc,
                 title: provider.serviceAllDetails.serviceDetails.title,
-                userImg: provider.serviceAllDetails.serviceSellerImage.imgUrl,
+                userImg: provider.serviceAllDetails.serviceSellerImage?.imgUrl,
                 sellerName: provider.serviceAllDetails.serviceSellerName,
                 sellerId: provider.sellerId,
                 videoLink: provider.serviceAllDetails.videoUrl,

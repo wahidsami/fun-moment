@@ -4,6 +4,7 @@ import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:funmoments/service/all_services_service.dart';
 import 'package:funmoments/service/common_service.dart';
 import 'package:funmoments/service/service_details_service.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/services/components/service_filter_dropdowns.dart';
 import 'package:funmoments/view/services/service_details_page.dart';
 import 'package:funmoments/view/utils/common_helper.dart';
@@ -35,7 +36,7 @@ class _AllServicePageState extends State<AllServicePage> {
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: FMColors.background,
       appBar: CommonHelper().appbarCommon('All Services', context, () {
         Navigator.pop(context);
       }),

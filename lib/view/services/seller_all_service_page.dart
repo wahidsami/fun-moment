@@ -38,7 +38,7 @@ class _ServicebyCategoryPageState extends State<SellerAllServicePage> {
     print('seller id ${widget.sellerId}');
     ConstantColors cc = ConstantColors();
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       appBar: CommonHelper().appbarCommon(widget.sellerName, context, () {
         Provider.of<SellerAllServicesService>(context, listen: false)
             .setEverythingToDefault();

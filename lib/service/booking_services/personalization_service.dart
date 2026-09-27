@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -137,28 +136,30 @@ class PersonalizationService with ChangeNotifier {
   fetchServiceExtra(serviceId, BuildContext context) async {
     setLoadingTrue();
     setToDefault(context);
-    var connection = await checkConnection();
-    if (connection) {
-      //internet connection is on
+    try {
+      var connection = await checkConnection();
+      if (!connection) {
+        OthersHelper().showToast('Please check your internet connection', Colors.black);
+        serviceExtraData = 'error';
+        return;
+      }
+
       var header = {
-        //if header type is application/json then the data should be in jsonEncode method
         "Accept": "application/json",
-        // "Content-Type": "application/json"
       };
 
       var response = await http.get(
           Uri.parse('$baseApi/service-list/service-book/$serviceId'),
           headers: header);
       print('$baseApi/service-list/service-book/$serviceId');
-
       debugPrint(response.body.toString());
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         var data = ServiceExtraModel.fromJson(jsonDecode(response.body));
         isOnline = data.service.isServiceOnline ?? 0;
         print('tax is ${data.service.tax}');
 
-        tax = (data.service.tax).toDouble() ?? 0.0;
+        tax = data.service.tax;
 
         //adding included list
         for (int i = 0; i < data.service.serviceInclude.length; i++) {
@@ -179,16 +180,17 @@ class PersonalizationService with ChangeNotifier {
           });
         }
         serviceExtraData = data;
-        // var data = ServiceDetailsModel.fromJson(jsonDecode(response.body));
-
-        notifyListeners();
-        setLoadingFalse();
       } else {
         serviceExtraData = 'error';
-        setLoadingFalse();
         OthersHelper().showToast('Something went wrong', Colors.black);
-        notifyListeners();
       }
+    } catch (e, st) {
+      debugPrint('Error in fetchServiceExtra: $e\n$st');
+      serviceExtraData = 'error';
+      OthersHelper().showToast('Something went wrong', Colors.black);
+    } finally {
+      setLoadingFalse();
+      notifyListeners();
     }
   }
 }

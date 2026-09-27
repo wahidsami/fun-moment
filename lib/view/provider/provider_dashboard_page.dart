@@ -12,6 +12,7 @@ import 'package:funmoments/view/provider/provider_services_page.dart';
 import 'package:funmoments/view/tabs/orders/orders_page.dart';
 import 'package:funmoments/view/tabs/settings/supports/my_tickets_page.dart';
 import 'package:funmoments/view/wallet/wallet_page.dart';
+import 'package:funmoments/view/notification/components/notification_bell_button.dart';
 
 class ProviderDashboardPage extends StatefulWidget {
   const ProviderDashboardPage({Key? key}) : super(key: key);
@@ -48,6 +49,7 @@ class _ProviderDashboardPageState extends State<ProviderDashboardPage> {
         backgroundColor: FMColors.surfaceDark,
         elevation: 0,
         actions: [
+          const NotificationBellButton(),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

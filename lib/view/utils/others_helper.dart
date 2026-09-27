@@ -3,6 +3,7 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
@@ -33,9 +34,9 @@ class OthersHelper with ChangeNotifier {
   ConstantColors cc = ConstantColors();
   int deliveryCharge = 60;
 
-  showLoading(Color color) {
+  showLoading([Color? color]) {
     return SpinKitThreeBounce(
-      color: color,
+      color: color ?? FMColors.magenta,
       size: 16.0,
     );
   }
@@ -44,7 +45,10 @@ class OthersHelper with ChangeNotifier {
     return Container(
         height: MediaQuery.of(context).size.height - 180,
         alignment: Alignment.center,
-        child: Text(lnProvider.getString(msg)));
+        child: Text(
+          lnProvider.getString(msg),
+          style: const TextStyle(color: FMColors.error, fontSize: 14),
+        ));
   }
 
   void showToast(String msg, Color? color) {
@@ -54,7 +58,7 @@ class OthersHelper with ChangeNotifier {
         toastLength: Toast.LENGTH_LONG,
         gravity: ToastGravity.BOTTOM,
         timeInSecForIosWeb: 1,
-        backgroundColor: color,
+        backgroundColor: color ?? FMColors.surfaceElevated,
         textColor: Colors.white,
         fontSize: 16.0);
   }

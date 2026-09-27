@@ -79,6 +79,7 @@ dependencies:
   sign_in_with_apple: ^6.1.4
   rename_app: ^1.3.2
   rename: ^3.0.2
+  firebase_messaging: ^16.7.0
 
 dev_dependencies:
   flutter_lints: ^1.0.0
@@ -104,20 +105,26 @@ flutter:
   assets:
     - logo.png
     - assets/images/
+    - assets/images/app/booking/
+    - assets/images/app/dj/
+    - assets/images/app/equipment/
+    - assets/images/app/hero/
+    - assets/images/app/promotions/
     - assets/icons/
     - assets/icons/payment/
     - assets/svg/
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
+
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/cairo/Cairo-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/cairo/Cairo-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/cairo/Cairo-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/cairo/Cairo-Bold.ttf
+          weight: 700
  
  
  

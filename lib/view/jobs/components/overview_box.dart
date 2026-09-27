@@ -20,8 +20,9 @@ class OverviewBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: Colors.grey.withOpacity(.5)),
+        color: cc.black9,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cc.borderColor),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         CommonHelper().paragraphCommon(title, fontsize: 13),

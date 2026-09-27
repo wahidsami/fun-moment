@@ -5,10 +5,12 @@ import 'package:funmoments/service/home_services/category_service.dart';
 import 'package:funmoments/service/provider_service_management_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
+import 'package:funmoments/view/provider/provider_services_page.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 
 class ProviderAddServicePage extends StatefulWidget {
-  const ProviderAddServicePage({Key? key}) : super(key: key);
+  final bool fromMyServices;
+  const ProviderAddServicePage({Key? key, this.fromMyServices = false}) : super(key: key);
 
   @override
   State<ProviderAddServicePage> createState() => _ProviderAddServicePageState();
@@ -20,6 +22,7 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
   final _priceController = TextEditingController();
   final _descController = TextEditingController();
   int? _selectedCategoryId;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -38,24 +41,128 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
+
+    final lnProvider = Provider.of<AppStringService>(context, listen: false);
+
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedCategoryId == null) {
-      OthersHelper().showToast('Please select a category', Colors.black);
+      OthersHelper().showToast(lnProvider.getString('Please select a category'), Colors.black);
       return;
     }
 
-    final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
-    final success = await Provider.of<ProviderServiceManagementService>(context, listen: false).createService(
-      context: context,
-      title: _titleController.text.trim(),
-      description: _descController.text.trim(),
-      categoryId: _selectedCategoryId!,
-      price: price,
-    );
+    setState(() {
+      _isSubmitting = true;
+    });
 
-    if (success && mounted) {
-      Navigator.pop(context);
+    try {
+      final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
+      final providerService = Provider.of<ProviderServiceManagementService>(context, listen: false);
+      final success = await providerService.createService(
+        context: context,
+        title: _titleController.text.trim(),
+        description: _descController.text.trim(),
+        categoryId: _selectedCategoryId!,
+        price: price,
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        // Show clear success confirmation dialog styled with FUN MOMENT dark/neon UI
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) => AlertDialog(
+            backgroundColor: FMColors.surfaceDark,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: FMColors.magenta.withOpacity(0.4), width: 1.5),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: FMColors.magenta.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: FMColors.magenta, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: FMColors.magenta,
+                    size: 38,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  lnProvider.getString('Service Submitted Successfully'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  lnProvider.getString('Your service has been submitted and is pending admin approval.'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: FMColors.textMuted,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: FMColors.magenta,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(dialogCtx);
+                    },
+                    child: Text(
+                      lnProvider.getString('View My Services'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+
+        if (!mounted) return;
+
+        // Navigate automatically to Provider Services / My Services
+        if (widget.fromMyServices) {
+          Navigator.pop(context);
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const ProviderServicesPage()),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -238,9 +345,13 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
                     backgroundColor: FMColors.magenta,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: providerService.isCreating ? null : _submit,
-                  child: providerService.isCreating
-                      ? const CircularProgressIndicator(color: Colors.white)
+                  onPressed: (_isSubmitting || providerService.isCreating) ? null : _submit,
+                  child: (_isSubmitting || providerService.isCreating)
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        )
                       : Text(
                           lnProvider.getString('Submit for Approval'),
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),

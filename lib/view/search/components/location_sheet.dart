@@ -26,7 +26,7 @@ class LocationSheet extends StatelessWidget {
             topRight: Radius.circular(20),
             topLeft: Radius.circular(20),
           ),
-          color: cc.white,
+          color: cc.black9,
           border: Border.all(color: cc.black7)),
       constraints: BoxConstraints(
           maxHeight:

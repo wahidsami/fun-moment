@@ -1086,7 +1086,18 @@ class ServiceController extends Controller
         //Send order notification to seller
         $seller = User::where('id',$request->seller_id)->first();
         $order_message = __('You have a new order');
-        $seller->notify(new OrderNotification($last_order_id,$request->service_id, $request->seller_id, $request->buyer_id,$order_message));
+        if ($request->selected_payment_gateway !== 'paytabs' && $seller) {
+            $seller->notify(new OrderNotification(
+                $last_order_id,
+                $request->service_id,
+                $request->seller_id,
+                $request->buyer_id,
+                $order_message,
+                'new_booking',
+                0,
+                'seller'
+            ));
+        }
         $order_details = Order::find($last_order_id);
 
         //todo: check payment gateway is wallet or not
@@ -1225,6 +1236,20 @@ class ServiceController extends Controller
         }
 
         $user_id = Auth::guard("sanctum")->id();
+        if ($order_details->buyer_id !== null && $order_details->buyer_id !== $user_id) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Unauthorized action for this order.')
+            ], 403);
+        }
+
+        if ($order_details->payment_gateway === 'paytabs') {
+            return response()->json([
+                'success' => false,
+                'message' => __('PayTabs payments must be verified via server verification endpoint.')
+            ], 422);
+        }
+
         $order_details->payment_status = 'complete';
         $order_details->save();
 

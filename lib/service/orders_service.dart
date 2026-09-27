@@ -223,6 +223,70 @@ class OrdersService with ChangeNotifier {
     notifyListeners();
   }
 
+  bool acceptLoading = false;
+
+  setAcceptLoadingStatus(bool status) {
+    acceptLoading = status;
+    notifyListeners();
+  }
+
+  Future<bool> changeOrderStatus(BuildContext context,
+      {required orderId, required int status}) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    var token = prefs.getString('token');
+
+    var header = {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": "Bearer $token",
+    };
+
+    var data = jsonEncode({"id": orderId, "status": status});
+
+    var connection = await checkConnection();
+    if (!connection) return false;
+
+    setAcceptLoadingStatus(true);
+
+    try {
+      var response = await http.post(
+          Uri.parse('$baseApi/seller/my-orders/order/change-status'),
+          headers: header,
+          body: data);
+
+      setAcceptLoadingStatus(false);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        String msg = 'Status updated';
+        if (status == 1) msg = 'Booking accepted';
+        if (status == 2) msg = 'Booking marked completed';
+        if (status == 4) msg = 'Booking cancelled';
+        OthersHelper().showSnackBar(
+            context, msg, status == 4 ? Colors.red : Colors.green);
+        try {
+          Provider.of<OrderDetailsService>(context, listen: false)
+              .fetchOrderDetails(orderId, context);
+        } catch (_) {}
+        try {
+          Provider.of<MyOrdersService>(context, listen: false).fetchMyOrders();
+        } catch (_) {}
+        return true;
+      } else {
+        OthersHelper().showSnackBar(
+            context, 'Failed to update order status', Colors.black);
+        return false;
+      }
+    } catch (e) {
+      setAcceptLoadingStatus(false);
+      OthersHelper().showSnackBar(context, 'Network error: $e', Colors.black);
+      return false;
+    }
+  }
+
+  Future<bool> acceptOrder(BuildContext context, {required orderId}) async {
+    return changeOrderStatus(context, orderId: orderId, status: 1);
+  }
+
   cancelOrder(BuildContext context, {required orderId}) async {
     //get user id
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -235,32 +299,38 @@ class OrdersService with ChangeNotifier {
       "Authorization": "Bearer $token",
     };
 
-    var data = jsonEncode({"id": orderId});
+    var data = jsonEncode({"id": orderId, "status": 4});
 
     var connection = await checkConnection();
     if (!connection) return;
 
     setCancelLoadingStatus(true);
 
-    var response = await http.post(
-        Uri.parse('$baseApi/seller/my-orders/order/change-status'),
-        headers: header,
-        body: data);
+    try {
+      var response = await http.post(
+          Uri.parse('$baseApi/seller/my-orders/order/change-status'),
+          headers: header,
+          body: data);
 
-    print(response.body);
-    print(response.statusCode);
+      print('cancelOrder status: ${response.statusCode}, body: ${response.body}');
+      setCancelLoadingStatus(false);
 
-    setCancelLoadingStatus(false);
-
-    final decodedData = jsonDecode(response.body);
-
-    if (response.statusCode == 500) {
-      OthersHelper().showSnackBar(context, 'Order cancelled', Colors.black);
-      Provider.of<MyOrdersService>(context, listen: false).fetchMyOrders();
-      Navigator.pop(context);
-    } else {
-      OthersHelper()
-          .showSnackBar(context, 'Something went wrong', Colors.black);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        OthersHelper().showSnackBar(context, 'Order cancelled', Colors.black);
+        try {
+          Provider.of<OrderDetailsService>(context, listen: false)
+              .fetchOrderDetails(orderId, context);
+        } catch (_) {}
+        try {
+          Provider.of<MyOrdersService>(context, listen: false).fetchMyOrders();
+        } catch (_) {}
+      } else {
+        OthersHelper()
+            .showSnackBar(context, 'Something went wrong', Colors.black);
+      }
+    } catch (e) {
+      setCancelLoadingStatus(false);
+      OthersHelper().showSnackBar(context, 'Network error: $e', Colors.black);
     }
   }
 }

@@ -45,7 +45,7 @@ class _MenuPageState extends State<MenuPage> {
     ConstantColors cc = ConstantColors();
 
     return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         body: Consumer<ProfileService>(builder: (context, ps, child) {
           return ps.profileDetails == null || ps.profileDetails is String
               ? const LoginOrRegister()

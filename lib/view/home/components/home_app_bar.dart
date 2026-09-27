@@ -4,13 +4,33 @@ import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/profile_service.dart';
 import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
+import 'package:funmoments/view/auth/login/login.dart';
 import 'package:funmoments/view/tabs/settings/profile_edit.dart';
 import 'package:funmoments/view/utils/language_selector_sheet.dart';
+import 'package:funmoments/view/notification/components/notification_bell_button.dart';
 
 class HomeAppBar extends StatelessWidget {
   const HomeAppBar({
     Key? key,
   }) : super(key: key);
+
+  void _openProfileOrLogin(BuildContext context, bool isGuest) {
+    if (isGuest) {
+      Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) => const LoginPage(hasBackButton: true),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) => const ProfileEditPage(),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +39,7 @@ class HomeAppBar extends StatelessWidget {
         builder: (context, profileProvider, child) {
           final name = profileProvider.profileDetails?.userDetails.name;
           final image = profileProvider.profileImage;
+          final isGuest = name == null || profileProvider.profileDetails == null;
 
           return FMSurfaceCard(
             gradient: LinearGradient(
@@ -33,19 +54,12 @@ class HomeAppBar extends StatelessWidget {
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (BuildContext context) => const ProfileEditPage(),
-                        ),
-                      );
-                    },
+                    onTap: () => _openProfileOrLogin(context, isGuest),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          name == null
+                          isGuest
                               ? asProvider.getString('Welcome to FUN MOMENT')
                               : asProvider.getString('Welcome back'),
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -64,18 +78,13 @@ class HomeAppBar extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
+                const NotificationBellButton(),
+                const SizedBox(width: 4),
                 const LanguageSwitchPill(compact: true),
                 const SizedBox(width: 10),
                 InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (BuildContext context) => const ProfileEditPage(),
-                      ),
-                    );
-                  },
+                  onTap: () => _openProfileOrLogin(context, isGuest),
                   child: image != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(18),

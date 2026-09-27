@@ -41,7 +41,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
     final rtlProvider = Provider.of<RtlService>(context, listen: false);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       appBar: CommonHelper().appbarCommon('', context, () {
         Navigator.pop(context);
       }),
@@ -75,7 +75,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                           Text(
                             provider.jobDetails.title.toString(),
                             style: TextStyle(
-                                color: cc.greyFour,
+                                color: cc.greyPrimary,
                                 fontSize: 18,
                                 height: 1.4,
                                 fontWeight: FontWeight.bold),

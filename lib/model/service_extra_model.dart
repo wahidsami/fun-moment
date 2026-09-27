@@ -37,7 +37,7 @@ class Service {
     this.sellerId,
     this.title,
     this.price,
-    this.tax,
+    this.tax = 0.0,
     this.image,
     this.isServiceOnline,
     this.serviceCityId,
@@ -52,7 +52,7 @@ class Service {
   int? sellerId;
   String? title;
   var price;
-  var tax;
+  double tax;
   String? image;
   int? isServiceOnline;
   int? serviceCityId;
@@ -62,12 +62,23 @@ class Service {
   SellerForMobile sellerForMobile;
   ServiceCity? serviceCity;
 
+  static double parseTax(dynamic rawTax) {
+    if (rawTax == null) return 0.0;
+    if (rawTax is num) return rawTax.toDouble();
+    if (rawTax is String) {
+      final cleaned = rawTax.trim();
+      if (cleaned.isEmpty) return 0.0;
+      return double.tryParse(cleaned) ?? 0.0;
+    }
+    return 0.0;
+  }
+
   factory Service.fromJson(Map<String, dynamic> json) => Service(
         id: json["id"],
         sellerId: json["seller_id"],
         title: json["title"],
         price: json["price"],
-        tax: json["tax"],
+        tax: parseTax(json["tax"]),
         image: json["image"],
         isServiceOnline: json["is_service_online"],
         serviceCityId: json["service_city_id"],

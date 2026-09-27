@@ -19,9 +19,9 @@ class RtlService with ChangeNotifier {
   bool get isRtl => direction == 'rtl';
   bool get isArabic => langSlug.startsWith('ar');
 
-  String currency = '\$';
-  String currencyDirection = 'left';
-  String currencyCode = 'USD';
+  String currency = 'SAR';
+  String currencyDirection = 'right';
+  String currencyCode = 'SAR';
 
   bool alreadyCurrencyLoaded = false;
   bool alreadyRtlLoaded = false;
@@ -32,6 +32,9 @@ class RtlService with ChangeNotifier {
     if (savedLang != null && savedLang.isNotEmpty) {
       langSlug = savedLang;
       direction = savedLang == 'ar' ? 'rtl' : 'ltr';
+      if (currency == 'SAR' || currency == 'SR' || currency == 'ر.س') {
+        currency = isArabic ? 'ر.س' : 'SAR';
+      }
       if (context != null) {
         try {
           Provider.of<AppStringService>(context, listen: false).setLanguage(savedLang);
@@ -50,6 +53,10 @@ class RtlService with ChangeNotifier {
     langSlug = langCode;
     direction = langCode == 'ar' ? 'rtl' : 'ltr';
 
+    if (currency == 'SAR' || currency == 'SR' || currency == 'ر.س') {
+      currency = (langCode == 'ar') ? 'ر.س' : 'SAR';
+    }
+
     await srf.setString(userSelectedLangKey, langCode);
     await srf.setString('slug', langCode);
 
@@ -66,21 +73,31 @@ class RtlService with ChangeNotifier {
 
   fetchCurrency() async {
     if (alreadyCurrencyLoaded == false) {
-      var response = await http.get(Uri.parse('$baseApi/currency'));
-      if (response.statusCode == 201) {
-        print(response.body);
-        currency = jsonDecode(response.body)['currency']['symbol'];
-        currencyDirection =
-            jsonDecode(response.body)['currency']['position'] ?? 'left';
-        currencyCode = jsonDecode(response.body)['currency']['code'] ?? "USD";
-        alreadyCurrencyLoaded = true;
-        notifyListeners();
-      } else {
-        print('failed loading currency');
-        print(response.body);
+      try {
+        var response = await http.get(Uri.parse('$baseApi/currency'));
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          final data = jsonDecode(response.body);
+          final curr = data['currency'];
+          if (curr != null) {
+            String sym = curr['symbol']?.toString().trim() ?? '';
+            String code = curr['code']?.toString().trim() ?? '';
+
+            // Reject invalid, placeholder '@', or generic '$' fallbacks when SAR is intended
+            if (sym.isEmpty || sym == '\$' || sym == '@' || code == 'SAR' || sym == 'SR') {
+              sym = isArabic ? 'ر.س' : 'SAR';
+              code = 'SAR';
+            }
+
+            currency = sym;
+            currencyDirection = curr['position'] ?? (sym == 'SAR' || sym == 'ر.س' ? 'right' : 'left');
+            currencyCode = code.isNotEmpty ? code : "SAR";
+            alreadyCurrencyLoaded = true;
+            notifyListeners();
+          }
+        }
+      } catch (e) {
+        debugPrint('fetchCurrency error: $e');
       }
-    } else {
-      //already loaded from server. no need to load again
     }
   }
 

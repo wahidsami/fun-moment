@@ -8,6 +8,7 @@ import 'package:funmoments/view/tabs/orders/components/complete_request.dart';
 import 'package:funmoments/view/tabs/orders/components/decline_history.dart';
 import 'package:funmoments/view/tabs/orders/components/order_extras.dart';
 import 'package:funmoments/view/tabs/orders/components/seller_details.dart';
+import 'package:funmoments/view/tabs/orders/components/provider_order_actions.dart';
 import 'package:funmoments/view/utils/common_helper.dart';
 import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/constant_styles.dart';
@@ -70,7 +71,7 @@ class _OrdersDetailsPageState extends State<OrderDetailsPage> {
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 20, vertical: 20),
                                           decoration: BoxDecoration(
-                                              color: Colors.white,
+                                              color: cc.black9,
                                               borderRadius:
                                                   BorderRadius.circular(9)),
                                           child: Column(
@@ -128,7 +129,7 @@ class _OrdersDetailsPageState extends State<OrderDetailsPage> {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 20, vertical: 20),
                                     decoration: BoxDecoration(
-                                        color: Colors.white,
+                                        color: cc.black9,
                                         borderRadius: BorderRadius.circular(9)),
                                     child: Column(
                                         crossAxisAlignment:
@@ -158,6 +159,11 @@ class _OrdersDetailsPageState extends State<OrderDetailsPage> {
                                   OrderExtras(
                                     orderId: widget.orderId,
                                     sellerId: provider.orderDetails.sellerId,
+                                  ),
+
+                                  // provider actions (accept / decline / complete)
+                                  ProviderOrderActions(
+                                    orderId: widget.orderId,
                                   ),
 
                                   //complete request

@@ -73,7 +73,7 @@ class LoginService with ChangeNotifier {
                       responseData["users"]["email"]?.toString() ?? '', context, token);
 
           if (isOtepSent) {
-            Navigator.push(
+            Navigator.pushReplacement(
               context,
               MaterialPageRoute<void>(
                 builder: (BuildContext context) => EmailVerifyPage(

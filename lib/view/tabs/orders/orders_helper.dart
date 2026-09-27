@@ -63,7 +63,7 @@ class OrdersHelper {
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
       decoration: BoxDecoration(
           border: Border.all(color: cc.borderColor),
-          color: Colors.white,
+          color: cc.black9,
           borderRadius: BorderRadius.circular(4)),
       child: Text(
         capsuleText,

@@ -16,7 +16,6 @@ import 'package:funmoments/view/auth/reset_password/reset_pass_email_page.dart';
 import 'package:funmoments/view/auth/signup/signup.dart';
 import 'package:funmoments/view/home/landing_page.dart';
 import 'package:funmoments/view/home/homepage_helper.dart';
-import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 import 'package:funmoments/view/utils/language_selector_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -119,7 +118,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   Container(
-                    height: 220,
+                    height: 240,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(FMRadii.xl),
@@ -137,12 +136,13 @@ class _LoginPageState extends State<LoginPage> {
                   Positioned.fill(
                     child: Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(26),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 14),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const FMBrandLogo(height: 74),
-                            const SizedBox(height: 18),
+                            const FMBrandLogo(height: 60),
+                            const SizedBox(height: 12),
                             Text(
                               lnProvider.getString('Welcome back'),
                               style: Theme.of(context)
@@ -151,15 +151,19 @@ class _LoginPageState extends State<LoginPage> {
                                   ?.copyWith(
                                     fontWeight: FontWeight.w800,
                                     color: Colors.white,
+                                    fontSize: 22,
                                   ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             Text(
                               lnProvider.getString(
                                   'Login to continue your FUN MOMENT journey'),
                               textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     color: FMColors.magentaLight,
+                                    fontSize: 13,
                                   ),
                             ),
                           ],

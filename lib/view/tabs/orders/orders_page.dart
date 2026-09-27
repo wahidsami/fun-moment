@@ -40,7 +40,7 @@ class _OrdersPageState extends State<OrdersPage> {
     });
 
     return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         body: SafeArea(
           child: Consumer<ProfileService>(builder: (context, ps, child) {
             return ps.profileDetails == null || ps.profileDetails is String
@@ -123,13 +123,14 @@ class _OrdersPageState extends State<OrdersPage> {
                                                           alignment:
                                                               Alignment.center,
                                                           decoration: BoxDecoration(
+                                                              color: cc.black9,
                                                               border: Border.all(
                                                                   color: cc
                                                                       .borderColor),
                                                               borderRadius:
                                                                   BorderRadius
                                                                       .circular(
-                                                                          5)),
+                                                                          12)),
                                                           child: Column(
                                                               children: [
                                                                 Container(

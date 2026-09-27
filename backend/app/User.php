@@ -79,6 +79,11 @@ class User extends Authenticatable
         return $this->belongsTo(ServiceCity::class,'service_city','id');
     }
 
+    public function deviceTokens()
+    {
+        return $this->hasMany(UserDeviceToken::class, 'user_id', 'id');
+    }
+
     public function area(){
         return $this->belongsTo(ServiceArea::class,'service_area','id');
     }

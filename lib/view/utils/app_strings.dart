@@ -9,6 +9,10 @@ var appStrings = {
   "Discover": "Discover",
   "Bookings": "Bookings",
   "Orders": "Orders",
+  "Dashboard": "Dashboard",
+  "Services": "Services",
+  "Jobs": "Jobs",
+  "Book Now": "Book Now",
   "Save": "Save",
   "Saved": "Saved",
   "Search": "Search",
@@ -560,7 +564,24 @@ var appStrings = {
   "Direct invites": "Direct invites",
   "Payouts & balance": "Payouts & balance",
   "Support": "Support",
-  "Help tickets": "Help tickets"
+  "Help tickets": "Help tickets",
+  "Discover Your Perfect Moment": "Discover Your Perfect Moment",
+  "Find DJs, entertainment, venues, and everything you need to bring your event to life.":
+      "Find DJs, entertainment, venues, and everything you need to bring your event to life.",
+  "Everything for Your Event": "Everything for Your Event",
+  "From equipment and décor to catering and more, find it all in one place.":
+      "From equipment and décor to catering and more, find it all in one place.",
+  "Choose. Book. Celebrate.": "Choose. Book. Celebrate.",
+  "Compare services, book with ease, and enjoy the moment you created.":
+      "Compare services, book with ease, and enjoy the moment you created.",
+  "Pending Admin Approval": "Pending Admin Approval",
+  "Approved": "Approved",
+  "Service Submitted Successfully": "Service Submitted Successfully",
+  "Your service has been submitted and is pending admin approval.":
+      "Your service has been submitted and is pending admin approval.",
+  "View My Services": "View My Services",
+  "Awaiting admin approval before publishing to customers":
+      "Awaiting admin approval before publishing to customers"
 };
 
 var translations = {
@@ -571,7 +592,14 @@ var translations = {
   "Recently listed": "المضافة حديثاً",
   "See all": "عرض الكل",
   "Home": "الرئيسية",
+  "Discover": "استكشف",
+  "Bookings": "الحجوزات",
   "Orders": "الطلبات",
+  "Profile": "الملف الشخصي",
+  "Dashboard": "لوحة التحكم",
+  "Services": "الخدمات",
+  "Jobs": "الوظائف",
+  "Book Now": "احجز الآن",
 
   //here
   "Order": "الطلب",
@@ -1119,5 +1147,22 @@ var translations = {
   "Direct invites": "دعوات مباشرة",
   "Payouts & balance": "المدفوعات والرصيد",
   "Support": "الدعم",
-  "Help tickets": "تذاكر المساعدة"
+  "Help tickets": "تذاكر المساعدة",
+  "Discover Your Perfect Moment": "اكتشف لحظتك المثالية",
+  "Find DJs, entertainment, venues, and everything you need to bring your event to life.":
+      "اكتشف منسقي الموسيقى والترفيه والقاعات وكل ما تحتاجه لتصنع مناسبتك.",
+  "Everything for Your Event": "كل ما تحتاجه لمناسبتك",
+  "From equipment and décor to catering and more, find it all in one place.":
+      "من التجهيزات والديكور إلى الضيافة وأكثر، كل شيء في مكان واحد.",
+  "Choose. Book. Celebrate.": "اختر. احجز. واحتفل.",
+  "Compare services, book with ease, and enjoy the moment you created.":
+      "قارن الخدمات، واحجز بسهولة، واستمتع باللحظة التي صنعتها.",
+  "Pending Admin Approval": "قيد موافقة الإدارة",
+  "Approved": "معتمد",
+  "Service Submitted Successfully": "تم إرسال الخدمة بنجاح",
+  "Your service has been submitted and is pending admin approval.":
+      "تم إرسال الخدمة بنجاح وهي الآن قيد المراجعة والموافقة من قبل الإدارة.",
+  "View My Services": "عرض خدماتي",
+  "Awaiting admin approval before publishing to customers":
+      "في انتظار موافقة الإدارة قبل النشر للعملاء"
 };

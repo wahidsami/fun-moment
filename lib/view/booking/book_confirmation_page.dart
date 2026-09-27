@@ -53,11 +53,12 @@ class _BookConfirmationPageState extends State<BookConfirmationPage> {
         return Future.value(true);
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         appBar: CommonHelper()
             .appbarForBookingPages(lnProvider.getString('Details'), context),
         body: Consumer<BookConfirmationService>(
           builder: (context, bcProvider, child) => SlidingUpPanel(
+            color: cc.black9,
             controller: _pc,
             borderRadius: const BorderRadius.only(
               topRight: Radius.circular(20),

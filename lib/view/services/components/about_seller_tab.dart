@@ -37,7 +37,7 @@ class AboutSellerTab extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
                 child: CachedNetworkImage(
                   imageUrl:
-                      provider.serviceAllDetails.serviceSellerImage.imgUrl ??
+                      provider.serviceAllDetails.serviceSellerImage?.imgUrl ??
                           userPlaceHolderUrl,
                   placeholder: (context, url) {
                     return Image.asset('assets/images/loading_image.png');

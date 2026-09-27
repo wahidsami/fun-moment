@@ -56,7 +56,7 @@ class _ServiceSchedulePageState extends State<ServiceSchedulePage> {
         return Future.value(true);
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         appBar: CommonHelper().appbarForBookingPages('Schedule', context,
             extraFunction: () {
           //set coupon value to default again
@@ -134,6 +134,14 @@ class _ServiceSchedulePageState extends State<ServiceSchedulePage> {
                                     : provider.totalDay,
                                 selectionColor: cc.primaryColor,
                                 selectedTextColor: Colors.white,
+                                dateTextStyle: TextStyle(
+                                    color: cc.greyPrimary,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold),
+                                dayTextStyle: TextStyle(
+                                    color: cc.greyParagraph, fontSize: 11),
+                                monthTextStyle: TextStyle(
+                                    color: cc.greyParagraph, fontSize: 11),
                                 onDateChange: (value) {
                                   // New date selected
 
@@ -205,6 +213,7 @@ class _ServiceSchedulePageState extends State<ServiceSchedulePage> {
                                                   Container(
                                                     alignment: Alignment.center,
                                                     decoration: BoxDecoration(
+                                                        color: cc.black9,
                                                         border: Border.all(
                                                             color: selectedShedule ==
                                                                     index
@@ -225,7 +234,7 @@ class _ServiceSchedulePageState extends State<ServiceSchedulePage> {
                                                           .schedules[index]
                                                           .schedule,
                                                       style: TextStyle(
-                                                        color: cc.greyFour,
+                                                        color: selectedShedule == index ? cc.primaryColor : cc.greyPrimary,
                                                         fontSize: 14,
                                                         fontWeight:
                                                             FontWeight.w400,

@@ -4,6 +4,7 @@ import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/booking_services/book_service.dart';
 import 'package:funmoments/service/push_notification_service.dart';
 import 'package:funmoments/service/service_details_service.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/booking/service_personalization_page.dart';
 import 'package:funmoments/view/live_chat/chat_message_page.dart';
 import 'package:funmoments/view/services/components/about_seller_tab.dart';
@@ -64,7 +65,7 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage>
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: FMColors.background,
       body: Consumer<AppStringService>(
         builder: (context, asProvider, child) =>
             Consumer<ServiceDetailsService>(
@@ -101,7 +102,7 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage>
                                 ],
                               ),
                               Container(
-                                color: Colors.white,
+                                color: FMColors.background,
                                 padding:
                                     const EdgeInsets.symmetric(horizontal: 25),
                                 margin:
@@ -114,11 +115,11 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage>
                                           currentTab = value;
                                         });
                                       },
-                                      labelColor: cc.primaryColor,
-                                      unselectedLabelColor: cc.greyFour,
-                                      indicatorColor: cc.primaryColor,
-                                      unselectedLabelStyle: TextStyle(
-                                          color: cc.greyParagraph,
+                                      labelColor: FMColors.magenta,
+                                      unselectedLabelColor: FMColors.textMuted,
+                                      indicatorColor: FMColors.magenta,
+                                      unselectedLabelStyle: const TextStyle(
+                                          color: FMColors.textMuted,
                                           fontWeight: FontWeight.normal),
                                       controller: _tabController,
                                       tabs: [

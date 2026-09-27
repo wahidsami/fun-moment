@@ -468,13 +468,16 @@ function site_currency_symbol($text = false)
 {
     $all_currency = XgPaymentGateway::script_currency_list();
 
-    $symbol = '$';
-    $global_currency = get_static_option('site_global_currency');
+    $global_currency = get_static_option('site_global_currency') ?: env('SITE_GLOBAL_CURRENCY', 'SAR');
+    $symbol = ($global_currency === 'SAR') ? 'SAR' : '$';
     foreach ($all_currency as $currency => $sym) {
         if ($global_currency == $currency) {
             $symbol = $text ? $currency : $sym;
             break;
         }
+    }
+    if ($global_currency === 'SAR' && ($symbol === '$' || empty(trim($symbol)) || trim($symbol) === '@')) {
+        $symbol = 'SAR';
     }
     $sapce = get_static_option('add_remove_sapce_between_amount_and_symbol') === 'yes' ? true : false;
     return $sapce ? ' '. $symbol. ' ' : $symbol;

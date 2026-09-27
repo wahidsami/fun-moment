@@ -6,6 +6,7 @@ import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/auth_services/email_verify_service.dart';
 import 'package:funmoments/service/auth_services/reset_password_service.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/common_helper.dart';
 import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
@@ -49,6 +50,7 @@ class _EmailVerifyPageState extends State<EmailVerifyPage> {
         }
       },
       child: Scaffold(
+        backgroundColor: FMColors.background,
         appBar: CommonHelper().appbarCommon('Verify Email', context, () {
           Navigator.pop(context);
         }),
@@ -88,21 +90,27 @@ class _EmailVerifyPageState extends State<EmailVerifyPage> {
                     obscureText: false,
                     animationType: AnimationType.fade,
                     showCursor: true,
-                    cursorColor: cc.greyFive,
-
+                    cursorColor: FMColors.textMuted,
+                    textStyle: const TextStyle(
+                      color: FMColors.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                     pinTheme: PinTheme(
-                        shape: PinCodeFieldShape.box,
-                        borderRadius: BorderRadius.circular(5),
-                        fieldHeight: 50,
-                        fieldWidth: 70,
-                        activeFillColor: Colors.white,
-                        borderWidth: 1.5,
-                        selectedColor: cc.primaryColor,
-                        activeColor: cc.primaryColor,
-                        inactiveColor: cc.greyFive),
+                      shape: PinCodeFieldShape.box,
+                      borderRadius: BorderRadius.circular(14),
+                      fieldHeight: 54,
+                      fieldWidth: 62,
+                      activeFillColor: FMColors.surface,
+                      selectedFillColor: FMColors.surface,
+                      inactiveFillColor: FMColors.inputSurface,
+                      borderWidth: 1.5,
+                      selectedColor: FMColors.magenta,
+                      activeColor: FMColors.magenta,
+                      inactiveColor: FMColors.border,
+                    ),
                     animationDuration: const Duration(milliseconds: 200),
-                    // backgroundColor: Colors.white,
-                    // enableActiveFill: true,
+                    enableActiveFill: true,
                     errorAnimationController: errorController,
                     controller: textEditingController,
                     onCompleted: (otp) {
@@ -116,14 +124,8 @@ class _EmailVerifyPageState extends State<EmailVerifyPage> {
                           widget.countryId,
                           userType: widget.userType);
                     },
-                    onChanged: (value) {
-                      // setState(() {
-                      //   currentText = value;
-                      // });
-                    },
+                    onChanged: (value) {},
                     beforeTextPaste: (text) {
-                      //if you return true then it will show the paste confirmation dialog. Otherwise if false, then nothing will happen.
-                      //but you can show anything you want here, like your pop up saying wrong paste format or etc
                       return true;
                     },
                   ),
@@ -134,7 +136,7 @@ class _EmailVerifyPageState extends State<EmailVerifyPage> {
                     ? Container(
                         margin: const EdgeInsets.only(top: 15, bottom: 5),
                         alignment: Alignment.center,
-                        child: OthersHelper().showLoading(cc.primaryColor),
+                        child: OthersHelper().showLoading(FMColors.magenta),
                       )
                     : Container(),
 
@@ -151,7 +153,7 @@ class _EmailVerifyPageState extends State<EmailVerifyPage> {
                                 text:
                                     '${lnProvider.getString("Did not receive")}?  ',
                                 style: const TextStyle(
-                                    color: Color(0xff646464), fontSize: 14),
+                                    color: FMColors.textMuted, fontSize: 14),
                                 children: <TextSpan>[
                                   TextSpan(
                                       recognizer: TapGestureRecognizer()
@@ -161,15 +163,15 @@ class _EmailVerifyPageState extends State<EmailVerifyPage> {
                                               isFromOtpPage: true);
                                         },
                                       text: lnProvider.getString("Send again"),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
                                         fontSize: 14,
-                                        color: cc.primaryColor,
+                                        color: FMColors.magenta,
                                       )),
                                 ],
                               ),
                             )
-                          : OthersHelper().showLoading(cc.primaryColor),
+                          : OthersHelper().showLoading(FMColors.magenta),
                     ],
                   ),
                 ),

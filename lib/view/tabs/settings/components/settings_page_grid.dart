@@ -25,20 +25,21 @@ class SettingsPageGrid extends StatelessWidget {
               crossAxisCount: 2,
               mainAxisSpacing: 15,
               crossAxisSpacing: 15,
-              height: 70),
+              height: 80),
           padding: const EdgeInsets.only(top: 30),
           itemCount: 4,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
             return Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
+                color: cc.black9,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: cc.borderColor),
               ),
               child:
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                 SvgPicture.asset(
                   SettingsHelper().cardContent[index].iconLink,
                   height: 35,

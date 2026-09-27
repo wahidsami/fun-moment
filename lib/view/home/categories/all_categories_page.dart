@@ -35,7 +35,7 @@ class _AllCategoriesPageState extends State<AllCategoriesPage> {
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
     return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         appBar: CommonHelper().appbarCommon('All Categories', context, () {
           Navigator.pop(context);
         }),

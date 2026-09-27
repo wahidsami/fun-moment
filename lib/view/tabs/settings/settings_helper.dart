@@ -48,12 +48,13 @@ class SettingsHelper {
           ),
       title: Text(
         title,
-        style: TextStyle(color: cc.greyFour, fontSize: 14),
+        style: TextStyle(color: cc.greyPrimary, fontSize: 14),
       ),
       trailing: trailing ??
-          const Icon(
+          Icon(
             Icons.arrow_forward_ios,
             size: 17,
+            color: cc.greyFour,
           ),
     );
   }

@@ -102,7 +102,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         },
         child: Scaffold(
           // resizeToAvoidBottomInset: false,
-          backgroundColor: Colors.white,
+          backgroundColor: cc.bgColor,
           appBar: CommonHelper()
               .appbarForBookingPages(lnProvider.getString('Address'), context),
           body: Consumer<AppStringService>(

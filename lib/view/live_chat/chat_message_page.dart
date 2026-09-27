@@ -153,7 +153,7 @@ class _ChatMessagePageState extends State<ChatMessagePage> {
       appBar: AppBar(
         elevation: 0,
         automaticallyImplyLeading: false,
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         flexibleSpace: SafeArea(
           child: Container(
             padding: const EdgeInsets.only(right: 16, left: 8),
@@ -335,8 +335,7 @@ class _ChatMessagePageState extends State<ChatMessagePage> {
                                                                           'fromUser'] !=
                                                                       widget
                                                                           .currentUserId
-                                                                  ? Colors.grey
-                                                                      .shade200
+                                                                  ? cc.black9
                                                                   : cc.primaryColor),
                                                             ),
                                                             padding:
@@ -349,14 +348,7 @@ class _ChatMessagePageState extends State<ChatMessagePage> {
                                                                   .toString(),
                                                               style: TextStyle(
                                                                   fontSize: 15,
-                                                                  color: (messageData[
-                                                                              'fromUser'] !=
-                                                                          widget
-                                                                              .currentUserId
-                                                                      ? Colors.grey[
-                                                                          800]
-                                                                      : Colors
-                                                                          .white)),
+                                                                  color: Colors.white),
                                                             ),
                                                           ),
                                                         messageData['attachment'] !=
@@ -469,7 +461,7 @@ class _ChatMessagePageState extends State<ChatMessagePage> {
                       left: 20, bottom: 10, top: 10, right: 10),
                   height: 60,
                   width: double.infinity,
-                  color: Colors.white,
+                  color: cc.black9,
                   child: Row(
                     children: <Widget>[
                       pickedImage != null
@@ -510,10 +502,11 @@ class _ChatMessagePageState extends State<ChatMessagePage> {
                       Expanded(
                         child: TextField(
                           controller: sendMessageController,
+                          style: TextStyle(color: cc.greyPrimary),
                           decoration: InputDecoration(
                               hintText:
                                   lnProvider.getString("Write message..."),
-                              hintStyle: const TextStyle(color: Colors.black54),
+                              hintStyle: TextStyle(color: cc.greyFour),
                               border: InputBorder.none),
                         ),
                       ),

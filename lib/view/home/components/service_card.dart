@@ -9,7 +9,6 @@ import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/booking/service_personalization_page.dart';
-import 'package:funmoments/view/utils/responsive.dart';
 
 import '../../../service/booking_services/personalization_service.dart';
 import '../../utils/constant_colors.dart';
@@ -118,67 +117,72 @@ class ServiceCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Expanded(
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               AutoSizeText(
                                 '${asProvider.getString('Starts from')}:',
                                 maxLines: 1,
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(height: 2),
                               Consumer<RtlService>(
-                                builder: (context, rtlP, child) => Flexible(
-                                  child: Text(
-                                    rtlP.currencyDirection == 'left'
-                                        ? '${rtlP.currency}$price'
-                                        : '$price${rtlP.currency}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineSmall
-                                        ?.copyWith(
-                                          color: FMColors.magentaLight,
-                                          fontSize: 21,
-                                        ),
-                                  ),
+                                builder: (context, rtlP, child) => Text(
+                                  rtlP.currencyDirection == 'left'
+                                      ? '${rtlP.currency}$price'
+                                      : '$price${rtlP.currency}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        color: FMColors.magentaLight,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          height: 44,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Provider.of<BookService>(context, listen: false)
-                                  .setData(serviceId, title, price, sellerId,
-                                      image: imageLink);
-                              Provider.of<PersonalizationService>(context,
-                                      listen: false)
-                                  .setDefaultPrice(Provider.of<BookService>(
-                                          context,
-                                          listen: false)
-                                      .totalPrice);
-                              Provider.of<PersonalizationService>(context,
-                                      listen: false)
-                                  .fetchServiceExtra(serviceId, context);
-                              Navigator.push(
-                                context,
-                                PageTransition(
-                                  type: PageTransitionType.rightToLeft,
-                                  child: const ServicePersonalizationPage(),
-                                ),
-                              );
-                            },
-                            child: Text(
-                              asProvider.getString(
-                                  buttonText?.toString() ?? 'Book Now'),
-                              style: const TextStyle(fontSize: 13),
-                            ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                            minimumSize: const Size(0, 42),
+                          ),
+                          onPressed: () {
+                            Provider.of<BookService>(context, listen: false)
+                                .setData(serviceId, title, price, sellerId,
+                                    image: imageLink);
+                            Provider.of<PersonalizationService>(context,
+                                    listen: false)
+                                .setDefaultPrice(Provider.of<BookService>(
+                                        context,
+                                        listen: false)
+                                    .totalPrice);
+                            Provider.of<PersonalizationService>(context,
+                                    listen: false)
+                                .fetchServiceExtra(serviceId, context);
+                            Navigator.push(
+                              context,
+                              PageTransition(
+                                type: PageTransitionType.rightToLeft,
+                                child: const ServicePersonalizationPage(),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            asProvider.getString(
+                                buttonText?.toString() ?? 'Book Now'),
+                            maxLines: 1,
+                            style: const TextStyle(fontSize: 13),
                           ),
                         ),
                       ],

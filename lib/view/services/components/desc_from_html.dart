@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 
 class DescInHtml extends StatelessWidget {
   const DescInHtml({Key? key, this.desc}) : super(key: key);
@@ -7,45 +8,16 @@ class DescInHtml extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return //product desc
-        HtmlWidget(
-      // the first parameter (`html`) is required
+    return HtmlWidget(
       '''
-
      $desc
-
-     
   ''',
-
-      // all other parameters are optional, a few notable params:
-
-      // specify custom styling for an element
-      // see supported inline styling below
-      // customStylesBuilder: (element) {
-      //   if (element.outerHtml.contains('p')) {
-      //     return {'color': 'red'};
-      //   }
-
-      //   return null;
-      // },
-
-      // these callbacks are called when a complicated element is loading
-      // or failed to render allowing the app to render progress indicator
-      // and fallback widget
       onErrorBuilder: (context, element, error) =>
-          Text('$element error: $error'),
+          Text('$element error: $error', style: const TextStyle(color: FMColors.error)),
       onLoadingBuilder: (context, element, loadingProgress) =>
-          CircularProgressIndicator(),
-
-      // this callback will be triggered when user taps a link
-
-      // select the render mode for HTML body
-      // by default, a simple `Column` is rendered
-      // consider using `ListView` or `SliverList` for better performance
+          const CircularProgressIndicator(color: FMColors.magenta),
       renderMode: RenderMode.column,
-
-      // set the default styling for text
-      textStyle: TextStyle(fontSize: 15),
+      textStyle: const TextStyle(fontSize: 15, color: FMColors.textSecondary, height: 1.5),
     );
   }
 }

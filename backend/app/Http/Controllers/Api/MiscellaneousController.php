@@ -36,12 +36,17 @@ class MiscellaneousController extends Controller
         ]);
     }
     public function currencyInfo(){
+        $global_currency = get_static_option('site_global_currency') ?: env('SITE_GLOBAL_CURRENCY', 'SAR');
+        $symbol = site_currency_symbol();
+        if ($global_currency === 'SAR' && ($symbol === '$' || empty(trim($symbol)) || trim($symbol) === '@')) {
+            $symbol = 'SAR';
+        }
 
         return response()->success([
             'currency'=> [ 
-                "symbol" => site_currency_symbol(),
-                "code" => get_static_option('site_global_currency'),
-                "position" => get_static_option('site_currency_symbol_position')
+                "symbol" => $symbol,
+                "code" => $global_currency,
+                "position" => get_static_option('site_currency_symbol_position') ?: 'right'
             ],
         ]);
     }

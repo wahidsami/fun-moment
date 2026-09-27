@@ -28,7 +28,7 @@ class _SavedItemPageState extends State<SavedItemPage> {
     ConstantColors cc = ConstantColors();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Container(

@@ -29,7 +29,7 @@ class _DeclineOrderPageState extends State<DeclineOrderPage> {
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       appBar: CommonHelper().appbarCommon('Decline', context, () {
         Navigator.pop(context);
       }),
@@ -45,7 +45,7 @@ class _DeclineOrderPageState extends State<DeclineOrderPage> {
                 lnProvider
                     .getString('Describe why you want to decline the request'),
                 style: TextStyle(
-                    color: cc.greyFour,
+                    color: cc.greyPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600),
               ),

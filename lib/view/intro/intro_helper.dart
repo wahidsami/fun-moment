@@ -5,18 +5,18 @@ class IntroHelper {
 
   geTitle(int i) {
     List title = [
-      "Creative Hub",
-      "Event Rentals",
-      "Seamless Artistic Communication"
+      "Discover Your Perfect Moment",
+      "Everything for Your Event",
+      "Choose. Book. Celebrate."
     ];
     return title[i];
   }
 
   geSubTitle(int i) {
     List subTitle = [
-      "Connecting Art and Entertainment Experts",
-      "Discover Creative Solutions in One Touch",
-      "Bridging Artists and Creative Projects"
+      "Find DJs, entertainment, venues, and everything you need to bring your event to life.",
+      "From equipment and décor to catering and more, find it all in one place.",
+      "Compare services, book with ease, and enjoy the moment you created."
     ];
     return subTitle[i];
   }

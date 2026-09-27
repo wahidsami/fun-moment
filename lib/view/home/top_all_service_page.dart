@@ -32,7 +32,7 @@ class _TopAllServicePageState extends State<TopAllServicePage> {
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       appBar: CommonHelper().appbarCommon('Top Booked Services', context, () {
         Navigator.pop(context);
       }),

@@ -36,7 +36,7 @@ class _ServicebyCategoryPageState extends State<ServicebyCategoryPage> {
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       appBar: CommonHelper().appbarCommon(widget.categoryName, context, () {
         Provider.of<ServiceByCategoryService>(context, listen: false)
             .setEverythingToDefault();

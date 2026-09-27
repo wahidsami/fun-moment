@@ -45,7 +45,7 @@ class CategoryCard extends StatelessWidget {
         width: 104,
         margin: EdgeInsets.only(right: marginRight),
         child: FMSurfaceCard(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -74,7 +74,7 @@ class CategoryCard extends StatelessWidget {
                         fit: BoxFit.contain,
                       ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               AutoSizeText(
                 name?.toString() ?? '',
                 textAlign: TextAlign.center,

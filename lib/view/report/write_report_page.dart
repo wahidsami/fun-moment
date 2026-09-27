@@ -31,7 +31,7 @@ class _WriteReportPageState extends State<WriteReportPage> {
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cc.bgColor,
       appBar: CommonHelper().appbarCommon('Report', context, () {
         Navigator.pop(context);
       }),
@@ -49,7 +49,7 @@ class _WriteReportPageState extends State<WriteReportPage> {
               Text(
                 lnProvider.getString('What went wrong?'),
                 style: TextStyle(
-                    color: cc.greyFour,
+                    color: cc.greyPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600),
               ),

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/app_strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -94,6 +95,56 @@ void main() {
       expect(stringService.getString('Language'), 'Language');
     });
 
+    test('AppStringService translates onboarding strings accurately in Arabic and English', () {
+      final stringService = AppStringService();
+
+      // Screen 1
+      stringService.setLanguage('ar');
+      expect(stringService.getString('Discover Your Perfect Moment'), 'اكتشف لحظتك المثالية');
+      expect(
+        stringService.getString('Find DJs, entertainment, venues, and everything you need to bring your event to life.'),
+        'اكتشف منسقي الموسيقى والترفيه والقاعات وكل ما تحتاجه لتصنع مناسبتك.',
+      );
+
+      // Screen 2
+      expect(stringService.getString('Everything for Your Event'), 'كل ما تحتاجه لمناسبتك');
+      expect(
+        stringService.getString('From equipment and décor to catering and more, find it all in one place.'),
+        'من التجهيزات والديكور إلى الضيافة وأكثر، كل شيء في مكان واحد.',
+      );
+
+      // Screen 3
+      expect(stringService.getString('Choose. Book. Celebrate.'), 'اختر. احجز. واحتفل.');
+      expect(
+        stringService.getString('Compare services, book with ease, and enjoy the moment you created.'),
+        'قارن الخدمات، واحجز بسهولة، واستمتع باللحظة التي صنعتها.',
+      );
+
+      // Buttons
+      expect(stringService.getString('Skip'), 'تخطي');
+      expect(stringService.getString('Continue'), 'استمر');
+
+      // Switch back to English
+      stringService.setLanguage('en');
+      expect(stringService.getString('Discover Your Perfect Moment'), 'Discover Your Perfect Moment');
+      expect(
+        stringService.getString('Find DJs, entertainment, venues, and everything you need to bring your event to life.'),
+        'Find DJs, entertainment, venues, and everything you need to bring your event to life.',
+      );
+      expect(stringService.getString('Everything for Your Event'), 'Everything for Your Event');
+      expect(
+        stringService.getString('From equipment and décor to catering and more, find it all in one place.'),
+        'From equipment and décor to catering and more, find it all in one place.',
+      );
+      expect(stringService.getString('Choose. Book. Celebrate.'), 'Choose. Book. Celebrate.');
+      expect(
+        stringService.getString('Compare services, book with ease, and enjoy the moment you created.'),
+        'Compare services, book with ease, and enjoy the moment you created.',
+      );
+      expect(stringService.getString('Skip'), 'Skip');
+      expect(stringService.getString('Continue'), 'Continue');
+    });
+
     test('Language persistence: loadSavedLanguage hydrates user choice correctly', () async {
       SharedPreferences.setMockInitialValues({
         RtlService.userSelectedLangKey: 'ar',
@@ -112,6 +163,20 @@ void main() {
       final stringService = AppStringService();
       stringService.setLanguage('ar');
       expect(stringService.getString('NonExistentCustomString123'), 'NonExistentCustomString123');
+    });
+
+    test('Typography: Arabic mode uses Cairo font while English mode preserves default', () {
+      final arabicTheme = FMTheme.dark(isArabic: true);
+      expect(arabicTheme.textTheme.bodyLarge?.fontFamily, 'Cairo');
+      expect(arabicTheme.textTheme.headlineMedium?.fontFamily, 'Cairo');
+      expect(arabicTheme.appBarTheme.titleTextStyle?.fontFamily, 'Cairo');
+      expect(arabicTheme.elevatedButtonTheme.style?.textStyle?.resolve({})?.fontFamily, 'Cairo');
+
+      final englishTheme = FMTheme.dark(isArabic: false);
+      expect(englishTheme.textTheme.bodyLarge?.fontFamily, isNot('Cairo'));
+      expect(englishTheme.textTheme.headlineMedium?.fontFamily, isNot('Cairo'));
+      expect(englishTheme.appBarTheme.titleTextStyle?.fontFamily, isNot('Cairo'));
+      expect(englishTheme.elevatedButtonTheme.style?.textStyle?.resolve({})?.fontFamily, isNot('Cairo'));
     });
   });
 }

@@ -403,7 +403,7 @@ class UserController extends Controller
             'email' => 'required|email|unique:users|max:191',
             'username' => 'required|unique:users|max:191',
             'phone' => 'required|max:191',
-            'password' => 'required|min:6|max:191',
+            'password' => 'required|min:8|max:191',
             'service_city' => 'required',
             'service_area' => 'required',
             'country_id' => 'required',

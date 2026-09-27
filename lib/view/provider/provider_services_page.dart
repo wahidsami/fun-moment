@@ -6,7 +6,6 @@ import 'package:funmoments/service/provider_service_management_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/provider/provider_add_service_page.dart';
-import 'package:funmoments/view/utils/common_helper.dart';
 
 class ProviderServicesPage extends StatefulWidget {
   const ProviderServicesPage({Key? key}) : super(key: key);
@@ -76,7 +75,7 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const ProviderAddServicePage()),
+                MaterialPageRoute(builder: (_) => const ProviderAddServicePage(fromMyServices: true)),
               );
             },
           ),
@@ -87,7 +86,7 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const ProviderAddServicePage()),
+            MaterialPageRoute(builder: (_) => const ProviderAddServicePage(fromMyServices: true)),
           );
         },
         icon: const Icon(Icons.add, color: Colors.white),
@@ -131,7 +130,7 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const ProviderAddServicePage()),
+                          MaterialPageRoute(builder: (_) => const ProviderAddServicePage(fromMyServices: true)),
                         );
                       },
                       icon: const Icon(Icons.add, color: Colors.white),
@@ -206,6 +205,47 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
                               ),
                             ),
                             const SizedBox(height: 6),
+                            // Approval Status Badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: service.isPendingApproval
+                                    ? Colors.amber.withOpacity(0.12)
+                                    : Colors.green.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: service.isPendingApproval
+                                      ? Colors.amber.withOpacity(0.5)
+                                      : Colors.green.withOpacity(0.4),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    service.isPendingApproval
+                                        ? Icons.hourglass_top_rounded
+                                        : Icons.check_circle_outline_rounded,
+                                    size: 12,
+                                    color: service.isPendingApproval ? Colors.amber : Colors.greenAccent,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      service.isPendingApproval
+                                          ? lnProvider.getString('Pending Admin Approval')
+                                          : lnProvider.getString('Approved'),
+                                      style: TextStyle(
+                                        color: service.isPendingApproval ? Colors.amber : Colors.greenAccent,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 6),
                             Text(
                               '${rtl.currency}${service.price}',
                               style: const TextStyle(
@@ -217,11 +257,11 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                Icon(Icons.visibility_outlined, size: 14, color: FMColors.textMuted),
+                                const Icon(Icons.visibility_outlined, size: 14, color: FMColors.textMuted),
                                 const SizedBox(width: 4),
                                 Text('${service.view ?? 0}', style: const TextStyle(color: FMColors.textMuted, fontSize: 12)),
                                 const SizedBox(width: 12),
-                                Icon(Icons.shopping_bag_outlined, size: 14, color: FMColors.textMuted),
+                                const Icon(Icons.shopping_bag_outlined, size: 14, color: FMColors.textMuted),
                                 const SizedBox(width: 4),
                                 Text(
                                   '${service.completeOrderCount ?? 0} done',
@@ -239,9 +279,11 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
                           Switch(
                             value: isOn,
                             activeColor: FMColors.magenta,
-                            onChanged: (_) {
-                              provider.toggleServiceStatus(service.id);
-                            },
+                            onChanged: service.isPendingApproval
+                                ? null
+                                : (_) {
+                                    provider.toggleServiceStatus(service.id);
+                                  },
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),

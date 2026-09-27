@@ -24,7 +24,7 @@ class _HireJobSuccessPageState extends State<HireJobSuccessPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         appBar: CommonHelper().appbarCommon('Success', context, () {
           Navigator.pop(context);
         }),
@@ -47,7 +47,7 @@ class _HireJobSuccessPageState extends State<HireJobSuccessPage> {
                   Text(
                     lnProvider.getString('Hired successfully'),
                     style: TextStyle(
-                        color: cc.greyFour,
+                        color: cc.greyPrimary,
                         fontSize: 21,
                         fontWeight: FontWeight.w600),
                   ),

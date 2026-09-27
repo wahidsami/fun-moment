@@ -246,23 +246,23 @@ class ServiceDetails {
   List<ServiceFaq> serviceFaq;
 
   factory ServiceDetails.fromJson(Map<String, dynamic> json) => ServiceDetails(
-        id: json["id"],
-        categoryId: json["category_id"],
+        id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+        categoryId: json["category_id"] is int ? json["category_id"] : int.tryParse(json["category_id"]?.toString() ?? ''),
         subcategoryId: json["subcategory_id"],
-        sellerId: json["seller_id"],
-        serviceCityId: json["service_city_id"],
+        sellerId: json["seller_id"] is int ? json["seller_id"] : int.tryParse(json["seller_id"]?.toString() ?? ''),
+        serviceCityId: json["service_city_id"] is int ? json["service_city_id"] : int.tryParse(json["service_city_id"]?.toString() ?? ''),
         title: json["title"],
         slug: json["slug"],
         description: json["description"],
         image: json["image"],
         video: json["video"],
-        status: json["status"],
-        isServiceOn: json["is_service_on"],
+        status: json["status"] is int ? json["status"] : int.tryParse(json["status"]?.toString() ?? ''),
+        isServiceOn: json["is_service_on"] is int ? json["is_service_on"] : int.tryParse(json["is_service_on"]?.toString() ?? ''),
         price: json["price"],
         tax: json["tax"],
-        view: json["view"],
-        soldCount: json["sold_count"],
-        featured: json["featured"],
+        view: json["view"] is int ? json["view"] : int.tryParse(json["view"]?.toString() ?? ''),
+        soldCount: json["sold_count"] is int ? json["sold_count"] : int.tryParse(json["sold_count"]?.toString() ?? ''),
+        featured: json["featured"] is int ? json["featured"] : int.tryParse(json["featured"]?.toString() ?? ''),
         sellerForMobile: json["seller_for_mobile"] is Map<String, dynamic>
             ? SellerForMobile.fromJson(json["seller_for_mobile"])
             : SellerForMobile(),

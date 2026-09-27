@@ -46,7 +46,7 @@ class _ServicePersonalizationPageState
         return Future.value(true);
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         appBar: CommonHelper().appbarForBookingPages(
             lnProvider.getString('Personalize'), context,
             isPersonalizatioPage: true, extraFunction: () {
@@ -143,54 +143,57 @@ class _ServicePersonalizationPageState
           builder: (context, asProvider, child) => Consumer<BookService>(
             builder: (context, provider, child) =>
                 Consumer<PersonalizationService>(
-              builder: (context, personalizationProvider, child) => Container(
-                height: 157,
-                padding: EdgeInsets.only(
-                    left: screenPadding, top: 30, right: screenPadding),
-                decoration: BookingHelper().bottomSheetDecoration(),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      BookingHelper().detailsPanelRow(
-                          asProvider.getString('Total'),
-                          0,
-                          '${provider.totalPrice}'),
-                      const SizedBox(
-                        height: 23,
-                      ),
-                      CommonHelper().buttonOrange(asProvider.getString('Next'),
-                          () {
-                        if (personalizationProvider.isloading == false) {
-                          if (personalizationProvider.isOnline == 1) {
-                            //if it is an online service no need to show service schedule and choose location page
+              builder: (context, personalizationProvider, child) => SafeArea(
+                top: false,
+                child: Container(
+                  padding: EdgeInsets.only(
+                      left: screenPadding,
+                      top: 18,
+                      right: screenPadding,
+                      bottom: 14),
+                  decoration: BookingHelper().bottomSheetDecoration(),
+                  child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        BookingHelper().detailsPanelRow(
+                            asProvider.getString('Total'),
+                            0,
+                            '${provider.totalPrice}'),
+                        const SizedBox(
+                          height: 16,
+                        ),
+                        CommonHelper().buttonOrange(asProvider.getString('Next'),
+                            () {
+                          if (personalizationProvider.isloading == false) {
+                            if (personalizationProvider.isOnline == 1) {
+                              //if it is an online service no need to show service schedule and choose location page
 
-                            Navigator.push(
-                                context,
-                                PageTransition(
-                                    type: PageTransitionType.rightToLeft,
-                                    child: const DeliveryAddressPage()));
-                            BookStepsService().onNext(context);
-                          } else {
-                            //increase page steps by one
-                            BookStepsService().onNext(context);
-                            //fetch shedule
-                            Provider.of<SheduleService>(context, listen: false)
-                                .fetchShedule(provider.sellerId,
-                                    firstThreeLetter(DateTime.now(), null));
+                              Navigator.push(
+                                  context,
+                                  PageTransition(
+                                      type: PageTransitionType.rightToLeft,
+                                      child: const DeliveryAddressPage()));
+                              BookStepsService().onNext(context);
+                            } else {
+                              //increase page steps by one
+                              BookStepsService().onNext(context);
+                              //fetch shedule
+                              Provider.of<SheduleService>(context, listen: false)
+                                  .fetchShedule(provider.sellerId,
+                                      firstThreeLetter(DateTime.now(), null));
 
-                            //go to shedule page
-                            Navigator.push(
-                                context,
-                                PageTransition(
-                                    type: PageTransitionType.rightToLeft,
-                                    child: const ServiceSchedulePage()));
+                              //go to shedule page
+                              Navigator.push(
+                                  context,
+                                  PageTransition(
+                                      type: PageTransitionType.rightToLeft,
+                                      child: const ServiceSchedulePage()));
+                            }
                           }
-                        }
-                      }),
-                      const SizedBox(
-                        height: 24,
-                      ),
-                    ]),
+                        }),
+                      ]),
+                ),
               ),
             ),
           ),

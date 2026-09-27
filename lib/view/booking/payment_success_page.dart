@@ -34,7 +34,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
     ConstantColors cc = ConstantColors();
 
     return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: cc.bgColor,
         appBar: CommonHelper()
             .appbarCommon(lnProvider.getString('Payment'), context, () {
           // Navigator.pushReplacement<void, void>(
@@ -126,7 +126,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
                                 Text(
                                   '${asProvider.getString('Payment successful')}!',
                                   style: TextStyle(
-                                      color: cc.greyFour,
+                                      color: cc.greyPrimary,
                                       fontSize: 21,
                                       fontWeight: FontWeight.w600),
                                 ),

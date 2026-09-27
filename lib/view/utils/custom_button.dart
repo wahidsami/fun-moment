@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 
-import 'constant_colors.dart';
 import 'others_helper.dart';
 
 class CustomButton extends StatelessWidget {
@@ -37,33 +37,39 @@ class CustomButton extends StatelessWidget {
                     onPressed!();
                   },
         style: ButtonStyle(
+          elevation: MaterialStateProperty.all(0),
+          shape: MaterialStateProperty.all(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(FMRadii.md),
+            ),
+          ),
           backgroundColor: MaterialStateProperty.resolveWith((states) {
             if (states.contains(MaterialState.disabled)) {
-              return cc.primaryColor.withOpacity(.05);
+              return FMColors.surfaceElevated;
             }
             if (states.contains(MaterialState.pressed)) {
-              return cc.black3;
+              return FMColors.magentaDark;
             }
-            return backgroundColor ?? cc.primaryColor;
+            return backgroundColor ?? FMColors.magenta;
           }),
           foregroundColor: MaterialStateProperty.resolveWith((states) {
             if (states.contains(MaterialState.disabled)) {
-              return cc.black5;
+              return FMColors.textMuted;
             }
-            if (states.contains(MaterialState.pressed)) {
-              return foregroundColor ?? cc.white;
-            }
-            return foregroundColor ?? cc.white;
+            return foregroundColor ?? Colors.white;
           }),
         ),
         child: isLoading
             ? SizedBox(
-                child: OthersHelper().showLoading(cc.white),
+                child: OthersHelper().showLoading(Colors.white),
               )
             : FittedBox(
                 child: Text(
                   btText,
                   maxLines: 1,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
       ),

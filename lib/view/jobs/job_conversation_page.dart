@@ -62,7 +62,7 @@ class _JobConversationPageState extends State<JobConversationPage> {
         appBar: AppBar(
           elevation: 0,
           automaticallyImplyLeading: false,
-          backgroundColor: Colors.white,
+          backgroundColor: cc.bgColor,
           flexibleSpace: SafeArea(
             child: Container(
               padding: const EdgeInsets.only(right: 16, left: 8),
@@ -192,7 +192,7 @@ class _JobConversationPageState extends State<JobConversationPage> {
                                                 color: (provider.messagesList[
                                                             index]['type'] ==
                                                         "seller"
-                                                    ? Colors.grey.shade200
+                                                    ? cc.black9
                                                     : cc.primaryColor),
                                               ),
                                               padding: const EdgeInsets.all(16),
@@ -202,13 +202,7 @@ class _JobConversationPageState extends State<JobConversationPage> {
                                                     ['message'],
                                                 style: TextStyle(
                                                     fontSize: 15,
-                                                    color:
-                                                        (provider.messagesList[
-                                                                        index]
-                                                                    ['type'] ==
-                                                                "seller"
-                                                            ? Colors.grey[800]
-                                                            : Colors.white)),
+                                                    color: Colors.white),
                                               ),
                                             ),
                                             //Attachment =============>
@@ -350,7 +344,7 @@ class _JobConversationPageState extends State<JobConversationPage> {
                         left: 20, bottom: 10, top: 10, right: 10),
                     height: 60,
                     width: double.infinity,
-                    color: Colors.white,
+                    color: cc.black9,
                     child: Row(
                       children: <Widget>[
                         pickedFile != null
@@ -372,10 +366,11 @@ class _JobConversationPageState extends State<JobConversationPage> {
                         Expanded(
                           child: TextField(
                             controller: sendMessageController,
+                            style: TextStyle(color: cc.greyPrimary),
                             decoration: InputDecoration(
                                 hintText: ln.getString("Write message..."),
                                 hintStyle:
-                                    const TextStyle(color: Colors.black54),
+                                    TextStyle(color: cc.greyFour),
                                 border: InputBorder.none),
                           ),
                         ),

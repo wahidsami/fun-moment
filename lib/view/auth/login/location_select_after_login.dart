@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/all_services_service.dart';
+import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/auth/signup/components/country_states_dropdowns.dart';
 import 'package:funmoments/view/home/landing_page.dart';
 import 'package:funmoments/view/services/service_details_page.dart';
@@ -15,7 +16,7 @@ class LocationSelectAfterLoginPage extends StatelessWidget {
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: FMColors.background,
       appBar: CommonHelper().appbarCommon('Select Location', context, () {
         Navigator.pop(context);
       }),

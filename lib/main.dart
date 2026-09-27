@@ -1,8 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:funmoments/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
@@ -88,21 +88,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
 
-  flutterLocalNotificationsPlugin.initialize(
-    const InitializationSettings(
-      android: AndroidInitializationSettings('icon'),
-    ),
-    // onDidReceiveBackgroundNotificationResponse: (_) {},
-    // onDidReceiveNotificationResponse: (_) {},
-  );
-  final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-      flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await PushNotificationService().initializeFCM();
 
-  await androidImplementation?.requestNotificationsPermission();
   await HomepageHelper().locationPermissionCheck();
 
   runApp(const MyApp());
@@ -192,7 +181,9 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer<RtlService>(
         builder: (context, rtlProvider, child) {
+          final isArabic = rtlProvider.langSlug.startsWith('ar');
           return MaterialApp(
+            navigatorKey: navigatorKey,
             debugShowCheckedModeBanner: false,
             title: 'Fun Moments',
             localizationsDelegates: const [
@@ -210,16 +201,14 @@ class MyApp extends StatelessWidget {
               Locale('ar'),
             ],
             builder: (context, rtlchild) {
-              return Consumer<RtlService>(
-                builder: (context, rtlP, child) => Directionality(
-                  textDirection: rtlP.direction == 'ltr'
-                      ? TextDirection.ltr
-                      : TextDirection.rtl,
-                  child: rtlchild!,
-                ),
+              return Directionality(
+                textDirection: rtlProvider.direction == 'ltr'
+                    ? TextDirection.ltr
+                    : TextDirection.rtl,
+                child: rtlchild!,
               );
             },
-            theme: FMTheme.dark(),
+            theme: FMTheme.dark(isArabic: isArabic),
             home: child,
           );
         },

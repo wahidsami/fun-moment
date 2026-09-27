@@ -72,3 +72,6 @@ backend/__rootFiles/
 # Local assistant / workspace metadata
 .agents/
 .codex/
+*.log
+docs/*.zip
+tasks/

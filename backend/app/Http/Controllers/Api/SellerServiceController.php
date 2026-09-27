@@ -26,7 +26,7 @@ class SellerServiceController extends Controller
 {
     public function myService()
     {
-        $services = Service::select(['id','title','image','price','is_service_online','view','is_service_on'])
+        $services = Service::select(['id','title','image','price','is_service_online','view','is_service_on','status'])
             ->with('reviews_for_mobile')
             ->withCount('reviews','pendingOrder','completeOrder','cancelOrder')
             ->where('seller_id', Auth::guard('sanctum')->user()->id)
@@ -95,15 +95,27 @@ class SellerServiceController extends Controller
     public function addService(Request $request)
     {
         if ($request->isMethod('post')) {
+            $user = Auth::guard('sanctum')->user();
+            if (empty($user->service_city) || !\App\ServiceCity::where('id', $user->service_city)->exists()) {
+                return response()->json([
+                    'message' => __('Please complete your service city/location in your profile settings before creating a service.'),
+                    'errors' => [
+                        'service_city' => [__('Please complete your service city/location in your profile settings before creating a service.')]
+                    ]
+                ], 422);
+            }
+
             $request->validate([
                 'category_id' => 'required',
                 'title' => 'required|max:191|unique:services',
                 'description' => 'required|min:150',
+                'price' => 'required|numeric|min:0',
             ]);
             
-            $seller_country = User::select(['id','country_id'])->where('country_id',Auth::guard('sanctum')->user()->country_id)->first();
-            $country_tax = Tax::select('tax')->where('country_id',$seller_country->country_id)->first();
+            $seller_country_id = $user->country_id;
+            $country_tax = $seller_country_id ? Tax::select('tax')->where('country_id', $seller_country_id)->first() : null;
 
+            $image_id = null;
             if($request->file('image')){
                 MediaHelper::insert_media_image($request,'web','image');
                 $image_id = DB::getPdo()->lastInsertId();
@@ -122,9 +134,10 @@ class SellerServiceController extends Controller
             $service->slug = createSlug($request->title, "service");
             $service->description = $request->description;
             $service->image = $image_id;
+            $service->price = (float) $request->price;
             $service->video = $request->video;
-            $service->seller_id = Auth::guard('sanctum')->user()->id;
-            $service->service_city_id = Auth::guard('sanctum')->user()->service_city;
+            $service->seller_id = $user->id;
+            $service->service_city_id = $user->service_city;
             $service->status = 0;
             $service->tax = $country_tax->tax ?? 0;
             $service->is_service_all_cities = $request->is_service_all_cities ?? 0;

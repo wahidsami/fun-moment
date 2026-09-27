@@ -109,25 +109,14 @@ class StateDropdownService with ChangeNotifier {
   //Set state based on user profile
 //==============================>
   setStateBasedOnUserProfile(BuildContext context) {
-    selectedState = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            .userDetails
-            .city
-            ?.serviceCity ??
-        'Select City';
-    selectedStateId = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            .userDetails
-            .city
-            ?.id ??
-        defaultId;
+    final profile = Provider.of<ProfileService>(context, listen: false).profileDetails;
+    if (profile == null) return;
+    selectedState = profile.userDetails.city?.serviceCity ?? 'Select City';
+    selectedStateId = profile.userDetails.city?.id ?? defaultId;
     print(statesDropdownList);
     print(statesDropdownIndexList);
     print('selected state $selectedState');
     print('selected state id $selectedStateId');
-    // Future.delayed(const Duration(milliseconds: 500), () {
-    //   notifyListeners();
-    // });
   }
 
   //==============>

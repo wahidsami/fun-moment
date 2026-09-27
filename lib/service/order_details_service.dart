@@ -57,8 +57,19 @@ class OrderDetailsService with ChangeNotifier {
       setLoadingStatus(true);
     }
 
-    var response = await http
-        .post(Uri.parse('$baseApi/user/my-orders/$orderId'), headers: header);
+    bool isSeller = false;
+    try {
+      isSeller = Provider.of<ProfileService>(context, listen: false).isSeller;
+    } catch (_) {}
+    if (prefs.containsKey('userType')) {
+      isSeller = prefs.getInt('userType') == 0;
+    }
+
+    final endpoint = isSeller
+        ? '$baseApi/seller/my-orders/$orderId'
+        : '$baseApi/user/my-orders/$orderId';
+
+    var response = await http.post(Uri.parse(endpoint), headers: header);
 
     print('order details response ${response.body}');
 
