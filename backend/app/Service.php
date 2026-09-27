@@ -30,6 +30,9 @@ class Service extends Model
         'image_gallery',
         'video',
         'is_service_all_cities',
+        'delivery_days',
+        'admin_id',
+        'guard_name',
     ];
 
     

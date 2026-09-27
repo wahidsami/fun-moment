@@ -96,7 +96,8 @@ class SellerServiceController extends Controller
     {
         if ($request->isMethod('post')) {
             $user = Auth::guard('sanctum')->user();
-            if (empty($user->service_city) || !\App\ServiceCity::where('id', $user->service_city)->exists()) {
+            $city_id = $request->input('service_city_id') ?: $user->service_city;
+            if (empty($city_id) || !\App\ServiceCity::where('id', $city_id)->exists()) {
                 return response()->json([
                     'message' => __('Please complete your service city/location in your profile settings before creating a service.'),
                     'errors' => [
@@ -117,13 +118,13 @@ class SellerServiceController extends Controller
 
             $image_id = null;
             if($request->file('image')){
-                MediaHelper::insert_media_image($request,'web','image');
-                $image_id = DB::getPdo()->lastInsertId();
+                $media = MediaHelper::insert_media_image($request,'web','image');
+                $image_id = $media ? $media->id : null;
             }
             
             if($request->file('image_gallery')){
-                MediaHelper::insert_media_image($request,'web','image_gallery');
-                $image_id = DB::getPdo()->lastInsertId();
+                $media = MediaHelper::insert_media_image($request,'web','image_gallery');
+                $image_id = $media ? $media->id : $image_id;
             }
 
             $service = new Service();
@@ -137,7 +138,8 @@ class SellerServiceController extends Controller
             $service->price = (float) $request->price;
             $service->video = $request->video;
             $service->seller_id = $user->id;
-            $service->service_city_id = $user->service_city;
+            $service->service_city_id = $city_id;
+            $service->service_area_id = $request->input('service_area_id') ?: $user->service_area;
             $service->status = 0;
             $service->tax = $country_tax->tax ?? 0;
             $service->is_service_all_cities = $request->is_service_all_cities ?? 0;
@@ -156,7 +158,7 @@ class SellerServiceController extends Controller
                 'twitter_meta_image'=> $request->twitter_meta_image,
             ];
             $service->save();
-            $last_service_id = DB::getPdo()->lastInsertId();
+            $last_service_id = $service->id;
             $service->metaData()->create($Metas);
 
             try {
@@ -184,18 +186,19 @@ class SellerServiceController extends Controller
             ]);
 
             $seller_country = User::select(['id','country_id'])->where('country_id',Auth::guard('sanctum')->user()->country_id)->first();
-            $country_tax = Tax::select('tax')->where('country_id',$seller_country->country_id)->first();
+            $country_tax = Tax::select('tax')->where('country_id',optional($seller_country)->country_id)->first();
 
             $old_image = Service::select(['image','image_gallery'])->where('id',$request->service_id)->first();
             $old_slug = Service::select('slug')->where('id',$request->service_id)->first();
 
+            $image_id = null;
             if($request->file('image')){
-                MediaHelper::insert_media_image($request,'web','image');
-                $image_id = DB::getPdo()->lastInsertId();
+                $media = MediaHelper::insert_media_image($request,'web','image');
+                $image_id = $media ? $media->id : null;
             }
             if($request->file('image_gallery')){
-                MediaHelper::insert_media_image($request,'web','image_gallery');
-                $image_id = DB::getPdo()->lastInsertId();
+                $media = MediaHelper::insert_media_image($request,'web','image_gallery');
+                $image_id = $media ? $media->id : $image_id;
             }
 
             $seller_id = Auth::guard('sanctum')->id();
@@ -205,14 +208,14 @@ class SellerServiceController extends Controller
             }
 
             $service->update([
-                'category_id' => $request->category,
-                'subcategory_id' => $request->subcategory,
-                'child_category_id' => $request->child_category,
+                'category_id' => $request->category_id ?? $request->category,
+                'subcategory_id' => $request->subcategory_id ?? $request->subcategory,
+                'child_category_id' => $request->child_category_id ?? $request->child_category,
                 'title' => $request->title,
-                'slug' => $request->slug ?? $old_slug->slug,
+                'slug' => $request->slug ?? optional($old_slug)->slug,
                 'description' => $request->description,
-                'image' => $image_id ?? $old_image->image,
-                'image_gallery' => $image_id ?? $old_image->image_gallery,
+                'image' => $image_id ?? optional($old_image)->image,
+                'image_gallery' => $image_id ?? optional($old_image)->image_gallery,
                 'video' => $request->video,
                 'tax' => $country_tax->tax ?? 0,
                 'status' => 0,

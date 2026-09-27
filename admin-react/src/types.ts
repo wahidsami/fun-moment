@@ -91,6 +91,7 @@ export interface Service {
   id: number;
   title_en: string;
   title_ar: string;
+  category_id?: number;
   category_en: string;
   category_ar: string;
   seller_id: number;

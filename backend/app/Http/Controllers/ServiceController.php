@@ -21,6 +21,7 @@ use App\Serviceinclude;
 use App\Serviceadditional;
 use App\Servicebenifit;
 use App\Service;
+use App\ServiceCity;
 use App\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -51,9 +52,18 @@ class ServiceController extends Controller
                 return $this->formatServicePayload($service);
             })->values();
 
+        $categories = Category::select('id', 'name')->where('status', 1)->orderBy('name')->get();
+        $sellers = User::select('id', 'name', 'email')
+            ->where('user_type', 0)
+            ->where('user_status', 1)
+            ->orderBy('name')
+            ->get();
+
         return response()->json([
             'status' => 'success',
             'services' => $services,
+            'categories' => $categories,
+            'sellers' => $sellers,
         ]);
     }
 
@@ -72,15 +82,22 @@ class ServiceController extends Controller
 
         $seller = User::findOrFail($validated['seller_id']);
         $category = Category::find($validated['category_id']) ?? Category::firstOrFail();
-        $slug = Str::slug($validated['title_en']);
+        $slug = createSlug($validated['title_en'], 'Service');
+
+        $cityId = $seller->service_city 
+            ?: $request->integer('service_city_id') 
+            ?: optional(ServiceCity::where('status', 1)->first() ?: ServiceCity::first())->id;
+
+        $durationInput = $validated['duration'] ?? null;
+        $deliveryDays = $durationInput ? ((int) preg_replace('/[^0-9]/', '', $durationInput) ?: 1) : 0;
 
         $service = Service::create([
             'category_id' => $category->id,
             'subcategory_id' => $request->integer('subcategory_id') ?: null,
             'child_category_id' => $request->integer('child_category_id') ?: null,
             'seller_id' => $seller->id,
-            'service_city_id' => $seller->service_city,
-            'service_area_id' => $seller->service_area,
+            'service_city_id' => $cityId,
+            'service_area_id' => $seller->service_area ?: ($request->integer('service_area_id') ?: null),
             'title' => $validated['title_en'],
             'slug' => $slug,
             'description' => $validated['description_en'],
@@ -90,6 +107,7 @@ class ServiceController extends Controller
             'status' => 1,
             'is_service_on' => 1,
             'price' => $validated['price'],
+            'delivery_days' => $deliveryDays,
             'tax' => 0,
             'guard_name' => 'admin',
         ]);
@@ -118,20 +136,29 @@ class ServiceController extends Controller
         $category = Category::find($validated['category_id']) ?? Category::firstOrFail();
         $service = Service::findOrFail($id);
 
+        $cityId = $seller->service_city 
+            ?: $service->service_city_id 
+            ?: $request->integer('service_city_id') 
+            ?: optional(ServiceCity::where('status', 1)->first() ?: ServiceCity::first())->id;
+
+        $durationInput = $validated['duration'] ?? null;
+        $deliveryDays = $durationInput !== null ? ((int) preg_replace('/[^0-9]/', '', $durationInput) ?: 1) : $service->delivery_days;
+
         $service->update([
             'category_id' => $category->id,
             'subcategory_id' => $request->integer('subcategory_id') ?: null,
             'child_category_id' => $request->integer('child_category_id') ?: null,
             'seller_id' => $seller->id,
-            'service_city_id' => $seller->service_city,
-            'service_area_id' => $seller->service_area,
+            'service_city_id' => $cityId,
+            'service_area_id' => $seller->service_area ?: ($request->integer('service_area_id') ?: $service->service_area_id),
             'title' => $validated['title_en'],
-            'slug' => Str::slug($validated['title_en']),
+            'slug' => $validated['title_en'] !== $service->title ? createSlug($validated['title_en'], 'Service') : $service->slug,
             'description' => $validated['description_en'],
-            'image' => $request->input('image'),
-            'image_gallery' => $request->input('image_gallery'),
-            'video' => $request->input('video'),
+            'image' => $request->input('image', $service->image),
+            'image_gallery' => $request->input('image_gallery', $service->image_gallery),
+            'video' => $request->input('video', $service->video),
             'price' => $validated['price'],
+            'delivery_days' => $deliveryDays,
             'tax' => $request->input('tax', $service->tax ?? 0),
         ]);
 
@@ -148,9 +175,15 @@ class ServiceController extends Controller
             'status' => 'required|in:active,pending,suspended',
         ]);
 
+        $statusMap = [
+            'active' => 1,
+            'pending' => 0,
+            'suspended' => 2,
+        ];
+
         $service = Service::findOrFail($id);
         $service->update([
-            'status' => $validated['status'] === 'active' ? 1 : 0,
+            'status' => $statusMap[$validated['status']],
         ]);
 
         return response()->json([
@@ -182,8 +215,14 @@ class ServiceController extends Controller
             'status' => 'required|in:active,pending,suspended',
         ]);
 
+        $statusMap = [
+            'active' => 1,
+            'pending' => 0,
+            'suspended' => 2,
+        ];
+
         Service::whereIn('id', $validated['ids'])->update([
-            'status' => $validated['status'] === 'active' ? 1 : 0,
+            'status' => $statusMap[$validated['status']],
         ]);
 
         return response()->json([
@@ -213,7 +252,15 @@ class ServiceController extends Controller
 
     private function formatServicePayload(Service $service): array
     {
-        $status = (int) $service->status === 1 ? 'active' : 'suspended';
+        $statusVal = (int) $service->status;
+        if ($statusVal === 1) {
+            $status = 'active';
+        } elseif ($statusVal === 0) {
+            $status = 'pending';
+        } else {
+            $status = 'suspended';
+        }
+
         $title = $service->title ?? '';
         $description = $service->description ?? '';
         $categoryName = optional($service->category)->name ?? '';
@@ -224,13 +271,15 @@ class ServiceController extends Controller
             'id' => $service->id,
             'title_en' => $title,
             'title_ar' => $title,
+            'category_id' => (int) $service->category_id,
             'category_en' => $subcategoryName ?: $categoryName,
             'category_ar' => $subcategoryName ?: $categoryName,
             'seller_id' => (int) $service->seller_id,
             'seller_name' => $sellerName,
             'price' => (float) $service->price,
-            'duration' => $service->duration ?? '',
+            'duration' => $service->delivery_days ?? $service->duration ?? '',
             'status' => $status,
+            'is_service_on' => (int) ($service->is_service_on ?? 1),
             'rating' => (float) ($service->avg_rating ?? 0),
             'sales_count' => (int) ($service->orders_count ?? 0),
             'created_at' => optional($service->created_at)->toDateString(),

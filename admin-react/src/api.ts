@@ -152,7 +152,11 @@ export const LaravelAPI = {
     },
 
     // Services
-    async getServices(): Promise<Service[]> {
+    async getServicesPayload(): Promise<{
+      services: Service[];
+      categories: { id: number; name: string }[];
+      sellers: { id: number; name: string; email: string }[];
+    }> {
       const response = await fetch('/admin-home/services-json', {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
@@ -164,11 +168,16 @@ export const LaravelAPI = {
       }
 
       const payload = await response.json();
-      if (Array.isArray(payload?.services)) {
-        return payload.services;
-      }
+      return {
+        services: Array.isArray(payload?.services) ? payload.services : [],
+        categories: Array.isArray(payload?.categories) ? payload.categories : [],
+        sellers: Array.isArray(payload?.sellers) ? payload.sellers : [],
+      };
+    },
 
-      throw new Error('Services payload missing services array');
+    async getServices(): Promise<Service[]> {
+      const data = await this.getServicesPayload();
+      return data.services;
     },
   
     async updateServiceStatus(id: number, status: 'active' | 'pending' | 'suspended'): Promise<Service> {
@@ -205,7 +214,7 @@ export const LaravelAPI = {
         body: JSON.stringify({
           title_en: serviceData.title_en,
           title_ar: serviceData.title_ar,
-          category_id: 1,
+          category_id: serviceData.category_id || 1,
           seller_id: serviceData.seller_id,
           price: serviceData.price,
           duration: serviceData.duration,
@@ -215,7 +224,16 @@ export const LaravelAPI = {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to create service (${response.status})`);
+        let msg = `Failed to create service (${response.status})`;
+        try {
+          const errBody = await response.json();
+          if (errBody?.message) msg = errBody.message;
+          if (errBody?.errors) {
+            const errs = Object.values(errBody.errors).flat().join(', ');
+            if (errs) msg = `${msg}: ${errs}`;
+          }
+        } catch (_) {}
+        throw new Error(msg);
       }
 
       const payload = await response.json();
@@ -237,7 +255,7 @@ export const LaravelAPI = {
         body: JSON.stringify({
           title_en: serviceData.title_en,
           title_ar: serviceData.title_ar,
-          category_id: 1,
+          category_id: serviceData.category_id || 1,
           seller_id: serviceData.seller_id,
           price: serviceData.price,
           duration: serviceData.duration,
@@ -247,7 +265,16 @@ export const LaravelAPI = {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to update service (${response.status})`);
+        let msg = `Failed to update service (${response.status})`;
+        try {
+          const errBody = await response.json();
+          if (errBody?.message) msg = errBody.message;
+          if (errBody?.errors) {
+            const errs = Object.values(errBody.errors).flat().join(', ');
+            if (errs) msg = `${msg}: ${errs}`;
+          }
+        } catch (_) {}
+        throw new Error(msg);
       }
 
       const payload = await response.json();

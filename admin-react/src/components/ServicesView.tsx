@@ -128,10 +128,16 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
   const [formTitleAr, setFormTitleAr] = useState('');
   const [formCategoryEn, setFormCategoryEn] = useState('');
   const [formCategoryAr, setFormCategoryAr] = useState('');
+  const [formCategoryId, setFormCategoryId] = useState<number | ''>('');
+  const [formSellerId, setFormSellerId] = useState<number | ''>('');
   const [formPrice, setFormPrice] = useState<number>(100);
   const [formDuration, setFormDuration] = useState('');
   const [formDescEn, setFormDescEn] = useState('');
   const [formDescAr, setFormDescAr] = useState('');
+
+  // Sellers and Categories lists loaded from backend
+  const [sellers, setSellers] = useState<{ id: number; name: string; email: string }[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<{ id: number; name: string }[]>([]);
 
   // Nested categories initial state
   const [categories, setCategories] = useState<CategoryNode[]>([]);
@@ -174,8 +180,20 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
   const loadServices = async () => {
     setLoading(true);
     try {
-      const data = await LaravelAPI.getServices();
-      setServices(data);
+      const data = await LaravelAPI.getServicesPayload();
+      setServices(data.services);
+      if (data.categories && data.categories.length > 0) {
+        setCategoryOptions(data.categories);
+      }
+      if (data.sellers && data.sellers.length > 0) {
+        setSellers(data.sellers);
+      } else {
+        const users = await LaravelAPI.getUsers().catch(() => []);
+        const sellerUsers = users
+          .filter(u => u.role === 'seller')
+          .map(u => ({ id: u.id, name: u.name, email: u.email }));
+        setSellers(sellerUsers);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -188,7 +206,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
   }, []);
 
   // Update Status
-  const handleUpdateStatus = async (id: number, status: 'active' | 'suspended') => {
+  const handleUpdateStatus = async (id: number, status: 'active' | 'pending' | 'suspended') => {
     if (!hasPermission) {
       saveAuditLog({
         actorRole: activeRole,
@@ -217,7 +235,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
         action: 'status change',
         resource: `Service #${id} (${updated.title_en})`,
         detailsEn: `Service status updated to '${status}' successfully.`,
-        detailsAr: `تم تحديث حالة الخدمة إلى '${status === 'active' ? 'نشط' : 'موقوف'}' بنجاح.`,
+        detailsAr: `تم تحديث حالة الخدمة إلى '${status === 'active' ? 'نشط' : status === 'pending' ? 'معلق' : 'موقوف'}' بنجاح.`,
         status: 'success'
       });
 
@@ -232,8 +250,9 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
       }
 
       showSuccess(language === 'en' ? `Service status updated to ${status}!` : `تم تعديل حالة الخدمة بنجاح!`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert(err?.message || (language === 'en' ? 'Failed to update service status' : 'فشل تحديث حالة الخدمة'));
     }
   };
 
@@ -345,8 +364,12 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     setValidationError('');
     setFormTitleEn('');
     setFormTitleAr('');
-    setFormCategoryEn('Event Decoration');
-    setFormCategoryAr('ديكور وتنسيق الفعاليات');
+    const defaultCatId = categoryOptions[0]?.id ?? 1;
+    setFormCategoryId(defaultCatId);
+    const defaultCatName = categoryOptions[0]?.name ?? 'Event Decoration';
+    setFormCategoryEn(defaultCatName);
+    setFormCategoryAr(defaultCatName);
+    setFormSellerId(sellers[0]?.id ?? '');
     setFormPrice(450);
     setFormDuration('1 day');
     setFormDescEn('');
@@ -359,8 +382,11 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     setValidationError('');
     setFormTitleEn(service.title_en);
     setFormTitleAr(service.title_ar);
+    const catId = service.category_id || categoryOptions.find(c => c.name === service.category_en)?.id || 1;
+    setFormCategoryId(catId);
     setFormCategoryEn(service.category_en);
     setFormCategoryAr(service.category_ar);
+    setFormSellerId(service.seller_id);
     setFormPrice(service.price);
     setFormDuration(service.duration);
     setFormDescEn(service.description_en || '');
@@ -381,43 +407,51 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
       return;
     }
 
+    if (!formSellerId) {
+      setValidationError(language === 'en' ? "Please select a service provider (seller)." : "يرجى اختيار مزود الخدمة (البائع).");
+      return;
+    }
+
     setLoading(true);
     try {
-        if (formMode === 'create') {
-          const payload = {
-            title_en: formTitleEn,
-            title_ar: formTitleAr,
-            category_en: formCategoryEn,
-            category_ar: formCategoryAr,
+      if (formMode === 'create') {
+        const payload = {
+          title_en: formTitleEn,
+          title_ar: formTitleAr,
+          category_id: typeof formCategoryId === 'number' ? formCategoryId : 1,
+          category_en: formCategoryEn,
+          category_ar: formCategoryAr,
           price: formPrice,
           duration: formDuration,
-          status: 'pending' as const,
-          seller_id: 101, // Ahmand Al-Harbi default
-            description_en: formDescEn,
-            description_ar: formDescAr
-          };
-          const created = await LaravelAPI.createService(payload);
-          setServices([created, ...services]);
-          showSuccess(language === 'en' ? "Service created and synced with Laravel database!" : "تم إنشاء الخدمة ومزامنتها مع قاعدة البيانات بنجاح!");
-        } else if (formMode === 'edit' && editingServiceId) {
+          status: 'active' as const,
+          seller_id: Number(formSellerId),
+          description_en: formDescEn,
+          description_ar: formDescAr
+        };
+        const created = await LaravelAPI.createService(payload);
+        setServices([created, ...services]);
+        showSuccess(language === 'en' ? "Service created and synced with Laravel database!" : "تم إنشاء الخدمة ومزامنتها مع قاعدة البيانات بنجاح!");
+      } else if (formMode === 'edit' && editingServiceId) {
         const updatedService = await LaravelAPI.updateService(editingServiceId, {
           title_en: formTitleEn,
           title_ar: formTitleAr,
+          category_id: typeof formCategoryId === 'number' ? formCategoryId : 1,
           category_en: formCategoryEn,
           category_ar: formCategoryAr,
           price: formPrice,
           duration: formDuration,
           description_en: formDescEn,
           description_ar: formDescAr,
-          seller_id: selectedService?.seller_id ?? services.find(s => s.id === editingServiceId)?.seller_id ?? 101,
+          seller_id: Number(formSellerId),
           status: services.find(s => s.id === editingServiceId)?.status ?? 'active',
         });
         setServices(services.map(s => s.id === editingServiceId ? updatedService : s));
         showSuccess(language === 'en' ? "Service updated and synced with Laravel database!" : "تم تحديث بيانات الخدمة وحفظ التغييرات بالكامل!");
       }
       setFormMode('list');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setValidationError(err?.message || (language === 'en' ? "Failed to save service" : "فشل حفظ الخدمة"));
     } finally {
       setLoading(false);
     }
@@ -848,21 +882,54 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                 {/* Category Selection */}
                 <div>
                   <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
-                    {t.col_category}
+                    {t.col_category} *
                   </label>
                   <select
-                    value={formCategoryEn}
+                    value={formCategoryId}
                     onChange={(e) => {
-                      setFormCategoryEn(e.target.value);
-                      if (e.target.value === 'Event Decoration') setFormCategoryAr('ديكور وتنسيق الفعاليات');
-                      if (e.target.value === 'Media & Photography') setFormCategoryAr('الإعلام والتصوير');
-                      if (e.target.value === 'Music & Musicians') setFormCategoryAr('الموسيقى والعازفون');
+                      const id = Number(e.target.value);
+                      setFormCategoryId(id);
+                      const cat = categoryOptions.find(c => c.id === id);
+                      if (cat) {
+                        setFormCategoryEn(cat.name);
+                        setFormCategoryAr(cat.name);
+                      }
                     }}
                     className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs outline-hidden focus:border-indigo-500 bg-white"
                   >
-                    <option value="Event Decoration">Event Decoration / ديكور وتنسيق الفعاليات</option>
-                    <option value="Media & Photography">Media & Photography / الإعلام والتصوير</option>
-                    <option value="Music & Musicians">Music & Musicians / الموسيقى والعازفون</option>
+                    {categoryOptions.length > 0 ? (
+                      categoryOptions.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value={1}>Event Decoration / ديكور وتنسيق الفعاليات</option>
+                        <option value={2}>Media & Photography / الإعلام والتصوير</option>
+                        <option value={3}>Music & Musicians / الموسيقى والعازفون</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                {/* Service Provider (Seller) Selection */}
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                    {language === 'en' ? 'Service Provider (Seller)' : 'مزود الخدمة (البائع)'} *
+                  </label>
+                  <select
+                    value={formSellerId}
+                    onChange={(e) => setFormSellerId(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs outline-hidden focus:border-indigo-500 bg-white"
+                    required
+                  >
+                    <option value="">{language === 'en' ? '— Select Real Provider —' : '— اختر مزود الخدمة —'}</option>
+                    {sellers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.email}) — ID #{s.id}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
