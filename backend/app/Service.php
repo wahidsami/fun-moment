@@ -64,6 +64,14 @@ class Service extends Model
         return $this->hasMany('App\OnlineServiceFaq');
     }
 
+    public function days(){
+        return $this->hasMany(Day::class, 'service_id', 'id');
+    }
+
+    public function schedules(){
+        return $this->hasMany(Schedule::class, 'service_id', 'id');
+    }
+
     public function seller(){
         return $this->belongsTo('App\User','seller_id','id');
     }

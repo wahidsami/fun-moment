@@ -212,6 +212,9 @@ export const LaravelAPI = {
         fd.append('title_en', serviceData.title_en);
         fd.append('title_ar', serviceData.title_ar);
         fd.append('category_id', String(serviceData.category_id || 1));
+        if (serviceData.subcategory_id) {
+          fd.append('subcategory_id', String(serviceData.subcategory_id));
+        }
         fd.append('seller_id', String(serviceData.seller_id));
         fd.append('price', String(serviceData.price));
         fd.append('duration', serviceData.duration || '');
@@ -225,6 +228,7 @@ export const LaravelAPI = {
           title_en: serviceData.title_en,
           title_ar: serviceData.title_ar,
           category_id: serviceData.category_id || 1,
+          subcategory_id: serviceData.subcategory_id,
           seller_id: serviceData.seller_id,
           price: serviceData.price,
           duration: serviceData.duration,
@@ -271,6 +275,9 @@ export const LaravelAPI = {
         fd.append('title_en', serviceData.title_en);
         fd.append('title_ar', serviceData.title_ar);
         fd.append('category_id', String(serviceData.category_id || 1));
+        if (serviceData.subcategory_id) {
+          fd.append('subcategory_id', String(serviceData.subcategory_id));
+        }
         fd.append('seller_id', String(serviceData.seller_id));
         fd.append('price', String(serviceData.price));
         fd.append('duration', serviceData.duration || '');
@@ -284,6 +291,7 @@ export const LaravelAPI = {
           title_en: serviceData.title_en,
           title_ar: serviceData.title_ar,
           category_id: serviceData.category_id || 1,
+          subcategory_id: serviceData.subcategory_id,
           seller_id: serviceData.seller_id,
           price: serviceData.price,
           duration: serviceData.duration,
@@ -733,26 +741,65 @@ export const LaravelAPI = {
     return [];
   },
 
-  async uploadMedia(file: File): Promise<CMSContent> {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch('/admin-home/cms-media/upload', {
-      method: 'POST',
-      headers: { 'Accept': 'application/json' },
-      credentials: 'include',
-      body: formData,
+  async uploadMedia(file: File, onProgress?: (percent: number) => void): Promise<CMSContent> {
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/admin-home/cms-media/upload');
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.withCredentials = true;
+
+      if (onProgress && xhr.upload) {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            onProgress(percent);
+          }
+        };
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const payload = JSON.parse(xhr.responseText);
+            if (payload?.item) {
+              resolve(payload.item);
+              return;
+            }
+            reject(new Error(payload?.message || 'Media upload failed'));
+          } catch (_) {
+            reject(new Error('Invalid JSON response from server'));
+          }
+        } else {
+          let msg = `Media upload failed (${xhr.status})`;
+          try {
+            const errBody = JSON.parse(xhr.responseText);
+            if (errBody?.message) msg = errBody.message;
+            if (errBody?.errors) {
+              const errs = Object.values(errBody.errors).flat().join(', ');
+              if (errs) msg = `${msg}: ${errs}`;
+            }
+          } catch (_) {}
+          reject(new Error(msg));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error during media upload'));
+      xhr.send(formData);
     });
-    const payload = await response.json();
-    if (payload?.item) return payload.item;
-    throw new Error(payload?.message || 'Media upload failed');
   },
 
   async deleteMedia(id: number): Promise<void> {
-    await fetch(`/admin-home/cms-media/${id}/delete`, {
+    const response = await fetch(`/admin-home/cms-media/${id}/delete`, {
       method: 'POST',
       headers: { 'Accept': 'application/json' },
       credentials: 'include',
     });
+    if (!response.ok) {
+      throw new Error(`Failed to delete media asset (${response.status})`);
+    }
   },
 
   async updateMediaAlt(id: number, alt: string): Promise<CMSContent> {

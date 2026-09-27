@@ -490,12 +490,14 @@ class ServiceController extends Controller
         ]);
     }
 
-    //get schedule by seller
+    //get schedule by seller / service
     public function scheduleByDay($day,$seller_id)
     {
         if (empty($day) || empty($seller_id)) {
             return response()->json(['status' => __('no schedule')]);
         }
+
+        $service_id = request()->query('service_id') ?? request()->service_id;
 
         $dayMap = [
             'sunday' => 'Sun', 'sun' => 'Sun',
@@ -510,13 +512,23 @@ class ServiceController extends Controller
         $cleanDay = strtolower(trim($day));
         $shortDay = $dayMap[$cleanDay] ?? substr(ucfirst($cleanDay), 0, 3);
 
-        $get_day = Day::select('id', 'day','total_day', 'status')
+        $dayQuery = Day::select('id', 'day','total_day', 'status', 'service_id')
             ->where(function ($q) use ($day, $shortDay) {
                 $q->where('day', $day)
                   ->orWhere('day', $shortDay);
             })
-            ->where('seller_id', $seller_id)
-            ->first();
+            ->where('seller_id', $seller_id);
+
+        if (!empty($service_id)) {
+            // First search for service-specific day
+            $get_day = (clone $dayQuery)->where('service_id', $service_id)->first();
+            // If service has no specific day record, fallback to seller-level
+            if (!$get_day) {
+                $get_day = (clone $dayQuery)->whereNull('service_id')->first();
+            }
+        } else {
+            $get_day = (clone $dayQuery)->whereNull('service_id')->first() ?? $dayQuery->first();
+        }
 
         if (!$get_day || (int) $get_day->status === 0) {
             return response()->json([
@@ -524,16 +536,23 @@ class ServiceController extends Controller
             ]);
         }
 
-        $schedules = Schedule::select('id', 'schedule', 'status')
+        $schedulesQuery = Schedule::select('id', 'schedule', 'status', 'service_id')
             ->where('seller_id', $seller_id)
             ->where('day_id', $get_day->id)
             ->where(function ($q) {
                 $q->whereNull('status')
                   ->orWhere('status', 1)
                   ->orWhere('status', '1');
-            })
-            ->orderBy('id', 'asc')
-            ->get();
+            });
+
+        if (!empty($service_id)) {
+            $schedules = (clone $schedulesQuery)->where('service_id', $service_id)->orderBy('id', 'asc')->get();
+            if ($schedules->isEmpty() && is_null($get_day->service_id)) {
+                $schedules = $schedulesQuery->whereNull('service_id')->orderBy('id', 'asc')->get();
+            }
+        } else {
+            $schedules = $schedulesQuery->orderBy('id', 'asc')->get();
+        }
 
         if ($schedules->count() >= 1) {
             return response()->json([
@@ -918,32 +937,61 @@ class ServiceController extends Controller
             ]);
         }
 
-        if (!$is_service_online_bool) {
-            $requestedDate = \Carbon\Carbon::parse($request->date);
-            $dayName = $requestedDate->format('D');
-            $formattedDate = $requestedDate->format('D F d Y');
+        if (!$is_service_online_bool && !empty($request->date) && !empty($request->schedule)) {
+            try {
+                $requestedDateObj = \Carbon\Carbon::parse($request->date);
+                $reqDateYmd = $requestedDateObj->format('Y-m-d');
+            } catch (\Exception $e) {
+                $reqDateYmd = null;
+            }
 
-            $day = Day::select('id', 'day')
-                ->where('day', $dayName)
-                ->where('seller_id', $request->seller_id)
-                ->first();
+            $parseSlotSec = function ($slotStr) {
+                $parts = explode('-', (string)$slotStr);
+                if (count($parts) !== 2) return null;
+                $s = strtotime(trim($parts[0]));
+                $e = strtotime(trim($parts[1]));
+                if ($s === false || $e === false) return null;
+                $sSec = (int) date('H', $s) * 3600 + (int) date('i', $s) * 60;
+                $eSec = (int) date('H', $e) * 3600 + (int) date('i', $e) * 60;
+                return ['start' => $sSec, 'end' => $eSec];
+            };
 
-            $scheduleSetting = Schedule::select('seller_id', 'allow_multiple_schedule')
-                ->where('seller_id', $request->seller_id)
-                ->first();
+            $reqSlot = $parseSlotSec($request->schedule);
 
-            if (!is_null($day) && !is_null($scheduleSetting) && $scheduleSetting->allow_multiple_schedule == 'no') {
-                $alreadyBooked = Order::where('seller_id', $request->seller_id)
-                    ->where('date', $formattedDate)
-                    ->where('schedule', $request->schedule)
-                    ->whereIn('status', [0, 1, 2])
-                    ->first();
+            // Provider Cross-Service Conflict Detection:
+            // Query all active bookings for this provider (seller_id) across ALL services
+            $existingOrders = Order::where('seller_id', $request->seller_id)
+                ->whereIn('status', [0, 1, 2])
+                ->get();
 
-                if (!is_null($alreadyBooked)) {
-                    return response()->json([
-                        'error' => true,
-                        'message' => __('This schedule has already been booked. Please choose another time slot.'),
-                    ], 422);
+            foreach ($existingOrders as $ord) {
+                if (empty($ord->date)) continue;
+                $ordDateYmd = null;
+                try {
+                    $ordDateYmd = \Carbon\Carbon::parse($ord->date)->format('Y-m-d');
+                } catch (\Exception $e) {
+                    $ordDateYmd = null;
+                }
+
+                if ($reqDateYmd && $ordDateYmd && $reqDateYmd === $ordDateYmd) {
+                    $ordSlot = $parseSlotSec($ord->schedule);
+                    $hasOverlap = false;
+
+                    if ($reqSlot && $ordSlot) {
+                        // Check if time windows overlap: startA < endB && endA > startB
+                        if ($reqSlot['start'] < $ordSlot['end'] && $reqSlot['end'] > $ordSlot['start']) {
+                            $hasOverlap = true;
+                        }
+                    } elseif (trim($ord->schedule) === trim($request->schedule)) {
+                        $hasOverlap = true;
+                    }
+
+                    if ($hasOverlap) {
+                        return response()->json([
+                            'error' => true,
+                            'message' => __('This time slot conflicts with an existing booking for this provider. Please choose another time slot.'),
+                        ], 422);
+                    }
                 }
             }
         }

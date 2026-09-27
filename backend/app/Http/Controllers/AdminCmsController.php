@@ -463,9 +463,9 @@ class AdminCmsController extends Controller
 
     public function apiMediaInventory(): JsonResponse
     {
-        $media = MediaUpload::where('type', 'admin')
+        $media = MediaUpload::query()
             ->orderByDesc('id')
-            ->take(100)
+            ->take(150)
             ->get()
             ->map(fn (MediaUpload $item) => $this->formatMediaPayload($item))
             ->values();
@@ -484,8 +484,10 @@ class AdminCmsController extends Controller
             'file.max' => __('The file may not be greater than 10 Megabytes'),
         ]);
 
-        MediaHelper::insert_media_image($request);
-        $item = MediaUpload::where('type', 'admin')->orderByDesc('id')->first();
+        $item = MediaHelper::insert_media_image($request, 'admin', 'file');
+        if (!$item) {
+            $item = MediaUpload::where('type', 'admin')->orderByDesc('id')->first();
+        }
 
         return response()->json([
             'status' => 'success',

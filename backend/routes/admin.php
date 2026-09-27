@@ -815,5 +815,13 @@ Route::group(['prefix' => 'page-builder','middleware' => 'auth:admin','setlang']
     Route::post('/media-upload/alt','MediaUploadController@alt_change_upload_media_file')->name('admin.upload.media.file.alt.change');
 
 
- // media upload routes for restrict user in demo mode
+    // media upload routes for restrict user in demo mode
     Route::post('/media-upload/loadmore', 'MediaUploadController@get_image_for_loadmore')->name('admin.upload.media.file.loadmore');
+
+    // React Admin CMS Media routes
+    Route::group(['prefix' => 'cms-media'], function() {
+        Route::get('/', 'MediaUploadController@cms_media_list')->name('admin.cms.media.list');
+        Route::post('/upload', 'MediaUploadController@cms_media_upload')->name('admin.cms.media.upload');
+        Route::post('/{id}/delete', 'MediaUploadController@cms_media_delete')->name('admin.cms.media.delete');
+        Route::post('/{id}/alt', 'MediaUploadController@cms_media_alt')->name('admin.cms.media.alt');
+    });

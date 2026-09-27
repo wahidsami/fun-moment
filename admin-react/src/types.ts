@@ -174,6 +174,7 @@ export interface Service {
   title_en: string;
   title_ar: string;
   category_id?: number;
+  subcategory_id?: number;
   category_en: string;
   category_ar: string;
   seller_id: number;

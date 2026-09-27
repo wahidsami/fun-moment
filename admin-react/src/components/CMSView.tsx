@@ -218,6 +218,8 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
   const [mediaGallery, setMediaGallery] = useState<MediaItem[]>([]);
   const [searchMedia, setSearchMedia] = useState('');
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
 
   // Alert Success triggers
   const triggerSuccess = (msg: string) => {
@@ -230,12 +232,18 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
 
     const loadCmsInventory = async () => {
       try {
-        const items = await LaravelAPI.getCMSContent();
-        if (!mounted || !Array.isArray(items) || items.length === 0) {
+        const [items, mediaItems] = await Promise.all([
+          LaravelAPI.getCMSContent().catch(() => []),
+          LaravelAPI.getMediaLibrary().catch(() => []),
+        ]);
+        if (!mounted) {
           return;
         }
 
-        const liveBlogs = items
+        const rawItems = Array.isArray(items) ? items : [];
+        const rawMedia = Array.isArray(mediaItems) ? mediaItems : [];
+
+        const liveBlogs = rawItems
           .filter((item) => item.type === 'blog')
           .map((item) => ({
             id: item.id,
@@ -251,7 +259,7 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
             content_ar: item.content_ar ?? '',
           }));
 
-        const livePages = items
+        const livePages = rawItems
           .filter((item) => item.type === 'page')
           .map((item) => ({
             id: String(item.id),
@@ -269,7 +277,7 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
             }],
           }));
 
-        const liveWidgets = items
+        const liveWidgets = rawItems
           .filter((item) => item.type === 'widget')
           .map((item) => ({
             id: String(item.id),
@@ -279,7 +287,7 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
             title_ar: item.title_ar,
           }));
 
-        const liveMenus = items
+        const liveMenus = rawItems
           .filter((item) => item.type === 'menu')
           .map((item) => ({
             id: String(item.id),
@@ -288,17 +296,26 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
             url: item.url || (item.content && typeof item.content === 'string' ? item.content : '/'),
           }));
 
-        const liveMedia = items
-          .filter((item) => item.type === 'media')
-          .map((item) => ({
-            id: item.id,
-            name: item.slug ?? `media-${item.id}`,
-            url: item.image ?? '',
-            size: item.size ?? '',
-            dimensions: item.dimensions ?? '',
-            alt_en: item.alt_en ?? '',
-            alt_ar: item.alt_ar ?? '',
-          }));
+        const combinedMedia = [
+          ...rawItems.filter((item) => item.type === 'media'),
+          ...rawMedia,
+        ];
+        const seenIds = new Set<number>();
+        const liveMedia: MediaItem[] = [];
+        for (const item of combinedMedia) {
+          if (!seenIds.has(item.id)) {
+            seenIds.add(item.id);
+            liveMedia.push({
+              id: item.id,
+              name: item.slug || item.title_en || `media-${item.id}`,
+              url: item.image || item.url || '',
+              size: item.size ?? '',
+              dimensions: item.dimensions ?? '',
+              alt_en: item.alt_en ?? '',
+              alt_ar: item.alt_ar ?? '',
+            });
+          }
+        }
 
         if (liveBlogs.length > 0) {
           setBlogs(liveBlogs as BlogPost[]);
@@ -629,11 +646,15 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
 
   const handleUploadMediaFile = async (file?: File | null) => {
     if (!hasPermission || !file) return;
+    setIsUploadingMedia(true);
+    setUploadProgress(0);
     try {
-      const item = await LaravelAPI.uploadMedia(file);
+      const item = await LaravelAPI.uploadMedia(file, (percent) => {
+        setUploadProgress(percent);
+      });
       const normalized = {
         id: item.id,
-        name: item.slug ?? `media-${item.id}`,
+        name: item.slug || item.title_en || `media-${item.id}`,
         url: item.image ?? item.url ?? '',
         size: item.size ?? '',
         dimensions: item.dimensions ?? '',
@@ -643,8 +664,12 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
       setMediaGallery(current => [normalized, ...current]);
       setSelectedMedia(normalized);
       triggerSuccess(language === 'en' ? 'Asset uploaded successfully!' : 'تم رفع الملف بنجاح!');
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      alert(error?.message || (language === 'en' ? 'Upload failed' : 'فشل رفع الملف'));
+    } finally {
+      setIsUploadingMedia(false);
+      setUploadProgress(0);
     }
   };
 
@@ -2018,15 +2043,42 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                   }}
                 />
 
-                {/* Drag and drop simulated dropzone */}
+                {/* Drag and drop dropzone */}
                 <div
                   onClick={handleSimulateUpload}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) handleUploadMediaFile(file);
+                  }}
                   className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center cursor-pointer hover:bg-slate-50 hover:border-indigo-400 transition"
                 >
                   <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2 animate-bounce" />
-                  <p className="text-xs font-bold text-slate-700">{language === 'en' ? 'Click to upload a real media file from disk' : 'انقر لرفع ملف وسائط حقيقي من الجهاز'}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Supports JPEG, PNG, SVG up to 5MB size limit.</p>
+                  <p className="text-xs font-bold text-slate-700">
+                    {language === 'en' ? 'Click to browse, or drag & drop an image here' : 'انقر للتصفح، أو اسحب وأفلت صورة هنا'}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {language === 'en' ? 'Supports JPG, PNG, GIF, WEBP up to 10MB' : 'يدعم صيغ JPG, PNG, GIF, WEBP حتى ١٠ ميجابايت'}
+                  </p>
                 </div>
+
+                {/* Live Upload Progress */}
+                {isUploadingMedia && (
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                    <div className="flex items-center justify-between text-xs font-bold text-indigo-950 mb-1.5">
+                      <span>{language === 'en' ? 'Uploading & Processing Image...' : 'جاري رفع ومعالجة الصورة...'}</span>
+                      <span>{uploadProgress}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden border">
+                      <div className="h-full bg-indigo-600 transition-all duration-150" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                  </div>
+                )}
 
                 {/* Search bar */}
                 <div className="relative max-w-sm">

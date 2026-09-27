@@ -1276,12 +1276,29 @@ class SellerController extends Controller
         return response()->json(["schedule" => $schedules, "days" => $days]);
     }
 
-    public function scheduleDaysList()
+    public function scheduleDaysList(Request $request)
     {
         $seller_id = Auth::guard('sanctum')->user()->id;
-        $days = Day::with(['schedules' => function ($query) {
+        $service_id = $request->query('service_id') ?? $request->service_id;
+
+        $daysQuery = Day::with(['schedules' => function ($query) use ($service_id) {
+            if (!empty($service_id)) {
+                $query->where('service_id', $service_id);
+            }
             $query->orderBy('id', 'asc');
-        }])->where('seller_id', $seller_id)->get();
+        }])->where('seller_id', $seller_id);
+
+        if (!empty($service_id)) {
+            $service = Service::where('id', $service_id)->where('seller_id', $seller_id)->first();
+            if (!$service) {
+                return response()->json(['error' => true, 'message' => __('Service not found or unauthorized')], 404);
+            }
+            $daysQuery->where('service_id', $service_id);
+        } else {
+            $daysQuery->whereNull('service_id');
+        }
+
+        $days = $daysQuery->get();
 
         // Sort days logically Sun -> Sat
         $order = ['Sun' => 1, 'Mon' => 2, 'Tue' => 3, 'Wed' => 4, 'Thu' => 5, 'Fri' => 6, 'Sat' => 7];
@@ -1297,6 +1314,7 @@ class SellerController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'day' => 'required|string',
+            'service_id' => 'nullable|integer',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -1306,6 +1324,15 @@ class SellerController extends Controller
         }
 
         $seller_id = Auth::guard('sanctum')->user()->id;
+        $service_id = $request->service_id;
+
+        if (!empty($service_id)) {
+            $service = Service::where('id', $service_id)->where('seller_id', $seller_id)->first();
+            if (!$service) {
+                return response()->json(['error' => true, 'message' => __('Service not found or unauthorized')], 404);
+            }
+        }
+
         $dayInput = trim($request->day);
 
         // Normalize to standard 3-letter representation
@@ -1320,11 +1347,18 @@ class SellerController extends Controller
         ];
         $normalizedDay = $dayMap[strtolower($dayInput)] ?? substr(ucfirst($dayInput), 0, 3);
 
-        $existingDay = Day::where('seller_id', $seller_id)
+        $existingDayQuery = Day::where('seller_id', $seller_id)
             ->where(function ($q) use ($dayInput, $normalizedDay) {
                 $q->where('day', $dayInput)->orWhere('day', $normalizedDay);
-            })
-            ->first();
+            });
+
+        if (!empty($service_id)) {
+            $existingDayQuery->where('service_id', $service_id);
+        } else {
+            $existingDayQuery->whereNull('service_id');
+        }
+
+        $existingDay = $existingDayQuery->first();
 
         if ($existingDay) {
             $existingDay->status = 1;
@@ -1340,6 +1374,7 @@ class SellerController extends Controller
             'day' => $normalizedDay,
             'status' => 1,
             'seller_id' => $seller_id,
+            'service_id' => !empty($service_id) ? $service_id : null,
             'total_day' => 7,
         ]);
 
@@ -1354,17 +1389,25 @@ class SellerController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'id' => 'required',
+            'service_id' => 'nullable|integer',
         ]);
         if ($validator->fails()) {
             return response()->json(['error' => true, 'message' => $validator->errors()], 422);
         }
 
         $seller_id = Auth::guard('sanctum')->user()->id;
-        $day = Day::where('seller_id', $seller_id)
+        $service_id = $request->service_id;
+
+        $dayQuery = Day::where('seller_id', $seller_id)
             ->where(function ($q) use ($request) {
                 $q->where('id', $request->id)->orWhere('day', $request->id);
-            })
-            ->first();
+            });
+
+        if (!empty($service_id)) {
+            $dayQuery->where('service_id', $service_id);
+        }
+
+        $day = $dayQuery->first();
 
         if (!$day) {
             return response()->json(['error' => true, 'message' => __('Day not found or unauthorized')], 404);
@@ -1384,6 +1427,7 @@ class SellerController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'id' => 'required',
+            'service_id' => 'nullable|integer',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -1393,7 +1437,11 @@ class SellerController extends Controller
         }
 
         $seller_id = Auth::guard('sanctum')->user()->id;
-        $day = Day::where('seller_id', $seller_id)->where('id', $request->id)->first();
+        $dayQuery = Day::where('seller_id', $seller_id)->where('id', $request->id);
+        if (!empty($request->service_id)) {
+            $dayQuery->where('service_id', $request->service_id);
+        }
+        $day = $dayQuery->first();
         if (!$day) {
             return response()->json(['error' => true, 'message' => __('Day not found or unauthorized')], 404);
         }
@@ -1438,6 +1486,7 @@ class SellerController extends Controller
         $validator = Validator::make($request->all(), [
             'day_id' => $rule . '|integer',
             'schedule' => 'required|string',
+            'service_id' => 'nullable|integer',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -1447,6 +1496,8 @@ class SellerController extends Controller
         }
 
         $seller_id = Auth::guard('sanctum')->user()->id;
+        $service_id = $request->service_id;
+
         $parsed = $this->parseTimeRange($request->schedule);
         if (!$parsed) {
             return response()->json([
@@ -1465,7 +1516,14 @@ class SellerController extends Controller
         $formattedSlot = $parsed['formatted'];
 
         if ($request->has('schedule_for_all_days') && $request->schedule_for_all_days) {
-            $days = Day::where('seller_id', $seller_id)->where('status', 1)->get();
+            $daysQuery = Day::where('seller_id', $seller_id)->where('status', 1);
+            if (!empty($service_id)) {
+                $daysQuery->where('service_id', $service_id);
+            } else {
+                $daysQuery->whereNull('service_id');
+            }
+            $days = $daysQuery->get();
+
             if ($days->isEmpty()) {
                 return response()->json([
                     'error' => true,
@@ -1477,12 +1535,16 @@ class SellerController extends Controller
                 // Check duplicate
                 $exists = Schedule::where('day_id', $day->id)
                     ->where('seller_id', $seller_id)
+                    ->when(!empty($service_id), function($q) use ($service_id) {
+                        $q->where('service_id', $service_id);
+                    })
                     ->where('schedule', $formattedSlot)
                     ->exists();
                 if (!$exists) {
                     Schedule::create([
                         'day_id' => $day->id,
                         'seller_id' => $seller_id,
+                        'service_id' => !empty($service_id) ? $service_id : $day->service_id,
                         'schedule' => $formattedSlot,
                         'status' => 1,
                         'allow_multiple_schedule' => 'no',
@@ -1502,9 +1564,14 @@ class SellerController extends Controller
             ], 403);
         }
 
+        $targetServiceId = !empty($service_id) ? $service_id : $day->service_id;
+
         // Check duplicate
         $duplicate = Schedule::where('day_id', $day->id)
             ->where('seller_id', $seller_id)
+            ->when(!empty($targetServiceId), function($q) use ($targetServiceId) {
+                $q->where('service_id', $targetServiceId);
+            })
             ->where('schedule', $formattedSlot)
             ->exists();
         if ($duplicate) {
@@ -1514,10 +1581,13 @@ class SellerController extends Controller
             ], 422);
         }
 
-        // Check overlap with existing slots on the same day
-        $existingSchedules = Schedule::where('day_id', $day->id)
-            ->where('seller_id', $seller_id)
-            ->get();
+        // Check overlap with existing slots on the same day for this service
+        $existingSchedulesQuery = Schedule::where('day_id', $day->id)
+            ->where('seller_id', $seller_id);
+        if (!empty($targetServiceId)) {
+            $existingSchedulesQuery->where('service_id', $targetServiceId);
+        }
+        $existingSchedules = $existingSchedulesQuery->get();
 
         foreach ($existingSchedules as $existing) {
             $ep = $this->parseTimeRange($existing->schedule);
@@ -1534,6 +1604,7 @@ class SellerController extends Controller
         $created = Schedule::create([
             'day_id' => $day->id,
             'seller_id' => $seller_id,
+            'service_id' => $targetServiceId,
             'schedule' => $formattedSlot,
             'status' => 1,
             'allow_multiple_schedule' => 'no',
@@ -1551,6 +1622,7 @@ class SellerController extends Controller
             'up_id' => 'required|integer',
             'day_id' => 'required|integer',
             'schedule' => 'required|string',
+            'service_id' => 'nullable|integer',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -1581,12 +1653,16 @@ class SellerController extends Controller
         }
 
         $formattedSlot = $parsed['formatted'];
+        $targetServiceId = !empty($request->service_id) ? $request->service_id : ($schedule->service_id ?? $day->service_id);
 
         // Overlap check excluding self
-        $existingSchedules = Schedule::where('day_id', $day->id)
+        $existingSchedulesQuery = Schedule::where('day_id', $day->id)
             ->where('seller_id', $seller_id)
-            ->where('id', '!=', $schedule->id)
-            ->get();
+            ->where('id', '!=', $schedule->id);
+        if (!empty($targetServiceId)) {
+            $existingSchedulesQuery->where('service_id', $targetServiceId);
+        }
+        $existingSchedules = $existingSchedulesQuery->get();
 
         foreach ($existingSchedules as $existing) {
             $ep = $this->parseTimeRange($existing->schedule);
@@ -1600,6 +1676,7 @@ class SellerController extends Controller
 
         $schedule->update([
             'day_id' => $day->id,
+            'service_id' => $targetServiceId,
             'schedule' => $formattedSlot,
         ]);
 

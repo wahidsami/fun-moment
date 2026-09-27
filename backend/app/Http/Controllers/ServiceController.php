@@ -52,7 +52,9 @@ class ServiceController extends Controller
                 return $this->formatServicePayload($service);
             })->values();
 
-        $categories = Category::select('id', 'name')->where('status', 1)->orderBy('name')->get();
+        $categories = Category::with(['subcategories' => function($q) {
+            $q->select('id', 'category_id', 'name')->where('status', 1)->orderBy('name');
+        }])->select('id', 'name')->where('status', 1)->orderBy('name')->get();
         $sellers = User::select('id', 'name', 'email')
             ->where('user_type', 0)
             ->where('user_status', 1)

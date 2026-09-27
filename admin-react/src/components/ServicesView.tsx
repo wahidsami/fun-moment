@@ -129,16 +129,19 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
   const [formCategoryEn, setFormCategoryEn] = useState('');
   const [formCategoryAr, setFormCategoryAr] = useState('');
   const [formCategoryId, setFormCategoryId] = useState<number | ''>('');
+  const [formSubcategoryId, setFormSubcategoryId] = useState<number | ''>('');
   const [formSellerId, setFormSellerId] = useState<number | ''>('');
   const [formPrice, setFormPrice] = useState<number>(100);
   const [formDescEn, setFormDescEn] = useState('');
   const [formDescAr, setFormDescAr] = useState('');
   const [formImageFile, setFormImageFile] = useState<File | null>(null);
   const [formImagePreview, setFormImagePreview] = useState<string>('');
+  const [formSelectedMediaId, setFormSelectedMediaId] = useState<number | null>(null);
+  const [showMediaPickerModal, setShowMediaPickerModal] = useState(false);
 
   // Sellers and Categories lists loaded from backend
   const [sellers, setSellers] = useState<{ id: number; name: string; email: string }[]>([]);
-  const [categoryOptions, setCategoryOptions] = useState<{ id: number; name: string }[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<any[]>([]);
 
   // Nested categories initial state
   const [categories, setCategories] = useState<CategoryNode[]>([]);
@@ -174,6 +177,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
   const [mediaTypeFilter, setMediaTypeFilter] = useState<string>('all');
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const mediaVaultInputRef = React.useRef<HTMLInputElement>(null);
 
   // Permission Verification
   const hasPermission = activeRole === 'super_admin' || activeRole === 'moderator';
@@ -199,6 +203,25 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMedia = async () => {
+    try {
+      const assets = await LaravelAPI.getMediaLibrary();
+      if (Array.isArray(assets)) {
+        setMediaFiles(assets.map(a => ({
+          id: a.id,
+          name: a.slug || a.title_en || `asset-${a.id}`,
+          size: a.size || '',
+          type: 'image',
+          url: a.image || a.url || '',
+          uploadedAt: a.updated_at || 'Recently',
+          dimensions: a.dimensions || ''
+        })));
+      }
+    } catch (err) {
+      console.error("Failed to load media vault", err);
     }
   };
 
@@ -230,6 +253,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     loadServices();
     loadCategoryTree();
     loadGeographies();
+    loadMedia();
   }, []);
 
   // Update Status
@@ -391,11 +415,12 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     setValidationError('');
     setFormTitleEn('');
     setFormTitleAr('');
-    const defaultCatId = categoryOptions[0]?.id ?? 1;
+    const defaultCatId = categoryOptions[0]?.id ?? '';
     setFormCategoryId(defaultCatId);
-    const defaultCatName = categoryOptions[0]?.name ?? 'Event Decoration';
+    const defaultCatName = categoryOptions[0]?.name ?? '';
     setFormCategoryEn(defaultCatName);
     setFormCategoryAr(defaultCatName);
+    setFormSubcategoryId('');
     setFormSellerId(sellers[0]?.id ?? '');
     setFormPrice(450);
     setFormDuration('1 day');
@@ -403,6 +428,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     setFormDescAr('');
     setFormImageFile(null);
     setFormImagePreview('');
+    setFormSelectedMediaId(null);
   };
 
   const handleOpenEditForm = (service: Service) => {
@@ -411,10 +437,11 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     setValidationError('');
     setFormTitleEn(service.title_en);
     setFormTitleAr(service.title_ar);
-    const catId = service.category_id || categoryOptions.find(c => c.name === service.category_en)?.id || 1;
+    const catId = service.category_id || categoryOptions.find(c => c.name === service.category_en)?.id || '';
     setFormCategoryId(catId);
     setFormCategoryEn(service.category_en);
     setFormCategoryAr(service.category_ar);
+    setFormSubcategoryId(service.subcategory_id || '');
     setFormSellerId(service.seller_id);
     setFormPrice(service.price);
     setFormDuration(service.duration);
@@ -422,6 +449,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     setFormDescAr(service.description_ar || '');
     setFormImageFile(null);
     setFormImagePreview(service.image_url || '');
+    setFormSelectedMediaId(typeof service.image === 'number' ? service.image : null);
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
@@ -438,6 +466,11 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
       return;
     }
 
+    if (!formCategoryId) {
+      setValidationError(language === 'en' ? "Please select a category." : "يرجى اختيار تصنيف الخدمة.");
+      return;
+    }
+
     if (!formSellerId) {
       setValidationError(language === 'en' ? "Please select a service provider (seller)." : "يرجى اختيار مزود الخدمة (البائع).");
       return;
@@ -449,7 +482,8 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
         const payload = {
           title_en: formTitleEn,
           title_ar: formTitleAr,
-          category_id: typeof formCategoryId === 'number' ? formCategoryId : 1,
+          category_id: Number(formCategoryId),
+          subcategory_id: formSubcategoryId ? Number(formSubcategoryId) : undefined,
           category_en: formCategoryEn,
           category_ar: formCategoryAr,
           price: formPrice,
@@ -459,15 +493,18 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
           description_en: formDescEn,
           description_ar: formDescAr,
           imageFile: formImageFile || undefined,
+          image: formSelectedMediaId || undefined,
         };
         const created = await LaravelAPI.createService(payload);
         setServices([created, ...services]);
         showSuccess(language === 'en' ? "Service created and synced with Laravel database!" : "تم إنشاء الخدمة ومزامنتها مع قاعدة البيانات بنجاح!");
       } else if (formMode === 'edit' && editingServiceId) {
+        const originalService = services.find(s => s.id === editingServiceId);
         const updatedService = await LaravelAPI.updateService(editingServiceId, {
           title_en: formTitleEn,
           title_ar: formTitleAr,
-          category_id: typeof formCategoryId === 'number' ? formCategoryId : 1,
+          category_id: Number(formCategoryId),
+          subcategory_id: formSubcategoryId ? Number(formSubcategoryId) : undefined,
           category_en: formCategoryEn,
           category_ar: formCategoryAr,
           price: formPrice,
@@ -475,8 +512,9 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
           description_en: formDescEn,
           description_ar: formDescAr,
           seller_id: Number(formSellerId),
-          status: services.find(s => s.id === editingServiceId)?.status ?? 'active',
+          status: originalService?.status ?? 'active',
           imageFile: formImageFile || undefined,
+          image: formSelectedMediaId || originalService?.image,
         });
         setServices(services.map(s => s.id === editingServiceId ? updatedService : s));
         showSuccess(language === 'en' ? "Service updated and synced with Laravel database!" : "تم تحديث بيانات الخدمة وحفظ التغييرات بالكامل!");
@@ -503,11 +541,45 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Production-safe fallback: do not fabricate uploaded media in local state.
-  const handleSimulatedUpload = () => {
-    setValidationError(language === 'en'
-      ? 'Media upload needs a live backend implementation. No local mock upload was created.'
-      : 'رفع الوسائط يحتاج تكاملاً مباشراً مع الخادم. لم يتم إنشاء أي ملف وهمي محلياً.');
+  // Real upload handler for Media Vault
+  const handleUploadMediaAsset = async (file: File) => {
+    if (!hasPermission) return;
+    setUploadProgress(0);
+    try {
+      const item = await LaravelAPI.uploadMedia(file, (percent) => {
+        setUploadProgress(percent);
+      });
+      const newAsset: MediaFile = {
+        id: item.id,
+        name: item.slug || item.title_en || file.name,
+        size: item.size || `${(file.size / 1024).toFixed(1)} KB`,
+        type: 'image',
+        url: item.image || item.url || '',
+        uploadedAt: 'Just now',
+        dimensions: item.dimensions || ''
+      };
+      setMediaFiles(prev => [newAsset, ...prev]);
+      showSuccess(language === 'en' ? "Media asset uploaded successfully!" : "تم رفع أصل الوسائط بنجاح!");
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || (language === 'en' ? "Failed to upload asset" : "فشل رفع أصل الوسائط"));
+    } finally {
+      setUploadProgress(null);
+    }
+  };
+
+  // Real delete handler for Media Vault
+  const handleDeleteMediaAsset = async (fileId: number) => {
+    if (!hasPermission) return;
+    if (!window.confirm(language === 'en' ? "Delete this asset permanently?" : "هل أنت متأكد من حذف هذا الملف نهائياً؟")) return;
+    try {
+      await LaravelAPI.deleteMedia(fileId);
+      setMediaFiles(prev => prev.filter(m => m.id !== fileId));
+      showSuccess(language === 'en' ? "Asset removed permanently." : "تم حذف أصل الملف بنجاح.");
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || (language === 'en' ? "Failed to delete asset" : "فشل حذف الملف"));
+    }
   };
 
   // Category Tree add node handler
@@ -1018,22 +1090,38 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                         setFormCategoryEn(cat.name);
                         setFormCategoryAr(cat.name);
                       }
+                      setFormSubcategoryId('');
                     }}
                     className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs outline-hidden focus:border-indigo-500 bg-white"
+                    required
                   >
-                    {categoryOptions.length > 0 ? (
-                      categoryOptions.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
+                    <option value="">{language === 'en' ? '— Select Real Category —' : '— اختر التصنيف —'}</option>
+                    {categoryOptions.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name} (ID: #{cat.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Subcategory Selection */}
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                    {language === 'en' ? 'Subcategory (Optional)' : 'القسم الفرعي (اختياري)'}
+                  </label>
+                  <select
+                    value={formSubcategoryId}
+                    onChange={(e) => setFormSubcategoryId(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs outline-hidden focus:border-indigo-500 bg-white"
+                  >
+                    <option value="">{language === 'en' ? '— None / Main Category —' : '— بدون قسم فرعي —'}</option>
+                    {categoryOptions
+                      .find((c) => c.id === Number(formCategoryId))
+                      ?.subcategories?.map((sub: any) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name} (ID: #{sub.id})
                         </option>
-                      ))
-                    ) : (
-                      <>
-                        <option value={1}>Event Decoration / ديكور وتنسيق الفعاليات</option>
-                        <option value={2}>Media & Photography / الإعلام والتصوير</option>
-                        <option value={3}>Music & Musicians / الموسيقى والعازفون</option>
-                      </>
-                    )}
+                      ))}
                   </select>
                 </div>
 
@@ -1112,51 +1200,86 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                     placeholder="اكتب شرح كامل للخدمة، المخرجات، والضمانات الفنية لمزود الخدمة..."
                   />
                 </div>
+
                 {/* Service Thumbnail / Main Image */}
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
                     {language === 'en' ? 'Service Image / Thumbnail' : 'صورة / غلاف الخدمة'}
                   </label>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-4">
                     {formImagePreview ? (
-                      <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center group">
+                      <div className="relative w-28 h-28 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center group shadow-xs">
                         <img src={formImagePreview} alt="Preview" className="w-full h-full object-cover" />
                         <button
                           type="button"
-                          onClick={() => { setFormImageFile(null); setFormImagePreview(''); }}
-                          className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => { setFormImageFile(null); setFormImagePreview(''); setFormSelectedMediaId(null); }}
+                          className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          title={language === 'en' ? 'Remove Image' : 'إزالة الصورة'}
                         >
-                          <Trash2 className="w-5 h-5" />
+                          <Trash2 className="w-5 h-5 text-rose-300" />
                         </button>
                       </div>
                     ) : (
-                      <div className="w-24 h-24 rounded-lg border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 bg-slate-50">
-                        <ImageIcon className="w-6 h-6 mb-1 text-slate-300" />
-                        <span className="text-[10px]">{language === 'en' ? 'No Image' : 'لا توجد صورة'}</span>
-                      </div>
-                    )}
-                    <div>
-                      <input
-                        type="file"
-                        id="service-image-upload"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
+                      <div 
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const file = e.dataTransfer.files?.[0];
                           if (file) {
                             setFormImageFile(file);
                             setFormImagePreview(URL.createObjectURL(file));
+                            setFormSelectedMediaId(null);
                           }
                         }}
-                      />
-                      <label
-                        htmlFor="service-image-upload"
-                        className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
+                        className="w-28 h-28 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 bg-slate-50/70"
                       >
-                        <Upload className="w-3.5 h-3.5" />
-                        {formImagePreview ? (language === 'en' ? 'Change Image' : 'تغيير الصورة') : (language === 'en' ? 'Upload Image' : 'رفع صورة')}
-                      </label>
-                      <p className="text-[10px] text-slate-400 mt-1">PNG, JPG, WEBP up to 5MB</p>
+                        <ImageIcon className="w-6 h-6 mb-1 text-slate-300" />
+                        <span className="text-[10px]">{language === 'en' ? 'Drop or Select' : 'اسحب أو اختر'}</span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          id="service-image-upload"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setFormImageFile(file);
+                              setFormImagePreview(URL.createObjectURL(file));
+                              setFormSelectedMediaId(null);
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor="service-image-upload"
+                          className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          {formImagePreview ? (language === 'en' ? 'Upload New File' : 'رفع ملف جديد') : (language === 'en' ? 'Upload Thumbnail' : 'رفع صورة')}
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowMediaPickerModal(true)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/70 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span>{language === 'en' ? 'Choose from Media Library' : 'اختر من مكتبة الوسائط'}</span>
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        {language === 'en' ? 'JPG, PNG, GIF, WEBP up to 10MB' : 'يدعم JPG, PNG, GIF, WEBP حتى ١٠ ميجابايت'}
+                      </p>
+                      {formSelectedMediaId && (
+                        <span className="text-[10px] font-mono text-indigo-600 bg-indigo-50 rounded px-1.5 py-0.5 inline-block w-fit">
+                          {language === 'en' ? `Selected Asset #${formSelectedMediaId}` : `الأصل المحدد #${formSelectedMediaId}`}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1178,6 +1301,68 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                 </button>
               </div>
             </form>
+          )}
+
+          {/* Media Picker Modal */}
+          {showMediaPickerModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5 text-indigo-600" />
+                    <h4 className="font-bold text-slate-800 text-sm">
+                      {language === 'en' ? 'Select Thumbnail from Media Vault' : 'اختيار صورة الغلاف من مكتبة الوسائط'}
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowMediaPickerModal(false)}
+                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
+                  {mediaFiles.length === 0 ? (
+                    <div className="col-span-full py-8 text-center text-slate-400 text-xs">
+                      {language === 'en' ? 'No media assets found in library.' : 'لم يتم العثور على وسائط في المكتبة.'}
+                    </div>
+                  ) : (
+                    mediaFiles.map((asset) => (
+                      <div
+                        key={asset.id}
+                        onClick={() => {
+                          setFormImagePreview(asset.url);
+                          setFormSelectedMediaId(asset.id);
+                          setFormImageFile(null);
+                          setShowMediaPickerModal(false);
+                        }}
+                        className="group relative rounded-xl border border-slate-200 overflow-hidden cursor-pointer hover:border-indigo-600 hover:shadow-md transition bg-slate-50"
+                      >
+                        <img src={asset.url} alt={asset.name} className="w-full h-24 object-cover" />
+                        <div className="p-1.5 bg-white text-[9px] truncate font-medium text-slate-700">
+                          {asset.name}
+                        </div>
+                        <span className="absolute top-1 right-1 bg-black/60 text-white rounded px-1 text-[8px] font-mono">
+                          #{asset.id}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="border-t pt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowMediaPickerModal(false)}
+                    className="rounded-lg bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                  >
+                    {t.cancel}
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -1539,43 +1724,55 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
             </div>
 
             <div className="flex items-center gap-2">
-              <select
-                value={mediaTypeFilter}
-                onChange={(e) => setMediaTypeFilter(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-hidden text-slate-600 font-semibold"
-              >
-                <option value="all">{language === 'en' ? 'All Formats' : 'جميع الامتدادات'}</option>
-                <option value="image">{language === 'en' ? 'Images' : 'الصور'}</option>
-                <option value="video">{language === 'en' ? 'Videos' : 'الفيديو'}</option>
-                <option value="audio">{language === 'en' ? 'Audio' : 'الصوتيات'}</option>
-                <option value="pdf">{language === 'en' ? 'Documents' : 'المستندات'}</option>
-              </select>
+              <input
+                ref={mediaVaultInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleUploadMediaAsset(file);
+                    e.currentTarget.value = '';
+                  }
+                }}
+              />
 
               {hasPermission && (
                 <button
-                  onClick={handleSimulatedUpload}
+                  onClick={() => mediaVaultInputRef.current?.click()}
                   disabled={uploadProgress !== null}
                   className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <Upload className="h-3.5 w-3.5" />
-                  <span>{uploadProgress !== null ? `${uploadProgress}%` : (language === 'en' ? 'Upload Asset' : 'رفع ملف')}</span>
+                  <span>{uploadProgress !== null ? `${uploadProgress}%` : (language === 'en' ? 'Upload Image' : 'رفع صورة')}</span>
                 </button>
               )}
             </div>
           </div>
 
-          {/* Drag & Drop simulated dropzone */}
+          {/* Drag & Drop real dropzone */}
           {hasPermission && uploadProgress === null && (
             <div 
-              onClick={handleSimulatedUpload}
+              onClick={() => mediaVaultInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const file = e.dataTransfer.files?.[0];
+                if (file) handleUploadMediaAsset(file);
+              }}
               className="border-2 border-dashed border-slate-200 bg-slate-50 rounded-2xl p-6 text-center cursor-pointer hover:bg-indigo-50/20 hover:border-indigo-300 transition-colors"
             >
               <Upload className="mx-auto h-8 w-8 text-slate-400 mb-2 animate-bounce" />
               <p className="text-xs font-bold text-slate-700">
-                {language === 'en' ? 'Drag and drop files here, or click to browse' : 'اسحب الملفات وأفلتها هنا، أو اضغط للتصفح'}
+                {language === 'en' ? 'Drag & drop an image here, or click to browse' : 'اسحب صورة وأفلتها هنا، أو اضغط للتصفح'}
               </p>
               <p className="text-[10px] text-slate-400 mt-1">
-                {language === 'en' ? 'Supports JPG, PNG, MP4, MP3, PDF up to 25MB' : 'يدعم صيغ الصور، الفيديو، الصوتيات، والمستندات حتى ٢٥ ميجابايت'}
+                {language === 'en' ? 'Supports JPG, PNG, GIF, WEBP up to 10MB' : 'يدعم صيغ JPG, PNG, GIF, WEBP حتى ١٠ ميجابايت'}
               </p>
             </div>
           )}
@@ -1599,29 +1796,15 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
               <div key={file.id} className="rounded-xl border border-slate-200/60 bg-white overflow-hidden shadow-xs hover:shadow-md transition duration-150 flex flex-col group">
                 {/* Visual Preview */}
                 <div className="h-32 bg-slate-100 border-b border-slate-100 relative overflow-hidden flex items-center justify-center">
-                  {file.type === 'image' ? (
-                    <img 
-                      src={file.url} 
-                      alt={file.name} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : file.type === 'video' ? (
-                    <div className="text-center p-3 text-slate-400 font-bold text-[10px]">
-                      📹 VIDEO FILE
-                    </div>
-                  ) : file.type === 'audio' ? (
-                    <div className="text-center p-3 text-slate-400 font-bold text-[10px]">
-                      🎵 AUDIO MP3
-                    </div>
-                  ) : (
-                    <div className="text-center p-3 text-slate-400 font-bold text-[10px]">
-                      📄 DOCUMENT PDF
-                    </div>
-                  )}
+                  <img 
+                    src={file.url} 
+                    alt={file.name} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                    referrerPolicy="no-referrer"
+                  />
 
                   <span className="absolute top-1.5 left-1.5 bg-slate-900/80 text-white rounded px-1 text-[8px] font-bold uppercase tracking-wider">
-                    {file.type}
+                    #{file.id}
                   </span>
                 </div>
 
@@ -1629,38 +1812,53 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                 <div className="p-3 flex-1 flex flex-col justify-between text-xs">
                   <div className="min-w-0">
                     <p className="font-bold text-slate-700 truncate" title={file.name}>{file.name}</p>
-                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">{file.size} • {file.dimensions || file.uploadedAt}</p>
+                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">{file.size} {file.dimensions ? `• ${file.dimensions}` : ''}</p>
                   </div>
 
-                  {/* Copy link or view controls */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-50 flex items-center gap-1">
+                  {/* Actions: Use as thumbnail, copy CDN link, delete */}
+                  <div className="mt-3 pt-2.5 border-t border-slate-50 flex flex-col gap-1.5">
                     <button
-                      onClick={() => handleCopyLink(file)}
-                      className="flex-1 flex items-center justify-center gap-1 rounded bg-slate-50 border py-1 font-bold text-[10px] text-slate-600 hover:bg-slate-100"
+                      onClick={() => {
+                        setFormImagePreview(file.url);
+                        setFormSelectedMediaId(file.id);
+                        setFormImageFile(null);
+                        setFormMode('create');
+                        setActiveSubTab('services');
+                        showSuccess(language === 'en' ? `Selected asset #${file.id} as service thumbnail!` : `تم تعيين الأصل #${file.id} كغلاف للخدمة!`);
+                      }}
+                      className="w-full rounded bg-indigo-50 border border-indigo-200 py-1 font-bold text-[10px] text-indigo-700 hover:bg-indigo-100 flex items-center justify-center gap-1"
                     >
-                      {copiedId === file.id ? (
-                        <>
-                          <Check className="h-3 w-3 text-emerald-600" />
-                          <span className="text-emerald-600">Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3 w-3" />
-                          <span>CDN URL</span>
-                        </>
-                      )}
+                      <ImageIcon className="h-3 w-3" />
+                      <span>{language === 'en' ? 'Use as Thumbnail' : 'استخدم كغلاف للخدمة'}</span>
                     </button>
-                    {hasPermission && (
+
+                    <div className="flex items-center gap-1">
                       <button
-                        onClick={() => {
-                          setMediaFiles(mediaFiles.filter(m => m.id !== file.id));
-                          showSuccess(language === 'en' ? "Asset removed." : "تم حذف أصل الملف بنجاح.");
-                        }}
-                        className="p-1 rounded bg-slate-50 border text-rose-500 hover:bg-rose-50 hover:border-rose-100"
+                        onClick={() => handleCopyLink(file)}
+                        className="flex-1 flex items-center justify-center gap-1 rounded bg-slate-50 border py-1 font-bold text-[10px] text-slate-600 hover:bg-slate-100"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        {copiedId === file.id ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-600" />
+                            <span className="text-emerald-600">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>CDN URL</span>
+                          </>
+                        )}
                       </button>
-                    )}
+                      {hasPermission && (
+                        <button
+                          onClick={() => handleDeleteMediaAsset(file.id)}
+                          className="p-1 rounded bg-slate-50 border text-rose-500 hover:bg-rose-50 hover:border-rose-100"
+                          title={language === 'en' ? 'Delete asset' : 'حذف الملف'}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

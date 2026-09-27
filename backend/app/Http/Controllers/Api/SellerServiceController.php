@@ -112,7 +112,7 @@ class SellerServiceController extends Controller
 
             $request->validate([
                 'category_id' => 'required',
-                'title' => 'required|max:191|unique:services',
+                'title' => 'required|max:191',
                 'description' => 'required|min:10',
                 'price' => 'required|numeric|min:0',
             ]);
@@ -250,7 +250,7 @@ class SellerServiceController extends Controller
 
             $request->validate([
                 'category_id' => 'nullable',
-                'title' => 'required|max:191|unique:services,title,'.$service->id,
+                'title' => 'required|max:191',
                 'description' => 'required|min:10',
                 'price' => 'nullable|numeric|min:0',
             ]);

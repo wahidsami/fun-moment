@@ -103,4 +103,94 @@ class MediaUploadController extends Controller
         return response()->json(MediaHelper::load_more_images($request));
     }
 
+    public function cms_media_list(Request $request)
+    {
+        $all = MediaUpload::orderByDesc('id')->get()->map(function ($item) {
+            $img = get_attachment_image_by_id($item->id);
+            return [
+                'id' => $item->id,
+                'name' => $item->title ?: ('media-' . $item->id),
+                'url' => $img['img_url'] ?? asset('assets/uploads/media-uploader/' . $item->path),
+                'size' => $item->size ?: '',
+                'dimensions' => $item->dimensions ?: '',
+                'alt_en' => $item->alt ?: '',
+                'alt_ar' => $item->alt ?: '',
+                'type' => 'image',
+                'created_at' => optional($item->created_at)->toIso8601String(),
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'media' => $all,
+        ]);
+    }
+
+    public function cms_media_upload(Request $request)
+    {
+        $this->validate($request, [
+            'file' => 'required|mimes:jpg,jpeg,png,gif,webp|max:11000'
+        ], [
+            'file.max' => __('The file may not be greater than 10 Megabytes'),
+        ]);
+
+        $media = MediaHelper::insert_media_image($request, 'admin', 'file');
+        if (!$media) {
+            return response()->json(['status' => 'error', 'message' => __('Upload failed')], 422);
+        }
+
+        $img = get_attachment_image_by_id($media->id);
+        $url = $img['img_url'] ?? asset('assets/uploads/media-uploader/' . $media->path);
+
+        $item = [
+            'id' => $media->id,
+            'slug' => $media->title ?: ('media-' . $media->id),
+            'name' => $media->title ?: ('media-' . $media->id),
+            'image' => $url,
+            'url' => $url,
+            'size' => $media->size ?: '',
+            'dimensions' => $media->dimensions ?: '',
+            'alt_en' => $media->alt ?: '',
+            'alt_ar' => $media->alt ?: '',
+            'type' => 'image',
+        ];
+
+        return response()->json([
+            'status' => 'success',
+            'item' => $item,
+        ]);
+    }
+
+    public function cms_media_delete($id)
+    {
+        $media = MediaUpload::find($id);
+        if ($media) {
+            $folder_path = public_path('assets/uploads/media-uploader/');
+            @unlink($folder_path . $media->path);
+            @unlink($folder_path . 'grid-' . $media->path);
+            @unlink($folder_path . 'large-' . $media->path);
+            @unlink($folder_path . 'semi-large-' . $media->path);
+            @unlink($folder_path . 'thumb-' . $media->path);
+            $media->delete();
+        }
+
+        return response()->json(['status' => 'success', 'message' => __('Media deleted')]);
+    }
+
+    public function cms_media_alt(Request $request, $id)
+    {
+        $media = MediaUpload::findOrFail($id);
+        $media->update(['alt' => $request->input('alt', '')]);
+        $img = get_attachment_image_by_id($media->id);
+        return response()->json([
+            'status' => 'success',
+            'item' => [
+                'id' => $media->id,
+                'alt_en' => $media->alt,
+                'alt_ar' => $media->alt,
+                'url' => $img['img_url'] ?? '',
+            ]
+        ]);
+    }
+
 }
