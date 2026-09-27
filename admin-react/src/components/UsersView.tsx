@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AdminAccount, AdminRoleRecord, Language, Permission, User, UserRole } from '../types';
+import { AdminAccount, AdminRoleRecord, Language, Permission, User, UserRole, SellerVerificationDetail } from '../types';
 import { translations } from '../translations';
 import { useState, useEffect } from 'react';
 import { LaravelAPI } from '../api';
@@ -24,7 +24,9 @@ import {
   DollarSign,
   Shield,
   Briefcase,
-  Eye
+  Eye,
+  FileCheck,
+  XCircle
 } from 'lucide-react';
 
 interface UsersViewProps {
@@ -76,6 +78,8 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
 
   // Audit modals
   const [selectedSellerId, setSelectedSellerId] = useState<number | null>(null);
+  const [verificationDetail, setVerificationDetail] = useState<SellerVerificationDetail | null>(null);
+  const [loadingVerification, setLoadingVerification] = useState(false);
   const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
 
   // Edit Wallet
@@ -323,46 +327,62 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
     }
   };
 
-  const toggleVerification = (userId: number) => {
+  const handleOpenSellerAudit = async (sellerId: number) => {
+    setSelectedSellerId(sellerId);
+    setLoadingVerification(true);
+    try {
+      const res = await LaravelAPI.getSellerVerification(sellerId);
+      setVerificationDetail(res.verification);
+    } catch (e) {
+      console.error(e);
+      setVerificationDetail(null);
+    } finally {
+      setLoadingVerification(false);
+    }
+  };
+
+  const handleVerifySeller = async (userId: number, targetStatus: number) => {
     if (!hasPermission) {
       alert(language === 'en' ? "Access Denied." : "تم رفض الوصول.");
       return;
     }
-    const profile = sellerProfiles[userId];
-    if (!profile) return;
 
-    const nextVerified = !profile.isVerified;
+    try {
+      const res = await LaravelAPI.verifySeller(userId, targetStatus);
+      const isNowVerified = res.seller_verified ?? (targetStatus === 1);
 
-    setSellerProfiles({
-      ...sellerProfiles,
-      [userId]: { ...profile, isVerified: nextVerified }
-    });
+      setUsers(current => current.map(u => {
+        if (u.id === userId) {
+          return {
+            ...u,
+            seller_verified: isNowVerified,
+            seller_verification: {
+              ...(u.seller_verification || { address: '', national_id: '' }),
+              status: targetStatus,
+              is_verified: isNowVerified
+            }
+          };
+        }
+        return u;
+      }));
 
-    // Audit Log
-    const sellerUser = users.find(u => u.id === userId);
-    saveAuditLog({
-      actorRole: activeRole,
-      actorName: 'Current Active Admin',
-      action: 'status change',
-      resource: `Seller #${userId} ${sellerUser ? `(${sellerUser.name})` : ''}`,
-      detailsEn: `Toggled Commercial verification to ${nextVerified ? 'Verified' : 'Unverified'}.`,
-      detailsAr: `تعديل حالة مطابقة وتوثيق السجل التجاري للبائع إلى ${nextVerified ? 'موثق' : 'غير موثق'}.`,
-      status: 'success'
-    });
+      if (verificationDetail && verificationDetail.user_id === userId) {
+        setVerificationDetail({
+          ...verificationDetail,
+          status: targetStatus,
+          is_verified: isNowVerified
+        });
+      }
 
-    saveChangeRecord({
-      resource: `Seller Verification Status #${userId}`,
-      actorName: 'Current Active Admin',
-      field: 'CR_VERIFIED_STATUS',
-      oldValue: profile.isVerified ? 'VERIFIED' : 'UNVERIFIED',
-      newValue: nextVerified ? 'VERIFIED' : 'UNVERIFIED'
-    });
-
-    showSuccess(
-      language === 'en' 
-        ? "Seller verification status updated!" 
-        : "تم تحديث حالة توثيق البائع والربط الوطني!"
-    );
+      showSuccess(
+        targetStatus === 1
+          ? (language === 'en' ? "Seller verification approved and recorded in PostgreSQL!" : "تمت الموافقة على توثيق المزود وتثبيت الحالة في قاعدة البيانات!")
+          : (language === 'en' ? "Seller verification rejected and recorded in PostgreSQL!" : "تم رفض طلب توثيق المزود وتثبيت الحالة في قاعدة البيانات!")
+      );
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Failed to update verification status");
+    }
   };
 
   const showSuccess = (msg: string) => {
@@ -489,14 +509,16 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                 ) : (
                   filteredSellers.map((user) => {
                     const profile = sellerProfiles[user.id];
+                    const isVerified = Boolean(user.seller_verified || user.seller_verification?.is_verified);
+                    const verifyStatus = user.seller_verification?.status ?? (isVerified ? 1 : 0);
                     return (
                       <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-4 text-slate-400 font-bold">#{user.id}</td>
                         <td className="px-6 py-4">
                           <div className="font-bold text-slate-800">
-                            {profile?.storeName || '—'}
+                            {user.business_registration || profile?.storeName || user.name}
                           </div>
-                          <div className="text-[10px] text-slate-400 mt-0.5">{user.phone}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">{user.phone || '—'}</div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="font-bold text-slate-700">{user.name}</div>
@@ -505,18 +527,26 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-1">
                             <span className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold ${
-                              profile?.isVerified ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                              verifyStatus === 1
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : verifyStatus === 2
+                                ? 'bg-rose-50 text-rose-700'
+                                : 'bg-amber-50 text-amber-700'
                             }`}>
-                              {profile?.isVerified ? (language === 'en' ? 'CR Verified' : 'سجل موثق') : (language === 'en' ? 'CR Pending' : 'غير موثق')}
+                              {verifyStatus === 1
+                                ? (language === 'en' ? 'CR Verified' : 'سجل موثق')
+                                : verifyStatus === 2
+                                ? (language === 'en' ? 'CR Rejected' : 'توثيق مرفوض')
+                                : (language === 'en' ? 'CR Pending' : 'قيد المراجعة')}
                             </span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-slate-600 font-bold">
-                          {profile?.commissionRate}%
+                          {profile?.commissionRate || 10}%
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-1">
-                            <span className="font-bold text-slate-900">{user.wallet_balance?.toLocaleString()} SAR</span>
+                            <span className="font-bold text-slate-900">{user.wallet_balance?.toLocaleString() ?? 0} SAR</span>
                             {hasPermission && (
                               <button
                                 onClick={() => {
@@ -540,7 +570,7 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
-                              onClick={() => setSelectedSellerId(user.id)}
+                              onClick={() => handleOpenSellerAudit(user.id)}
                               className="rounded bg-slate-100 p-1 text-slate-600 hover:bg-slate-200"
                               title={language === 'en' ? 'Audit Store Profile' : 'مراجعة وتوثيق المتجر'}
                             >
@@ -739,74 +769,109 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
       {/* ======================= AUDIT SELLER DRAWER MODAL ======================= */}
       {selectedSellerId && (() => {
         const user = users.find(u => u.id === selectedSellerId);
-        const profile = sellerProfiles[selectedSellerId];
+        const detail = verificationDetail;
+        const currentStatus = detail?.status ?? (user?.seller_verified ? 1 : 0);
+        const isVerified = currentStatus === 1;
+
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
             <div className="w-full max-w-lg rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl animate-scale-in">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">
-                  {language === 'en' ? 'Government & Platform Seller Audit' : 'ملف التدقيق الحكومي والوطني للمزود'} #{selectedSellerId}
+                  {language === 'en' ? 'Provider Identity & Document Verification' : 'توثيق هوية ومستندات المزود'} #{selectedSellerId}
                 </span>
                 <button
-                  onClick={() => setSelectedSellerId(null)}
+                  onClick={() => { setSelectedSellerId(null); setVerificationDetail(null); }}
                   className="text-slate-400 hover:text-slate-600 text-sm font-bold"
                 >
                   ✕
                 </button>
               </div>
 
-              {user && profile && (
+              {loadingVerification ? (
+                <div className="py-12 text-center text-slate-400">
+                  <RefreshCcw className="mx-auto h-6 w-6 animate-spin mb-2 text-indigo-500" />
+                  <p className="text-xs">{language === 'en' ? 'Fetching government verification records...' : 'جاري جلب سجلات التوثيق من الخادم...'}</p>
+                </div>
+              ) : user ? (
                 <div className="space-y-4">
                   <div className="rounded-xl bg-slate-50 p-4 border flex items-center gap-3">
-                    <Building className="h-10 w-10 text-slate-400" />
+                    <Building className="h-10 w-10 text-slate-400 shrink-0" />
                     <div>
-                      <h4 className="font-bold text-slate-800 text-sm">{profile.storeName}</h4>
-                      <p className="text-xs text-slate-400">{user.name} ({user.email})</p>
+                      <h4 className="font-bold text-slate-800 text-sm">{user.business_registration || user.name}</h4>
+                      <p className="text-xs text-slate-500">{user.email} • {user.phone || 'No phone'}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{user.country || 'Saudi Arabia'}</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div>
-                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'Commercial Register (CR)' : 'السجل التجاري لمؤسسة'}</h4>
-                      <p className="text-xs font-semibold text-slate-700 mt-1 font-mono">{profile.crNumber}</p>
+                  <div className="grid grid-cols-2 gap-4 pt-1">
+                    <div className="rounded-lg border border-slate-100 p-2.5 bg-white">
+                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'National ID / Iqama' : 'الهوية الوطنية / الإقامة'}</h4>
+                      <p className="text-xs font-semibold text-slate-700 mt-1 font-mono">{detail?.national_id || user.seller_verification?.national_id || '—'}</p>
                     </div>
-                    <div>
-                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'VAT Register ID' : 'الرقم الضريبي الموحد'}</h4>
-                      <p className="text-xs font-semibold text-slate-700 mt-1 font-mono">{profile.vatNumber}</p>
+                    <div className="rounded-lg border border-slate-100 p-2.5 bg-white">
+                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'Tax / VAT Number' : 'الرقم الضريبي'}</h4>
+                      <p className="text-xs font-semibold text-slate-700 mt-1 font-mono">{detail?.tax_number || user.tax_number || '—'}</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-3">
+                  <div className="rounded-lg border border-slate-100 p-2.5 bg-white">
+                    <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'Business Address' : 'العنوان التجاري المسجل'}</h4>
+                    <p className="text-xs font-semibold text-slate-700 mt-1">{detail?.address || user.address || '—'}</p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-3.5 border flex items-center justify-between">
                     <div>
-                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'Total Platform Earnings' : 'مجموع مداخيل المنصة'}</h4>
-                      <p className="text-sm font-bold text-slate-900 mt-1">{profile.totalEarnings.toLocaleString()} SAR</p>
-                    </div>
-                    <div>
-                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'Verification Status' : 'حالة توثيق الربط'}</h4>
+                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'Current Verification Status' : 'حالة التوثيق في النظام'}</h4>
                       <div className="mt-1 flex items-center gap-1.5">
-                        <span className={`inline-block rounded px-2 py-0.5 text-[9px] font-bold ${
-                          profile.isVerified ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                        <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
+                          isVerified ? 'bg-emerald-100 text-emerald-800' : currentStatus === 2 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
                         }`}>
-                          {profile.isVerified ? 'VERIFIED' : 'UNVERIFIED'}
+                          {isVerified ? (language === 'en' ? 'APPROVED & VERIFIED' : 'موثق ومعتمد') : currentStatus === 2 ? (language === 'en' ? 'REJECTED' : 'مرفوض') : (language === 'en' ? 'PENDING DECISION' : 'قيد المراجعة')}
                         </span>
-                        {hasPermission && (
-                          <button
-                            type="button"
-                            onClick={() => toggleVerification(user.id)}
-                            className="text-[10px] text-indigo-600 font-bold hover:underline"
-                          >
-                            Toggle
-                          </button>
-                        )}
                       </div>
                     </div>
-                  </div>
-                </div>
-              )}
 
-              <div className="mt-6 flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+                    <div className="text-right">
+                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'Ledger Balance' : 'الرصيد المالي'}</h4>
+                      <p className="text-sm font-extrabold text-slate-900 mt-0.5">{user.wallet_balance ?? 0} SAR</p>
+                    </div>
+                  </div>
+
+                  {hasPermission && (
+                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 text-xs space-y-2">
+                      <p className="text-[11px] font-semibold text-indigo-900">
+                        {language === 'en' ? 'Administrative Decision (Persists directly to PostgreSQL):' : 'القرار الإداري (يتم الحفظ مباشرة في قاعدة البيانات):'}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleVerifySeller(user.id, 1)}
+                          disabled={isVerified}
+                          className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5"
+                        >
+                          <FileCheck className="h-4 w-4" />
+                          <span>{language === 'en' ? 'Approve Verification' : 'اعتماد التوثيق'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleVerifySeller(user.id, 2)}
+                          disabled={currentStatus === 2}
+                          className="flex-1 rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          <span>{language === 'en' ? 'Reject Submission' : 'رفض التوثيق'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="mt-5 flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
                 <button
-                  onClick={() => setSelectedSellerId(null)}
+                  onClick={() => { setSelectedSellerId(null); setVerificationDetail(null); }}
                   className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                 >
                   {t.back}

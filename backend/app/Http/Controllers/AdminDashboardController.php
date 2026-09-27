@@ -536,4 +536,30 @@ class AdminDashboardController extends Controller
         return round((($current - $previous) / $previous) * 100, 1);
     }
 
+    public function apiAuditLogs(Request $request): JsonResponse
+    {
+        $logs = \App\AdminAuditLog::orderByDesc('id')
+            ->take(100)
+            ->get()
+            ->map(function (\App\AdminAuditLog $log) {
+                return [
+                    'id' => 'AUD-' . str_pad($log->id, 5, '0', STR_PAD_LEFT),
+                    'timestamp' => optional($log->created_at)->format('Y-m-d H:i:s'),
+                    'actorRole' => 'super_admin',
+                    'actorName' => $log->admin_name ?: 'Administrator',
+                    'action' => $log->action,
+                    'resource' => $log->resource_type . ($log->resource_id ? " #{$log->resource_id}" : ''),
+                    'detailsEn' => $log->details_en,
+                    'detailsAr' => $log->details_ar,
+                    'status' => $log->status,
+                    'ip' => $log->ip_address,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'status' => 'success',
+            'logs' => $logs,
+        ]);
+    }
 }

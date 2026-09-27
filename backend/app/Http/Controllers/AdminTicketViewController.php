@@ -14,7 +14,7 @@ class AdminTicketViewController extends Controller
     public function __construct()
     {
         $this->middleware('permission:ticket-list|ticket-view|ticket-delete',['only' => ['tickets']]);
-        $this->middleware('permission:ticket-list|ticket-view',['only' => ['apiTickets', 'apiUpdateTicketStatus']]);
+        $this->middleware('permission:ticket-list|ticket-view',['only' => ['apiTickets', 'apiUpdateTicketStatus', 'apiTicketDetails', 'apiReplyTicket']]);
         $this->middleware('permission:ticket-view',['only' => ['ticketDetails']]);
         $this->middleware('permission:ticket-delete',['only' => ['ticketDelete']]);
     }
@@ -70,6 +70,79 @@ class AdminTicketViewController extends Controller
             'status' => 'success',
             'message' => __('Ticket status updated successfully'),
             'ticket' => $this->formatTicketPayload($ticket->fresh(['ticket_user', 'ticket_buyer', 'ticket_seller'])),
+        ]);
+    }
+
+    public function apiTicketDetails(Request $request, $id): JsonResponse
+    {
+        $ticket = SupportTicket::with(['ticket_user', 'ticket_buyer', 'ticket_seller'])->findOrFail($id);
+        $messages = SupportTicketMessage::where('support_ticket_id', $id)
+            ->orderBy('id', 'asc')
+            ->get()
+            ->map(function (SupportTicketMessage $msg) {
+                return [
+                    'id' => (int) $msg->id,
+                    'type' => $msg->type ?: 'buyer',
+                    'message' => $msg->message,
+                    'created_at' => optional($msg->created_at)->format('Y-m-d H:i:s'),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'status' => 'success',
+            'ticket' => array_merge($this->formatTicketPayload($ticket), [
+                'description' => $ticket->description ?? '',
+            ]),
+            'messages' => $messages,
+        ]);
+    }
+
+    public function apiReplyTicket(Request $request, $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'message' => 'required|string|max:5000',
+        ]);
+
+        $ticket = SupportTicket::with(['ticket_user', 'ticket_buyer', 'ticket_seller'])->findOrFail($id);
+
+        $reply = SupportTicketMessage::create([
+            'support_ticket_id' => $id,
+            'message' => trim($validated['message']),
+            'type' => 'admin',
+            'notify' => 'on',
+        ]);
+
+        if ($ticket->status === 'open') {
+            $ticket->update(['status' => 'in_progress']);
+        }
+
+        \App\AdminAuditLog::record([
+            'action' => 'ticket_reply',
+            'resource_type' => 'SupportTicket',
+            'resource_id' => (string) $id,
+            'details_en' => "Replied to ticket #{$id}",
+            'details_ar' => "تم الرد على تذكرة الدعم #{$id}",
+        ]);
+
+        $messages = SupportTicketMessage::where('support_ticket_id', $id)
+            ->orderBy('id', 'asc')
+            ->get()
+            ->map(function (SupportTicketMessage $msg) {
+                return [
+                    'id' => (int) $msg->id,
+                    'type' => $msg->type ?: 'buyer',
+                    'message' => $msg->message,
+                    'created_at' => optional($msg->created_at)->format('Y-m-d H:i:s'),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => __('Reply sent successfully.'),
+            'ticket' => $this->formatTicketPayload($ticket->fresh()),
+            'messages' => $messages,
         ]);
     }
 

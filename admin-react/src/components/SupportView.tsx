@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Language, SupportTicket, UserRole } from '../types';
+import { Language, SupportTicket, UserRole, TicketMessageItem } from '../types';
 import { translations } from '../translations';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LaravelAPI } from '../api';
-import { Search, Eye, ShieldAlert, CheckCircle2, RefreshCcw } from 'lucide-react';
+import { Search, Eye, ShieldAlert, CheckCircle2, RefreshCcw, Send, MessageSquare, User, Shield } from 'lucide-react';
 
 interface SupportViewProps {
   language: Language;
@@ -21,6 +21,10 @@ export default function SupportView({ language, activeRole }: SupportViewProps) 
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [ticketMessages, setTicketMessages] = useState<TicketMessageItem[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [replyMessage, setReplyMessage] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
   // Support Agents & Super Admins can manage tickets
@@ -41,6 +45,46 @@ export default function SupportView({ language, activeRole }: SupportViewProps) 
   useEffect(() => {
     loadTickets();
   }, []);
+
+  const handleOpenTicket = async (ticket: SupportTicket) => {
+    setSelectedTicket(ticket);
+    setLoadingMessages(true);
+    setReplyMessage('');
+    try {
+      const res = await LaravelAPI.getTicketDetails(ticket.id);
+      if (res.messages && Array.isArray(res.messages)) {
+        setTicketMessages(res.messages);
+      } else {
+        setTicketMessages([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setTicketMessages([]);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTicket || !replyMessage.trim() || sendingReply) return;
+    setSendingReply(true);
+    try {
+      const res = await LaravelAPI.replyTicket(selectedTicket.id, replyMessage.trim());
+      if (res.message) {
+        setTicketMessages(prev => [...prev, res.message]);
+      }
+      setReplyMessage('');
+      setSuccessMsg(language === 'en' ? 'Reply recorded and sent to customer!' : 'تم حفظ الرد وإرساله للعميل بنجاح!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+      loadTickets();
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'Failed to send reply');
+    } finally {
+      setSendingReply(false);
+    }
+  };
 
   const handleUpdateStatus = async (id: number, status: 'resolved' | 'in_progress') => {
     try {
@@ -197,8 +241,9 @@ export default function SupportView({ language, activeRole }: SupportViewProps) 
                     </td>
                     <td className="px-6 py-4 text-center">
                       <button
-                        onClick={() => setSelectedTicket(tkt)}
+                        onClick={() => handleOpenTicket(tkt)}
                         className="rounded p-1 text-slate-500 hover:bg-slate-100 transition-colors"
+                        title={language === 'en' ? 'Open Ticket Conversation' : 'عرض محادثة التذكرة'}
                       >
                         <Eye className="h-4 w-4" />
                       </button>
@@ -211,14 +256,19 @@ export default function SupportView({ language, activeRole }: SupportViewProps) 
         </div>
       </div>
 
-      {/* Ticket Reply Modal */}
+      {/* Ticket Conversation & Reply Modal */}
       {selectedTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl animate-scale-in">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">
-                {language === 'en' ? 'Dispute Help Desk File' : 'ملف تذكرة الدعم والنزاع'} #{selectedTicket.id}
-              </span>
+          <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl animate-scale-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">
+                  {language === 'en' ? 'Support Ticket Dispute File' : 'ملف تذكرة الدعم والمنازعة'} #{selectedTicket.id}
+                </span>
+                <h3 className="text-sm font-bold text-slate-800 mt-0.5">
+                  {language === 'en' ? selectedTicket.subject_en : selectedTicket.subject_ar}
+                </h3>
+              </div>
               <button
                 onClick={() => setSelectedTicket(null)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-bold"
@@ -227,34 +277,107 @@ export default function SupportView({ language, activeRole }: SupportViewProps) 
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="rounded-xl bg-indigo-50/30 border border-indigo-100/50 p-3">
-                <p className="text-[10px] font-bold text-indigo-800 uppercase">{language === 'en' ? 'Subject' : 'الموضوع الرئيسي'}</p>
-                <p className="text-xs font-bold text-slate-800 mt-1">
-                  {language === 'en' ? selectedTicket.subject_en : selectedTicket.subject_ar}
-                </p>
+            {/* Ticket Metadata Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-2.5 text-xs border border-slate-100 mb-3">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold">{language === 'en' ? 'Client' : 'العميل'}: </span>
+                <span className="font-semibold text-slate-700">{selectedTicket.user_name} ({selectedTicket.user_email})</span>
               </div>
-
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                <p className="text-[10px] font-bold text-slate-400 uppercase">{language === 'en' ? 'Latest User Appeal Message' : 'نص رسالة العميل الأخيرة'}</p>
-                <p className="text-xs text-slate-700 mt-1.5 leading-relaxed font-medium">
-                  "{selectedTicket.last_message}"
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-xs text-slate-400 font-bold uppercase">{language === 'en' ? 'Filed By' : 'مقدم البلاغ'}</h4>
-                  <p className="text-xs font-semibold text-slate-700 mt-1">{selectedTicket.user_name}</p>
-                </div>
-                <div>
-                  <h4 className="text-xs text-slate-400 font-bold uppercase">{t.col_ticket_category}</h4>
-                  <p className="text-xs font-semibold text-slate-700 mt-1 uppercase">{selectedTicket.category}</p>
-                </div>
+              <div className="flex items-center gap-2">
+                <span className="rounded bg-indigo-50 text-indigo-700 px-2 py-0.5 text-[10px] font-bold uppercase">
+                  {selectedTicket.category}
+                </span>
+                <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                  selectedTicket.status === 'resolved' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
+                }`}>
+                  {selectedTicket.status}
+                </span>
               </div>
             </div>
 
-            <div className="mt-8 flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+            {/* Conversation Messages Thread */}
+            <div className="flex-1 overflow-y-auto space-y-3 p-3 bg-slate-50/60 rounded-xl border border-slate-100 min-h-[220px] max-h-[340px]">
+              {loadingMessages ? (
+                <div className="py-8 text-center text-slate-400">
+                  <RefreshCcw className="mx-auto h-5 w-5 animate-spin mb-1 text-indigo-500" />
+                  <p className="text-xs">{language === 'en' ? 'Loading conversation thread...' : 'جاري تحميل سجل المحادثة...'}</p>
+                </div>
+              ) : ticketMessages.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs">
+                  {selectedTicket.last_message ? (
+                    <div className="bg-white rounded-lg p-3 border text-left rtl:text-right">
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                        {selectedTicket.user_name} (Initial Message):
+                      </span>
+                      <p className="text-slate-700">{selectedTicket.last_message}</p>
+                    </div>
+                  ) : (
+                    <p>{language === 'en' ? 'No messages logged yet in this ticket.' : 'لا توجد رسائل مسجلة بعد في هذه التذكرة.'}</p>
+                  )}
+                </div>
+              ) : (
+                ticketMessages.map((msg) => {
+                  const isAdmin = msg.type === 'admin';
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1 text-[10px] font-semibold text-slate-400">
+                        {isAdmin ? (
+                          <>
+                            <Shield className="h-3 w-3 text-indigo-500" />
+                            <span className="text-indigo-600 font-bold">{msg.sender_name || 'Admin Support'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <User className="h-3 w-3 text-slate-400" />
+                            <span>{msg.sender_name || selectedTicket.user_name}</span>
+                          </>
+                        )}
+                        <span>•</span>
+                        <span>{msg.created_at}</span>
+                      </div>
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed ${
+                          isAdmin
+                            ? 'bg-indigo-600 text-white rounded-tr-none'
+                            : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-xs'
+                        }`}
+                      >
+                        {msg.message}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Admin Reply Box */}
+            {hasPermission && selectedTicket.status !== 'resolved' && (
+              <form onSubmit={handleSendReply} className="mt-3 space-y-2">
+                <div className="relative">
+                  <textarea
+                    rows={2}
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    placeholder={language === 'en' ? 'Write official admin reply (persists to customer portal)...' : 'اكتب رد الدعم الإداري الرسمي (يظهر للعميل في التطبيق والموقع)...'}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={sendingReply || !replyMessage.trim()}
+                    className="absolute bottom-2.5 right-2.5 rtl:right-auto rtl:left-2.5 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-40 transition flex items-center gap-1"
+                  >
+                    <Send className="h-3 w-3" />
+                    <span>{sendingReply ? '...' : (language === 'en' ? 'Send Reply' : 'إرسال الرد')}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Modal Bottom Actions */}
+            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
               <button
                 onClick={() => setSelectedTicket(null)}
                 className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
@@ -263,20 +386,20 @@ export default function SupportView({ language, activeRole }: SupportViewProps) 
               </button>
 
               {hasPermission && selectedTicket.status !== 'resolved' && (
-                <>
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleUpdateStatus(selectedTicket.id, 'in_progress')}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+                    className="rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
                   >
-                    {language === 'en' ? 'Mark In Progress' : 'تغيير الحالة لقيد العمل'}
+                    {language === 'en' ? 'Mark In Progress' : 'قيد العمل'}
                   </button>
                   <button
                     onClick={() => handleUpdateStatus(selectedTicket.id, 'resolved')}
-                    className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                    className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                   >
-                    {language === 'en' ? 'Mark Resolved' : 'تسوية وحل التذكرة'}
+                    {language === 'en' ? 'Mark Resolved' : 'حل وإغلاق التذكرة'}
                   </button>
-                </>
+                </div>
               )}
             </div>
           </div>

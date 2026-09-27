@@ -5,8 +5,7 @@
 
 import { Language } from '../types';
 import { translations } from '../translations';
-import { useState, FormEvent } from 'react';
-import { Languages, Globe, Coins, CheckCircle2, Award } from 'lucide-react';
+import { Languages, Globe, Coins, Award } from 'lucide-react';
 
 interface LocalizationViewProps {
   language: Language;
@@ -14,14 +13,6 @@ interface LocalizationViewProps {
 
 export default function LocalizationView({ language }: LocalizationViewProps) {
   const t = translations[language];
-  const [exchangeRate, setExchangeRate] = useState('3.75');
-  const [successMsg, setSuccessMsg] = useState('');
-
-  const handleSaveRate = (e: FormEvent) => {
-    e.preventDefault();
-    setSuccessMsg(language === 'en' ? "Exchange rate updated successfully!" : "تم تحديث سعر صرف العملات بنجاح!");
-    setTimeout(() => setSuccessMsg(''), 3000);
-  };
 
   return (
     <div className="space-y-6">
@@ -87,39 +78,51 @@ export default function LocalizationView({ language }: LocalizationViewProps) {
 
         {/* Currency Rates Box */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
-          <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-1.5">
-            <Coins className="h-4.5 w-4.5 text-indigo-600" />
-            <span>{language === 'en' ? 'Currency Rate Settings' : 'سعر صرف العملات'}</span>
-          </h3>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+              <Coins className="h-4.5 w-4.5 text-indigo-600" />
+              <span>{language === 'en' ? 'System Base Currency' : 'العملة الأساسية للنظام'}</span>
+            </h3>
+            <span className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded">
+              {language === 'en' ? 'SYSTEM DEFINED' : 'محددة نظامياً'}
+            </span>
+          </div>
 
-          <form onSubmit={handleSaveRate} className="space-y-4">
+          <div className="space-y-4">
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase">{t.loc_exchange_rate}</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">
+                {language === 'en' ? 'Platform Sovereign Currency' : 'العملة السيادية للمنصة'}
+              </label>
               <div className="mt-1 flex items-center gap-2">
-                <input
-                  type="text"
-                  value={exchangeRate}
-                  onChange={(e) => setExchangeRate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500 font-mono"
-                  placeholder="3.75"
-                />
-                <span className="text-xs font-bold text-slate-600 shrink-0">SAR</span>
+                <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 flex items-center justify-between">
+                  <span>SAR - Saudi Arabian Riyal (ريال سعودي)</span>
+                  <span className="text-[10px] font-mono text-emerald-600 font-bold">1.0000</span>
+                </div>
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="w-full rounded-lg bg-indigo-600 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition cursor-pointer"
-            >
-              {t.save}
-            </button>
-          </form>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">
+                {language === 'en' ? 'Fixed Sovereign Peg (SAMA Official)' : 'سعر الصرف المربوط رسمياً (البنك المركزي السعودي)'}
+              </label>
+              <div className="mt-1 flex items-center gap-2">
+                <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700 flex items-center justify-between">
+                  <span>1 USD = 3.7500 SAR</span>
+                  <span className="text-[10px] text-slate-400 font-sans font-bold">FIXED PEG</span>
+                </div>
+              </div>
+            </div>
 
-          <div className="rounded-xl bg-indigo-50/50 border border-indigo-100/50 p-3 text-[10px] leading-relaxed text-indigo-800">
-            <span className="font-bold block mb-0.5">{language === 'en' ? 'Platform Currency Notice:' : 'ملاحظة عملة النظام:'}</span>
-            {language === 'en'
-              ? 'FUN MOMENT platform operates primarily in Saudi Riyals (SAR). Currency conversions only apply to international credit cards or payment processors.'
-              : 'تعمل منصة فَن مومنت بشكل رئيسي بالريال السعودي (SAR). ينطبق تحويل العملات فقط على بطاقات الائتمان الدولية ومزودي الدفع الأجانب.'}
+            <div className="rounded-xl bg-slate-50 border border-slate-200/60 p-3 text-[10px] leading-relaxed text-slate-600 space-y-1">
+              <span className="font-bold text-slate-800 block">
+                {language === 'en' ? 'Statutory Currency Compliance:' : 'الامتثال لأنظمة العملة الوطنية:'}
+              </span>
+              <p>
+                {language === 'en'
+                  ? 'All platform pricing, orders, provider payouts, and invoices are strictly denominated and settled in Saudi Riyals (SAR). Foreign exchange rate configuration is locked to statutory Saudi Central Bank (SAMA) fixed parity.'
+                  : 'كافة عمليات التسعير والطلبات وسحوبات المزودين والفواتير مقومة ومسواة حصراً بالريال السعودي (SAR). أسعار صرف العملات الأجنبية مقفلة بموجب التثبيت الرسمي الصادر عن البنك المركزي السعودي (ساما).'}
+              </p>
+            </div>
           </div>
         </div>
       </div>

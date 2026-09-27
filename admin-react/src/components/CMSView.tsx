@@ -345,7 +345,6 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
     updated[index] = updated[nextIndex];
     updated[nextIndex] = temp;
     setHomepageSections(updated);
-    triggerSuccess(language === 'en' ? 'Homepage block hierarchy rearranged!' : 'تم تغيير ترتيب بلوكات الصفحة الرئيسية بنجاح!');
   };
 
   const moveMenu = (index: number, direction: 'up' | 'down') => {
@@ -689,12 +688,10 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
     if (newTaxonomy.type === 'cat') {
       if (!categories.includes(newTaxonomy.value)) {
         setCategories([...categories, newTaxonomy.value]);
-        triggerSuccess(language === 'en' ? `Category "${newTaxonomy.value}" added` : `تمت إضافة التصنيف "${newTaxonomy.value}"`);
       }
     } else {
       if (!tags.includes(newTaxonomy.value)) {
         setTags([...tags, newTaxonomy.value]);
-        triggerSuccess(language === 'en' ? `Tag "#${newTaxonomy.value}" added` : `تمت إضافة الوسم "#${newTaxonomy.value}"`);
       }
     }
     setNewTaxonomy({ ...newTaxonomy, value: '' });
@@ -1498,7 +1495,6 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                           onClick={() => {
                             if (!hasPermission) return;
                             setHomepageSections(homepageSections.map(s => s.id === sect.id ? { ...s, enabled: !s.enabled } : s));
-                            triggerSuccess(language === 'en' ? 'Homepage section state toggled' : 'تم تعديل ظهور المكون في الصفحة الرئيسية');
                           }}
                           className={`rounded px-2.5 py-1 text-[10px] font-bold ${sect.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}
                         >
@@ -1665,11 +1661,19 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                     </div>
                   </div>
 
+                  <div className="rounded-xl bg-slate-100 p-3 text-[11px] text-slate-500 border text-center">
+                    <Lock className="h-3.5 w-3.5 mx-auto mb-1 text-slate-400" />
+                    <span>
+                      {language === 'en'
+                        ? 'Brand identity and theme tokens are defined by the static design system. Runtime overriding is disabled.'
+                        : 'الهوية البصرية وقوالب العرض محددة عبر كود المنصة الرئيسي. التعديل المباشر أثناء التشغيل معطل.'}
+                    </span>
+                  </div>
                   <button
-                    onClick={() => triggerSuccess(language === 'en' ? 'Branding and theme parameters compiled successfully!' : 'تم حفظ وحفظ خيارات المظهر والتصميم!')}
-                    className="w-full font-bold bg-slate-900 text-white rounded-xl py-2 hover:bg-black transition"
+                    disabled
+                    className="w-full font-bold bg-slate-200 text-slate-400 rounded-xl py-2 cursor-not-allowed"
                   >
-                    {language === 'en' ? 'Commit Layout Variables' : 'تطبيق خيارات الهوية والمظهر'}
+                    {language === 'en' ? 'Layout Variables Locked (System Default)' : 'متغيرات المظهر مقفلة (افتراضي النظام)'}
                   </button>
                 </div>
               </div>
@@ -1745,13 +1749,11 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                     <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
                       <span>Last Compile: <span className="font-mono text-slate-800">{seoConfig.lastGenerated}</span></span>
                       <button
-                        onClick={() => {
-                          setSeoConfig({ ...seoConfig, lastGenerated: new Date().toISOString().replace('T', ' ').substring(0, 16) });
-                          triggerSuccess(language === 'en' ? 'XML Sitemap generated and deployed to sitemap.xml successfully!' : 'تم إعادة بناء خرائط sitemap.xml وإرسالها بنجاح!');
-                        }}
-                        className="rounded-lg bg-indigo-600 text-white px-3.5 py-1.5 hover:bg-indigo-700"
+                        disabled
+                        className="rounded-lg bg-slate-200 text-slate-400 px-3.5 py-1.5 cursor-not-allowed text-[10px]"
+                        title={language === 'en' ? 'Sitemap generation runs automatically on schedule via Laravel cron.' : 'تحديث ملف الخرائط يعمل تلقائياً عبر مجدول المهام بالنظام.'}
                       >
-                        {language === 'en' ? 'Force Regenerate' : 'تحديث وبناء الآن'}
+                        {language === 'en' ? 'Automated Cron Job (Active)' : 'مجدول عبر الخادم (نشط)'}
                       </button>
                     </div>
                   </div>
@@ -1807,11 +1809,19 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                     />
                   </div>
 
+                  <div className="rounded-xl bg-slate-100 p-3 text-[11px] text-slate-500 border text-center">
+                    <Lock className="h-3.5 w-3.5 mx-auto mb-1 text-slate-400" />
+                    <span>
+                      {language === 'en'
+                        ? 'Raw client script injection is restricted to enforce Content Security Policy (CSP) and cross-site scripting (XSS) guards.'
+                        : 'حقن الشيفرات المباشرة مقيد لضمان سياسات الأمان ومنع ثغرات XSS وسياسات أمان المحتوى (CSP).'}
+                    </span>
+                  </div>
                   <button
-                    onClick={() => triggerSuccess(language === 'en' ? 'Custom client codes re-injected' : 'تم حقن وتطبيق التعديلات البرمجية!')}
-                    className="w-full font-bold bg-slate-900 text-white rounded-xl py-2"
+                    disabled
+                    className="w-full font-bold bg-slate-200 text-slate-400 rounded-xl py-2 cursor-not-allowed"
                   >
-                    {language === 'en' ? 'Inject Custom Script Overrides' : 'حفظ ونشر التعديلات البرمجية'}
+                    {language === 'en' ? 'Script Injection Disabled (Security Policy)' : 'حقن الشيفرات معطل (سياسة الأمان)'}
                   </button>
                 </div>
               </div>

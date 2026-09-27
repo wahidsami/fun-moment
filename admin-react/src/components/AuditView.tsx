@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Language, UserRole, Permission } from '../types';
+import { Language, UserRole, Permission, ImmutableAuditLogItem } from '../types';
 import { LaravelAPI } from '../api';
 import { ROLE_NAMES, ROLE_PERMISSIONS, checkPermission } from '../utils/auditLogger';
 import {
@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Terminal,
+  Database
 } from 'lucide-react';
 
 interface AuditViewProps {
@@ -45,7 +46,9 @@ export default function AuditView({ language, activeRole, onLogUpdated }: AuditV
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'denied' | 'pending_approval'>('all');
   const [logs, setLogs] = useState<BackendLog[]>([]);
+  const [immutableLogs, setImmutableLogs] = useState<ImmutableAuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingImmutable, setLoadingImmutable] = useState(false);
   const [error, setError] = useState('');
 
   const loadLogs = async () => {
@@ -65,8 +68,23 @@ export default function AuditView({ language, activeRole, onLogUpdated }: AuditV
     }
   };
 
+  const loadImmutableLogs = async () => {
+    setLoadingImmutable(true);
+    try {
+      const res = await LaravelAPI.getImmutableAuditLogs();
+      if (res.logs && Array.isArray(res.logs)) {
+        setImmutableLogs(res.logs);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingImmutable(false);
+    }
+  };
+
   useEffect(() => {
     loadLogs();
+    loadImmutableLogs();
   }, []);
 
   const filteredLogs = useMemo(() => {
@@ -262,11 +280,77 @@ export default function AuditView({ language, activeRole, onLogUpdated }: AuditV
         )}
 
         {activeTab === 'history' && (
-          <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-            <div className="flex items-center justify-center gap-2 font-semibold text-slate-700">
-              <History className="h-4 w-4" />
-              <span>{isRtl ? 'لا يوجد سجل تغييرات خلفي حتى الآن.' : 'No backend change-history store is available yet.'}</span>
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center justify-between border-b pb-2">
+              <div className="flex items-center gap-2">
+                <Database className="h-4 w-4 text-indigo-600" />
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  {isRtl ? 'سجل التدقيق الإداري غير القابل للتعديل (قاعدة بيانات PostgreSQL)' : 'Immutable Administrative Audit Ledger (PostgreSQL)'}
+                </h4>
+              </div>
+              <button
+                onClick={loadImmutableLogs}
+                className="inline-flex items-center gap-1.5 text-xs text-indigo-600 font-bold hover:underline"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loadingImmutable ? 'animate-spin' : ''}`} />
+                <span>{isRtl ? 'تحديث السجل' : 'Refresh Ledger'}</span>
+              </button>
             </div>
+
+            {loadingImmutable ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                <RefreshCw className="mx-auto mb-2 h-4 w-4 animate-spin text-indigo-600" />
+                {isRtl ? 'جاري قراءة سجل التدقيق من قاعدة البيانات...' : 'Fetching immutable audit records from PostgreSQL...'}
+              </div>
+            ) : immutableLogs.length > 0 ? (
+              <div className="overflow-hidden rounded-xl border border-slate-200">
+                <table className="w-full text-left text-xs text-slate-600 rtl:text-right">
+                  <thead className="bg-slate-50 font-bold uppercase text-[10px] text-slate-400 border-b">
+                    <tr>
+                      <th className="px-4 py-3">ID</th>
+                      <th className="px-4 py-3">{isRtl ? 'المشرف' : 'Admin Operator'}</th>
+                      <th className="px-4 py-3">{isRtl ? 'الإجراء' : 'Action'}</th>
+                      <th className="px-4 py-3">{isRtl ? 'المورد المستهدف' : 'Resource'}</th>
+                      <th className="px-4 py-3">{isRtl ? 'عنوان IP' : 'IP Address'}</th>
+                      <th className="px-4 py-3">{isRtl ? 'التفاصيل' : 'Details / State'}</th>
+                      <th className="px-4 py-3">{isRtl ? 'التاريخ والوقت' : 'Timestamp'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {immutableLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-50/50">
+                        <td className="px-4 py-3 font-mono text-slate-400">#{log.id}</td>
+                        <td className="px-4 py-3">
+                          <span className="font-bold text-slate-800">{log.admin_name}</span>
+                          <span className="text-[10px] text-slate-400 block font-mono">ID: {log.admin_id}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 uppercase">
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-slate-700">
+                          {log.resource} {log.resource_id ? `(#${log.resource_id})` : ''}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-[10px] text-slate-500">
+                          {log.ip_address || '—'}
+                        </td>
+                        <td className="px-4 py-3 max-w-xs truncate text-[11px] text-slate-600">
+                          {log.details || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-[10px] text-slate-400 whitespace-nowrap">
+                          {log.created_at}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                {isRtl ? 'لا توجد سجلات تدقيق محفوظة في جدول admin_audit_logs بعد.' : 'No audit records logged in PostgreSQL admin_audit_logs yet.'}
+              </div>
+            )}
           </div>
         )}
 

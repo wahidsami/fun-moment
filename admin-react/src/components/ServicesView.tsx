@@ -201,8 +201,34 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     }
   };
 
+  const loadCategoryTree = async () => {
+    try {
+      const tree = await LaravelAPI.getCategories();
+      if (Array.isArray(tree)) {
+        setCategories(tree);
+      }
+    } catch (err) {
+      console.error("Failed to load categories tree", err);
+    }
+  };
+
+  const loadGeographies = async () => {
+    try {
+      const locs = await LaravelAPI.getLocations();
+      if (locs) {
+        if (Array.isArray(locs.countries)) setCountries(locs.countries);
+        if (Array.isArray(locs.cities)) setCities(locs.cities);
+        if (Array.isArray(locs.areas)) setAreas(locs.areas);
+      }
+    } catch (err) {
+      console.error("Failed to load geographies", err);
+    }
+  };
+
   useEffect(() => {
     loadServices();
+    loadCategoryTree();
+    loadGeographies();
   }, []);
 
   // Update Status
@@ -478,33 +504,113 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
   };
 
   // Category Tree add node handler
-  const handleAddCategoryNode = (e: React.FormEvent) => {
+  const handleAddCategoryNode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setValidationError(language === 'en'
-      ? 'Category creation is not yet connected to the backend, so no local records are created.'
-      : 'إنشاء التصنيفات غير متصل بالخادم بعد، لذلك لن يتم إنشاء أي سجل محلي.');
+    setValidationError('');
+    if (!newCatEn.trim() || !newCatAr.trim()) {
+      setValidationError(language === 'en' ? 'Category names in Arabic and English are required.' : 'يرجى إدخال اسم القسم بالعربية والإنجليزية.');
+      return;
+    }
+
+    try {
+      const parentId = catLevel === 'sub' ? selectedParentCatId : catLevel === 'child' ? selectedParentSubId : undefined;
+      await LaravelAPI.createCategory({
+        level: catLevel,
+        name_en: newCatEn,
+        name_ar: newCatAr,
+        slug: newCatSlug,
+        parent_id: parentId
+      });
+
+      await loadCategoryTree();
+      setShowAddCategoryModal(false);
+      setNewCatEn('');
+      setNewCatAr('');
+      setNewCatSlug('');
+      showSuccess(language === 'en' ? 'Category created and persisted to database!' : 'تم إنشاء التصنيف وحفظه في قاعدة البيانات بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      setValidationError(err?.message || 'Failed to create category');
+    }
   };
 
   // Add Geography Node Handler
-  const handleAddGeoNode = (e: React.FormEvent) => {
+  const handleAddGeoNode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setValidationError(language === 'en'
-      ? 'Geography records must be saved through the backend before this screen can create them.'
-      : 'يجب حفظ سجلات المناطق عبر الخادم قبل أن يتمكن هذا القسم من إنشائها.');
+    setValidationError('');
+    if (!geoNameEn.trim() || !geoNameAr.trim()) {
+      setValidationError(language === 'en' ? 'Names in Arabic and English are required.' : 'يرجى إدخال الأسماء بالعربية والإنجليزية.');
+      return;
+    }
+
+    try {
+      const level = geoTab === 'countries' ? 'country' : geoTab === 'cities' ? 'city' : 'area';
+      await LaravelAPI.createLocation({
+        level,
+        name_en: geoNameEn,
+        name_ar: geoNameAr,
+        country_id: geoTab === 'cities' ? geoParentId : undefined,
+        city_id: geoTab === 'areas' ? Number(geoParentId) : undefined,
+        phone_code: geoTab === 'countries' ? geoParam1 : undefined,
+        currency: geoTab === 'countries' ? geoParam2 : undefined,
+        code: geoTab === 'countries' ? (geoParam1 || geoNameEn.slice(0, 2).toUpperCase()) : undefined
+      });
+
+      await loadGeographies();
+      setShowAddGeoModal(false);
+      setGeoNameEn('');
+      setGeoNameAr('');
+      setGeoParam1('');
+      setGeoParam2('');
+      showSuccess(language === 'en' ? 'Location created and persisted to database!' : 'تمت إضافة المنطقة وحفظها في قاعدة البيانات بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      setValidationError(err?.message || 'Failed to create location');
+    }
   };
 
   // Delete category node helper
-  const handleDeleteCategoryNode = (id: number, level: 'parent' | 'sub' | 'child') => {
-    setValidationError(language === 'en'
-      ? 'Delete is blocked until category data is managed by the backend.'
-      : 'الحذف معطل حتى تُدار بيانات التصنيفات من الخادم.');
+  const handleDeleteCategoryNode = async (id: number, level: 'parent' | 'sub' | 'child') => {
+    if (!hasPermission) {
+      alert(language === 'en' ? "Access Denied." : "تم رفض الوصول.");
+      return;
+    }
+    const confirmDel = window.confirm(language === 'en' ? `Are you sure you want to delete this category?` : `هل أنت متأكد من حذف هذا القسم؟`);
+    if (!confirmDel) return;
+
+    try {
+      await LaravelAPI.deleteCategory(id, level);
+      await loadCategoryTree();
+      showSuccess(language === 'en' ? 'Category deleted successfully!' : 'تم حذف القسم بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      setValidationError(err?.message || 'Failed to delete category (it may have dependent services or subcategories).');
+    }
   };
 
   // Toggle Geo entry status
-  const toggleGeoStatus = (id: string | number, level: 'country' | 'city' | 'area') => {
-    setValidationError(language === 'en'
-      ? 'Status toggles are disabled until geography data is backend-driven.'
-      : 'تعطيل تغيير الحالة حتى تصبح بيانات المناطق مدفوعة من الخادم.');
+  const toggleGeoStatus = async (id: string | number, level: 'country' | 'city' | 'area') => {
+    if (!hasPermission) return;
+    try {
+      let currentStatus: 'active' | 'inactive' = 'active';
+      if (level === 'country') {
+        const item = countries.find(c => c.id === id);
+        currentStatus = item?.status ?? 'active';
+      } else if (level === 'city') {
+        const item = cities.find(c => c.id === id);
+        currentStatus = item?.status ?? 'active';
+      } else {
+        const item = areas.find(a => a.id === id);
+        currentStatus = item?.status ?? 'active';
+      }
+      const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      await LaravelAPI.updateLocationStatus(id, level, nextStatus);
+      await loadGeographies();
+      showSuccess(language === 'en' ? `Location status changed to ${nextStatus}!` : `تم تحديث حالة المنطقة بنجاح!`);
+    } catch (err: any) {
+      console.error(err);
+      setValidationError(err?.message || 'Failed to update location status');
+    }
   };
 
   // Checkbox toggle

@@ -839,5 +839,311 @@ export const LaravelAPI = {
     }
 
     throw new Error('Dashboard summary payload missing activity_logs');
+  },
+
+  // Seller Verification
+  async verifySeller(id: number, status?: boolean): Promise<User> {
+    const response = await fetch(`/admin-home/frontend-users/${id}/verify`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(status !== undefined ? { status } : {}),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to verify seller (${response.status})`);
+    }
+
+    const payload = await response.json();
+    if (payload?.user) {
+      return payload.user;
+    }
+    throw new Error(payload?.message || 'Verification update failed');
+  },
+
+  async getSellerVerification(id: number): Promise<any> {
+    const response = await fetch(`/admin-home/frontend-users/${id}/verification`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load seller verification (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload?.verification ?? null;
+  },
+
+  // Categories Hierarchy
+  async getCategories(): Promise<any[]> {
+    const response = await fetch('/admin-home/categories-json', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load categories (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload?.categories) ? payload.categories : [];
+  },
+
+  async createCategory(node: { level: 'parent' | 'sub' | 'child'; name_en: string; name_ar?: string; slug?: string; parent_id?: number }): Promise<any> {
+    const response = await fetch('/admin-home/categories-json', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(node),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to create category (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload?.node;
+  },
+
+  async updateCategoryStatus(level: 'parent' | 'sub' | 'child', id: number, status?: 'active' | 'inactive'): Promise<any> {
+    const response = await fetch(`/admin-home/categories-json/${level}/${id}/status`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(status ? { status } : {}),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update category status (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async deleteCategory(level: 'parent' | 'sub' | 'child', id: number): Promise<void> {
+    const response = await fetch(`/admin-home/categories-json/${level}/${id}/delete`, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to delete category (${response.status})`);
+    }
+  },
+
+  // Locations / Coverage
+  async getLocations(): Promise<{ countries: any[]; cities: any[]; areas: any[] }> {
+    const response = await fetch('/admin-home/locations-json', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load locations (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return {
+      countries: Array.isArray(payload?.countries) ? payload.countries : [],
+      cities: Array.isArray(payload?.cities) ? payload.cities : [],
+      areas: Array.isArray(payload?.areas) ? payload.areas : [],
+    };
+  },
+
+  async createLocation(node: { level: 'country' | 'city' | 'area'; name_en: string; name_ar?: string; code?: string; country_id?: number; city_id?: number }): Promise<any> {
+    const response = await fetch('/admin-home/locations-json', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(node),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to create location (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload?.node;
+  },
+
+  async updateLocationStatus(level: 'country' | 'city' | 'area', id: string | number, status?: 'active' | 'inactive'): Promise<any> {
+    const response = await fetch(`/admin-home/locations-json/${level}/${id}/status`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(status ? { status } : {}),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update location status (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async deleteLocation(level: 'country' | 'city' | 'area', id: string | number): Promise<void> {
+    const response = await fetch(`/admin-home/locations-json/${level}/${id}/delete`, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to delete location (${response.status})`);
+    }
+  },
+
+  // Payouts
+  async getPayouts(): Promise<{ payouts: any[]; summary: any }> {
+    const response = await fetch('/admin-home/payouts-json', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load payouts (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return {
+      payouts: Array.isArray(payload?.payouts) ? payload.payouts : [],
+      summary: payload?.summary ?? {},
+    };
+  },
+
+  async updatePayoutStatus(id: number, status: 'pending' | 'completed' | 'rejected', admin_note?: string): Promise<any> {
+    const response = await fetch(`/admin-home/payouts-json/${id}/status`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ status, admin_note }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update payout status (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload?.payout;
+  },
+
+  // Ticket Conversation Details & Reply
+  async getTicketDetails(id: number): Promise<{ ticket: SupportTicket; messages: any[] }> {
+    const response = await fetch(`/admin-home/support-tickets-json/${id}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load ticket details (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return {
+      ticket: payload?.ticket,
+      messages: Array.isArray(payload?.messages) ? payload.messages : [],
+    };
+  },
+
+  async replyTicket(id: number, message: string): Promise<{ ticket: SupportTicket; messages: any[] }> {
+    const response = await fetch(`/admin-home/support-tickets-json/${id}/reply`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ message }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to send reply (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return {
+      ticket: payload?.ticket,
+      messages: Array.isArray(payload?.messages) ? payload.messages : [],
+    };
+  },
+
+  // Payment Gateways
+  async getPaymentGateways(): Promise<any> {
+    const response = await fetch('/admin-home/payment-gateways-json', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load payment gateways (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload?.gateways ?? null;
+  },
+
+  async updatePaymentGateways(gateways: any): Promise<any> {
+    const response = await fetch('/admin-home/payment-gateways-json', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(gateways),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update payment gateways (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload?.gateways;
+  },
+
+  // Immutable Audit Logs from PostgreSQL
+  async getImmutableAuditLogs(): Promise<any[]> {
+    const response = await fetch('/admin-home/audit-logs-json', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load audit logs (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload?.logs) ? payload.logs : [];
   }
 };

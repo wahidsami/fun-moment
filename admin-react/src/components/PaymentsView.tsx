@@ -3,11 +3,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Language, Payment, UserRole } from '../types';
+import { Language, Payment, UserRole, PayoutRequestItem, PaymentGatewaySettings } from '../types';
 import { translations } from '../translations';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LaravelAPI } from '../api';
-import { Search, ShieldAlert, CheckCircle2, RotateCcw, RefreshCcw } from 'lucide-react';
+import {
+  Search,
+  ShieldAlert,
+  CheckCircle2,
+  RotateCcw,
+  RefreshCcw,
+  DollarSign,
+  CreditCard,
+  Sliders,
+  Check,
+  XCircle,
+  Eye,
+  Lock,
+  ArrowUpRight,
+  Building,
+  Key
+} from 'lucide-react';
 
 interface PaymentsViewProps {
   language: Language;
@@ -16,11 +32,32 @@ interface PaymentsViewProps {
 
 export default function PaymentsView({ language, activeRole }: PaymentsViewProps) {
   const t = translations[language];
+  const [subTab, setSubTab] = useState<'transactions' | 'payouts' | 'gateways'>('transactions');
+
+  // Transactions state
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [methodFilter, setMethodFilter] = useState('all');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Payouts state
+  const [payouts, setPayouts] = useState<PayoutRequestItem[]>([]);
+  const [payoutFilter, setPayoutFilter] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all');
+  const [selectedPayout, setSelectedPayout] = useState<PayoutRequestItem | null>(null);
+  const [loadingPayouts, setLoadingPayouts] = useState(false);
+  const [payoutDecisionNote, setPayoutDecisionNote] = useState('');
+
+  // Gateways state
+  const [gatewaySettings, setGatewaySettings] = useState<PaymentGatewaySettings | null>(null);
+  const [loadingGateways, setLoadingGateways] = useState(false);
+  const [savingGateways, setSavingGateways] = useState(false);
+  const [paytabsProfileId, setPaytabsProfileId] = useState('');
+  const [paytabsServerKey, setPaytabsServerKey] = useState('');
+  const [paytabsClientKey, setPaytabsClientKey] = useState('');
+  const [paytabsCurrency, setPaytabsCurrency] = useState('SAR');
+  const [paytabsSandbox, setPaytabsSandbox] = useState(false);
+  const [paytabsStatus, setPaytabsStatus] = useState(true);
 
   // Financial Manager & Super Admin can manage payments
   const hasPermission = activeRole === 'super_admin' || activeRole === 'financial_manager';
@@ -37,8 +74,42 @@ export default function PaymentsView({ language, activeRole }: PaymentsViewProps
     }
   };
 
+  const loadPayouts = async () => {
+    setLoadingPayouts(true);
+    try {
+      const res = await LaravelAPI.getPayouts();
+      if (res.payouts && Array.isArray(res.payouts)) {
+        setPayouts(res.payouts);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingPayouts(false);
+    }
+  };
+
+  const loadGateways = async () => {
+    setLoadingGateways(true);
+    try {
+      const res = await LaravelAPI.getPaymentGateways();
+      if (res.gateways) {
+        setGatewaySettings(res.gateways);
+        setPaytabsProfileId(res.gateways.paytabs?.profile_id || '');
+        setPaytabsCurrency(res.gateways.paytabs?.currency || 'SAR');
+        setPaytabsSandbox(Boolean(res.gateways.paytabs?.sandbox_mode));
+        setPaytabsStatus(Boolean(res.gateways.paytabs?.status));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingGateways(false);
+    }
+  };
+
   useEffect(() => {
     loadPayments();
+    loadPayouts();
+    loadGateways();
   }, []);
 
   const handleRefund = async (txnId: string) => {
@@ -56,6 +127,59 @@ export default function PaymentsView({ language, activeRole }: PaymentsViewProps
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleUpdatePayoutStatus = async (id: number, status: 'completed' | 'rejected') => {
+    if (!hasPermission) {
+      alert("Unauthorized");
+      return;
+    }
+    const confirmAction = window.confirm(
+      language === 'en' 
+        ? `Are you sure you want to mark payout #${id} as ${status}?` 
+        : `هل أنت متأكد من تغيير حالة طلب السحب #${id} إلى ${status}؟`
+    );
+    if (!confirmAction) return;
+
+    try {
+      await LaravelAPI.updatePayoutStatus(id, status, payoutDecisionNote);
+      setSuccessMsg(language === 'en' ? `Payout #${id} marked as ${status} and persisted in database!` : `تم تحديث حالة طلب السحب وتثبيتها في قاعدة البيانات!`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+      setSelectedPayout(null);
+      setPayoutDecisionNote('');
+      loadPayouts();
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'Failed to update payout status');
+    }
+  };
+
+  const handleSaveGateways = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hasPermission) return;
+    setSavingGateways(true);
+    try {
+      const payload: any = {
+        paytabs_status: paytabsStatus,
+        paytabs_profile_id: paytabsProfileId,
+        paytabs_currency: paytabsCurrency,
+        paytabs_sandbox_mode: paytabsSandbox
+      };
+      if (paytabsServerKey.trim()) payload.paytabs_server_key = paytabsServerKey.trim();
+      if (paytabsClientKey.trim()) payload.paytabs_client_key = paytabsClientKey.trim();
+
+      await LaravelAPI.updatePaymentGateways(payload);
+      setPaytabsServerKey('');
+      setPaytabsClientKey('');
+      await loadGateways();
+      setSuccessMsg(language === 'en' ? 'Payment gateway settings updated and secured in PostgreSQL!' : 'تم حفظ وتشفير إعدادات بوابة الدفع في قاعدة البيانات بنجاح!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'Failed to save gateway settings');
+    } finally {
+      setSavingGateways(false);
     }
   };
 
@@ -78,10 +202,19 @@ export default function PaymentsView({ language, activeRole }: PaymentsViewProps
     return matchesSearch && matchesMethod;
   });
 
+  const filteredPayouts = payouts.filter(p => {
+    const matchesStatus = payoutFilter === 'all' || p.status_label === payoutFilter;
+    const matchesSearch =
+      p.seller_name.toLowerCase().includes(search.toLowerCase()) ||
+      p.seller_email.toLowerCase().includes(search.toLowerCase()) ||
+      p.amount.toString().includes(search);
+    return matchesStatus && matchesSearch;
+  });
+
   return (
     <div className="space-y-6">
-      {/* View Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* View Header with SubTabs */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-800">
             {t.payments_title}
@@ -89,6 +222,34 @@ export default function PaymentsView({ language, activeRole }: PaymentsViewProps
           <p className="text-xs text-slate-500">
             {t.payments_subtitle}
           </p>
+        </div>
+
+        {/* SubTab switcher */}
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-slate-100 p-1 text-xs font-semibold self-start sm:self-center">
+          <button
+            onClick={() => setSubTab('transactions')}
+            className={`rounded-lg px-3 py-1.5 transition ${
+              subTab === 'transactions' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {language === 'en' ? 'Transactions Ledger' : 'سجل العمليات المالية'}
+          </button>
+          <button
+            onClick={() => setSubTab('payouts')}
+            className={`rounded-lg px-3 py-1.5 transition ${
+              subTab === 'payouts' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {language === 'en' ? 'Provider Payout Requests' : 'طلبات سحب المزودين'}
+          </button>
+          <button
+            onClick={() => setSubTab('gateways')}
+            className={`rounded-lg px-3 py-1.5 transition ${
+              subTab === 'gateways' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {language === 'en' ? 'Payment Gateways' : 'بوابات الدفع الإلكتروني'}
+          </button>
         </div>
       </div>
 
@@ -100,8 +261,8 @@ export default function PaymentsView({ language, activeRole }: PaymentsViewProps
             <p className="font-bold">{language === 'en' ? 'Limited Role Access (Read-Only Mode)' : 'صلاحيات محدودة لهذا الدور (عرض فقط)'}</p>
             <p className="mt-1 leading-relaxed text-amber-700">
               {language === 'en'
-                ? `You are logged in as a ${t[`role_${activeRole}`]}. Only Super Admins and Financial Managers can process gateway refunds and reconcile payment ledger.`
-                : `لقد قمت بتسجيل الدخول بصفة ${t[`role_${activeRole}`]}. يمتلك مدير النظام العام والمدير المالي فقط الصلاحية للقيام بتسوية عمليات الاسترداد أو تسوية السجل المالي.`}
+                ? `You are logged in as a ${t[`role_${activeRole}`]}. Only Super Admins and Financial Managers can process payouts, gateway configuration, or refunds.`
+                : `لقد قمت بتسجيل الدخول بصفة ${t[`role_${activeRole}`]}. يمتلك مدير النظام العام والمدير المالي فقط الصلاحية للقيام بتسوية طلبات السحب وإعدادات بوابات الدفع والاسترداد.`}
             </p>
           </div>
         </div>
@@ -114,147 +275,507 @@ export default function PaymentsView({ language, activeRole }: PaymentsViewProps
         </div>
       )}
 
-      {/* Stats Cards Row inside Payments */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200/60 bg-white p-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase">{language === 'en' ? 'Gateway Inflow' : 'التدفق المالي عبر البوابات'}</p>
-          <p className="text-lg font-bold text-slate-800 mt-1">{gatewayInflows.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</p>
-          <p className="text-[9px] text-emerald-600 font-medium mt-1">● {succeededPayments.length} {language === 'en' ? 'succeeded settlements' : 'عمليات تسوية ناجحة'}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200/60 bg-white p-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase">{language === 'en' ? 'Refund Outflow' : 'إجمالي المبالغ المستردة'}</p>
-          <p className="text-lg font-bold text-slate-800 mt-1">{refundOutflows.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</p>
-          <p className="text-[9px] text-slate-400 font-medium mt-1">{refundedPayments.length} {language === 'en' ? 'refunded transaction(s)' : 'عملية/عمليات مستردة'}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200/60 bg-white p-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase">{language === 'en' ? 'Escrow Reserves' : 'احتياطي الضمان المالي الموقوف'}</p>
-          <p className="text-lg font-bold text-slate-800 mt-1">{escrowReserves.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</p>
-          <p className="text-[9px] text-blue-600 font-semibold mt-1">● {language === 'en' ? 'Pending settlement' : 'في انتظار التسوية'}</p>
-        </div>
-      </div>
+      {/* ===================== SUBTAB 1: TRANSACTIONS LEDGER ===================== */}
+      {subTab === 'transactions' && (
+        <div className="space-y-6">
+          {/* Stats Cards Row inside Payments */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200/60 bg-white p-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">{language === 'en' ? 'Gateway Inflow' : 'التدفق المالي عبر البوابات'}</p>
+              <p className="text-lg font-bold text-slate-800 mt-1">{gatewayInflows.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</p>
+              <p className="text-[9px] text-emerald-600 font-medium mt-1">● {succeededPayments.length} {language === 'en' ? 'succeeded settlements' : 'عمليات تسوية ناجحة'}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200/60 bg-white p-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">{language === 'en' ? 'Refund Outflow' : 'إجمالي المبالغ المستردة'}</p>
+              <p className="text-lg font-bold text-slate-800 mt-1">{refundOutflows.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</p>
+              <p className="text-[9px] text-slate-400 font-medium mt-1">{refundedPayments.length} {language === 'en' ? 'refunded transaction(s)' : 'عملية/عمليات مستردة'}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200/60 bg-white p-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">{language === 'en' ? 'Escrow Reserves' : 'احتياطي الضمان المالي الموقوف'}</p>
+              <p className="text-lg font-bold text-slate-800 mt-1">{escrowReserves.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</p>
+              <p className="text-[9px] text-blue-600 font-semibold mt-1">● {language === 'en' ? 'Pending settlement' : 'في انتظار التسوية'}</p>
+            </div>
+          </div>
 
-      {/* Controls */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-4">
-        <div className="relative flex-1">
-          <Search className="absolute top-2.5 left-3 h-4 w-4 text-slate-400 rtl:right-3 rtl:left-auto" />
-          <input
-            type="text"
-            placeholder={t.searchPlaceholder}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs outline-hidden focus:border-indigo-500 focus:bg-white rtl:pr-9 rtl:pl-3"
-          />
-        </div>
+          {/* Controls */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-4">
+            <div className="relative flex-1">
+              <Search className="absolute top-2.5 left-3 h-4 w-4 text-slate-400 rtl:right-3 rtl:left-auto" />
+              <input
+                type="text"
+                placeholder={t.searchPlaceholder}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs outline-hidden focus:border-indigo-500 focus:bg-white rtl:pr-9 rtl:pl-3"
+              />
+            </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-semibold">{t.filter}:</span>
-          <button
-            onClick={() => setMethodFilter('all')}
-            className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
-              methodFilter === 'all' ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-slate-200 bg-slate-50 text-slate-600'
-            }`}
-          >
-            {t.all}
-          </button>
-          <button
-            onClick={() => setMethodFilter('credit_card')}
-            className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
-              methodFilter === 'credit_card' ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-slate-200 bg-slate-50 text-slate-600'
-            }`}
-          >
-            {language === 'en' ? 'Credit Card' : 'بطاقة ائتمان'}
-          </button>
-          <button
-            onClick={() => setMethodFilter('stc_pay')}
-            className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
-              methodFilter === 'stc_pay' ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-slate-200 bg-slate-50 text-slate-600'
-            }`}
-          >
-            STC Pay
-          </button>
-          <button
-            onClick={() => setMethodFilter('apple_pay')}
-            className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
-              methodFilter === 'apple_pay' ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-slate-200 bg-slate-50 text-slate-600'
-            }`}
-          >
-            Apple Pay
-          </button>
-        </div>
-      </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 font-semibold">{t.filter}:</span>
+              <button
+                onClick={() => setMethodFilter('all')}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
+                  methodFilter === 'all' ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+              >
+                {t.all}
+              </button>
+              <button
+                onClick={() => setMethodFilter('credit_card')}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
+                  methodFilter === 'credit_card' ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+              >
+                {language === 'en' ? 'Credit Card' : 'بطاقة ائتمان'}
+              </button>
+              <button
+                onClick={() => setMethodFilter('stc_pay')}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
+                  methodFilter === 'stc_pay' ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+              >
+                STC Pay
+              </button>
+              <button
+                onClick={() => setMethodFilter('apple_pay')}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
+                  methodFilter === 'apple_pay' ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+              >
+                Apple Pay
+              </button>
+            </div>
+          </div>
 
-      {/* Transaction Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-500 rtl:text-right">
-            <thead className="bg-slate-50/70 text-[10px] font-bold tracking-wider text-slate-500 uppercase border-b border-slate-100">
-              <tr>
-                <th className="px-6 py-4">{t.col_txn}</th>
-                <th className="px-6 py-4">{language === 'en' ? 'Related Order' : 'رقم الطلب'}</th>
-                <th className="px-6 py-4">{language === 'en' ? 'Payer Name' : 'اسم دافع العملية'}</th>
-                <th className="px-6 py-4">{t.col_amount}</th>
-                <th className="px-6 py-4">{t.col_method}</th>
-                <th className="px-6 py-4">{t.status}</th>
-                <th className="px-6 py-4 text-center">{t.actions}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="py-10 text-center text-slate-400">
-                    <RefreshCcw className="mx-auto h-5 w-5 animate-spin mb-2" />
-                    <span>{t.loading}</span>
-                  </td>
-                </tr>
-              ) : filteredPayments.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-10 text-center text-slate-400">
-                    {language === 'en' ? 'No transactions match parameters.' : 'لا توجد عمليات دفع تطابق خيارات التصفية.'}
-                  </td>
-                </tr>
-              ) : (
-                filteredPayments.map((pay) => (
-                  <tr key={pay.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 text-slate-900 font-mono font-bold">{pay.id}</td>
-                    <td className="px-6 py-4 text-slate-400 font-bold">#{pay.order_id}</td>
-                    <td className="px-6 py-4 font-semibold text-slate-800">{pay.user_name}</td>
-                    <td className="px-6 py-4 text-slate-900 font-bold">{pay.amount} SAR</td>
-                    <td className="px-6 py-4 font-semibold text-slate-500 uppercase">
-                      {pay.method === 'credit_card' ? 'Visa/Mada' : pay.method.replace('_', ' ')}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        pay.status === 'succeeded'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : pay.status === 'pending'
-                          ? 'bg-amber-50 text-amber-700'
-                          : pay.status === 'refunded'
-                          ? 'bg-blue-50 text-blue-700'
-                          : 'bg-rose-50 text-rose-700'
-                      }`}>
-                        {pay.status === 'succeeded' ? t.status_pay_succeeded : pay.status === 'pending' ? t.status_pay_pending : pay.status === 'refunded' ? t.status_pay_refunded : t.status_pay_failed}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {hasPermission && pay.status === 'succeeded' ? (
-                        <button
-                          onClick={() => handleRefund(pay.id)}
-                          className="flex items-center gap-1 rounded bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700 transition hover:bg-rose-100 mx-auto"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                          <span>{language === 'en' ? 'Refund' : 'استرداد الرصيد'}</span>
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 italic">—</span>
-                      )}
-                    </td>
+          {/* Transaction Table */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-500 rtl:text-right">
+                <thead className="bg-slate-50/70 text-[10px] font-bold tracking-wider text-slate-500 uppercase border-b border-slate-100">
+                  <tr>
+                    <th className="px-6 py-4">{t.col_txn}</th>
+                    <th className="px-6 py-4">{language === 'en' ? 'Related Order' : 'رقم الطلب'}</th>
+                    <th className="px-6 py-4">{language === 'en' ? 'Payer Name' : 'اسم دافع العملية'}</th>
+                    <th className="px-6 py-4">{t.col_amount}</th>
+                    <th className="px-6 py-4">{t.col_method}</th>
+                    <th className="px-6 py-4">{t.status}</th>
+                    <th className="px-6 py-4 text-center">{t.actions}</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="py-10 text-center text-slate-400">
+                        <RefreshCcw className="mx-auto h-5 w-5 animate-spin mb-2" />
+                        <span>{t.loading}</span>
+                      </td>
+                    </tr>
+                  ) : filteredPayments.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-10 text-center text-slate-400">
+                        {language === 'en' ? 'No transactions match parameters.' : 'لا توجد عمليات دفع تطابق خيارات التصفية.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredPayments.map((pay) => (
+                      <tr key={pay.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 text-slate-900 font-mono font-bold">{pay.id}</td>
+                        <td className="px-6 py-4 text-slate-400 font-bold">#{pay.order_id}</td>
+                        <td className="px-6 py-4 font-semibold text-slate-800">{pay.user_name}</td>
+                        <td className="px-6 py-4 text-slate-900 font-bold">{pay.amount} SAR</td>
+                        <td className="px-6 py-4 font-semibold text-slate-500 uppercase">
+                          {pay.method === 'credit_card' ? 'Visa/Mada' : pay.method.replace('_', ' ')}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            pay.status === 'succeeded'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : pay.status === 'pending'
+                              ? 'bg-amber-50 text-amber-700'
+                              : pay.status === 'refunded'
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'bg-rose-50 text-rose-700'
+                          }`}>
+                            {pay.status === 'succeeded' ? t.status_pay_succeeded : pay.status === 'pending' ? t.status_pay_pending : pay.status === 'refunded' ? t.status_pay_refunded : t.status_pay_failed}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {hasPermission && pay.status === 'succeeded' ? (
+                            <button
+                              onClick={() => handleRefund(pay.id)}
+                              className="flex items-center gap-1 rounded bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700 transition hover:bg-rose-100 mx-auto"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              <span>{language === 'en' ? 'Refund' : 'استرداد الرصيد'}</span>
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ===================== SUBTAB 2: PROVIDER PAYOUT REQUESTS ===================== */}
+      {subTab === 'payouts' && (
+        <div className="space-y-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-4">
+            <div className="relative flex-1">
+              <Search className="absolute top-2.5 left-3 h-4 w-4 text-slate-400 rtl:right-3 rtl:left-auto" />
+              <input
+                type="text"
+                placeholder={language === 'en' ? 'Search payouts by seller or amount...' : 'ابحث في طلبات السحب باسم المزود أو المبلغ...'}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs outline-hidden focus:border-indigo-500 focus:bg-white rtl:pr-9 rtl:pl-3"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 font-semibold">{t.filter}:</span>
+              <button
+                onClick={() => setPayoutFilter('all')}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
+                  payoutFilter === 'all' ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+              >
+                {t.all}
+              </button>
+              <button
+                onClick={() => setPayoutFilter('pending')}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
+                  payoutFilter === 'pending' ? 'border-amber-200 bg-amber-50 text-amber-600' : 'border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+              >
+                {language === 'en' ? 'Pending' : 'قيد الانتظار'}
+              </button>
+              <button
+                onClick={() => setPayoutFilter('completed')}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
+                  payoutFilter === 'completed' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+              >
+                {language === 'en' ? 'Completed' : 'مكتمل'}
+              </button>
+              <button
+                onClick={() => setPayoutFilter('rejected')}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold border ${
+                  payoutFilter === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+              >
+                {language === 'en' ? 'Rejected' : 'مرفوض'}
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-500 rtl:text-right">
+                <thead className="bg-slate-50/70 text-[10px] font-bold tracking-wider text-slate-500 uppercase border-b border-slate-100">
+                  <tr>
+                    <th className="px-6 py-4">ID</th>
+                    <th className="px-6 py-4">{language === 'en' ? 'Seller Name' : 'اسم المزود'}</th>
+                    <th className="px-6 py-4">{language === 'en' ? 'Requested Amount' : 'المبلغ المطلوب'}</th>
+                    <th className="px-6 py-4">{language === 'en' ? 'Receipt / Ref' : 'إيصال التحويل'}</th>
+                    <th className="px-6 py-4">{language === 'en' ? 'Request Date' : 'تاريخ الطلب'}</th>
+                    <th className="px-6 py-4">{t.status}</th>
+                    <th className="px-6 py-4 text-center">{t.actions}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {loadingPayouts ? (
+                    <tr>
+                      <td colSpan={7} className="py-10 text-center text-slate-400">
+                        <RefreshCcw className="mx-auto h-5 w-5 animate-spin mb-2" />
+                        <span>{t.loading}</span>
+                      </td>
+                    </tr>
+                  ) : filteredPayouts.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-10 text-center text-slate-400">
+                        {language === 'en' ? 'No payout requests match criteria.' : 'لا توجد طلبات سحب تطابق الخيارات.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredPayouts.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 font-bold text-slate-400">#{p.id}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-800">{p.seller_name}</div>
+                          <div className="text-[10px] text-slate-400">{p.seller_email}</div>
+                        </td>
+                        <td className="px-6 py-4 font-extrabold text-slate-900 text-sm">
+                          {p.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR
+                        </td>
+                        <td className="px-6 py-4 font-mono text-[11px] text-slate-500">
+                          {p.payment_receipt || '—'}
+                        </td>
+                        <td className="px-6 py-4 text-slate-400 text-[10px]">{p.created_at}</td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            p.status_label === 'completed'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : p.status_label === 'rejected'
+                              ? 'bg-rose-50 text-rose-700'
+                              : 'bg-amber-50 text-amber-700'
+                          }`}>
+                            {p.status_label === 'completed'
+                              ? (language === 'en' ? 'Paid / Completed' : 'تم التحويل')
+                              : p.status_label === 'rejected'
+                              ? (language === 'en' ? 'Rejected' : 'مرفوض')
+                              : (language === 'en' ? 'Pending Review' : 'قيد المراجعة')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={() => setSelectedPayout(p)}
+                            className="rounded bg-slate-100 p-1 text-slate-600 hover:bg-slate-200"
+                            title={language === 'en' ? 'Inspect Payout Decision' : 'مراجعة واتخاذ قرار'}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Payout Details & Decision Modal */}
+          {selectedPayout && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+              <div className="w-full max-w-lg rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl animate-scale-in space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    {language === 'en' ? 'Provider Payout Request File' : 'ملف طلب سحب الأرباح'} #{selectedPayout.id}
+                  </span>
+                  <button
+                    onClick={() => setSelectedPayout(null)}
+                    className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="rounded-xl bg-slate-50 p-4 border flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm">{selectedPayout.seller_name}</h4>
+                    <p className="text-xs text-slate-400">{selectedPayout.seller_email} • {selectedPayout.seller_phone || 'No phone'}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Amount</span>
+                    <span className="text-lg font-black text-slate-900">{selectedPayout.amount} SAR</span>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-100 p-3 bg-white space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">{language === 'en' ? 'Transaction Receipt Details' : 'تفاصيل إيصال التحويل'}</span>
+                  <p className="text-xs text-slate-700 font-mono">{selectedPayout.payment_receipt || (language === 'en' ? 'No receipt uploaded' : 'لم يتم إرفاق إيصال بعد')}</p>
+                </div>
+
+                {hasPermission && selectedPayout.status_label === 'pending' && (
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-slate-400">
+                        {language === 'en' ? 'Administrative Decision Note' : 'ملاحظات الإدارة للطلب'}
+                      </label>
+                      <input
+                        type="text"
+                        value={payoutDecisionNote}
+                        onChange={(e) => setPayoutDecisionNote(e.target.value)}
+                        placeholder={language === 'en' ? 'e.g. Transferred via Alinma Bank ref #82918' : 'مثال: تم التحويل بنك الإنماء مرجع 82918'}
+                        className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2">
+                      <button
+                        onClick={() => handleUpdatePayoutStatus(selectedPayout.id, 'completed')}
+                        className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition flex items-center justify-center gap-1.5"
+                      >
+                        <Check className="h-4 w-4" />
+                        <span>{language === 'en' ? 'Approve & Mark Paid' : 'اعتماد وتسجيل التحويل'}</span>
+                      </button>
+                      <button
+                        onClick={() => handleUpdatePayoutStatus(selectedPayout.id, 'rejected')}
+                        className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 transition flex items-center justify-center gap-1.5"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        <span>{language === 'en' ? 'Reject Request' : 'رفض الطلب'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end border-t border-slate-100 pt-3">
+                  <button
+                    onClick={() => setSelectedPayout(null)}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    {t.back}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================== SUBTAB 3: PAYMENT GATEWAY SETTINGS ===================== */}
+      {subTab === 'gateways' && (
+        <div className="max-w-2xl space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600">
+                  <CreditCard className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">
+                    {language === 'en' ? 'PayTabs Gateway Configuration' : 'إعدادات بوابة الدفع PayTabs'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {language === 'en' ? 'Core Saudi Arabian payment processor (Mada, Visa, Mastercard, Apple Pay)' : 'بوابة الدفع المعتمدة للمملكة (مدى، فيزا، ماستركارد، آبل باي)'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 ${paytabsStatus ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                  {paytabsStatus ? 'ENABLED' : 'DISABLED'}
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveGateways} className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50">
+                <div>
+                  <span className="text-xs font-bold text-slate-700 block">
+                    {language === 'en' ? 'Gateway Active Status' : 'تفعيل البوابة'}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {language === 'en' ? 'Toggle PayTabs for live checkout in mobile & web' : 'تشغيل أو تعطيل الدفع بـ PayTabs في التطبيق والموقع'}
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  disabled={!hasPermission}
+                  checked={paytabsStatus}
+                  onChange={(e) => setPaytabsStatus(e.target.checked)}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50">
+                <div>
+                  <span className="text-xs font-bold text-slate-700 block">
+                    {language === 'en' ? 'Sandbox / Test Mode' : 'وضع التجربة (Sandbox)'}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {language === 'en' ? 'Enable for developer testing with test cards' : 'تفعيل لاختبار الدفع ببطاقات التجربة'}
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  disabled={!hasPermission}
+                  checked={paytabsSandbox}
+                  onChange={(e) => setPaytabsSandbox(e.target.checked)}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400">
+                  {language === 'en' ? 'PayTabs Profile ID' : 'معرف ملف التاجر (Profile ID)'}
+                </label>
+                <input
+                  type="text"
+                  disabled={!hasPermission}
+                  value={paytabsProfileId}
+                  onChange={(e) => setPaytabsProfileId(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono outline-hidden focus:border-indigo-500"
+                  placeholder="e.g. 104829"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400">
+                  {language === 'en' ? 'Processing Currency' : 'عملة معالجة الدفع'}
+                </label>
+                <select
+                  disabled={!hasPermission}
+                  value={paytabsCurrency}
+                  onChange={(e) => setPaytabsCurrency(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold outline-hidden bg-white"
+                >
+                  <option value="SAR">SAR - Saudi Riyal (الريال السعودي)</option>
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="EUR">EUR - Euro</option>
+                </select>
+              </div>
+
+              <div className="rounded-xl border border-slate-100 p-4 space-y-3 bg-slate-50/50">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                  <Lock className="h-3.5 w-3.5 text-indigo-600" />
+                  <span>{language === 'en' ? 'Encrypted API Credentials' : 'مفاتيح الربط المشفرة (API Secrets)'}</span>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400">
+                    {language === 'en' ? 'Server Key (Secret)' : 'مفتاح الخادم السري (Server Key)'}
+                  </label>
+                  <input
+                    type="password"
+                    disabled={!hasPermission}
+                    value={paytabsServerKey}
+                    onChange={(e) => setPaytabsServerKey(e.target.value)}
+                    placeholder={gatewaySettings?.paytabs?.server_key_masked || '••••••••••••••••'}
+                    className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono outline-hidden focus:border-indigo-500 bg-white"
+                  />
+                  <span className="text-[9px] text-slate-400 mt-0.5 block">
+                    {language === 'en' ? 'Leave empty to preserve existing encrypted server key' : 'اتركه فارغاً للاحتفاظ بالمفتاح المشفر الحالي'}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400">
+                    {language === 'en' ? 'Client Key (Public)' : 'مفتاح العميل (Client Key)'}
+                  </label>
+                  <input
+                    type="text"
+                    disabled={!hasPermission}
+                    value={paytabsClientKey}
+                    onChange={(e) => setPaytabsClientKey(e.target.value)}
+                    placeholder={gatewaySettings?.paytabs?.client_key_masked || '••••••••••••••••'}
+                    className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono outline-hidden focus:border-indigo-500 bg-white"
+                  />
+                  <span className="text-[9px] text-slate-400 mt-0.5 block">
+                    {language === 'en' ? 'Leave empty to preserve existing client key' : 'اتركه فارغاً للاحتفاظ بالمفتاح الحالي'}
+                  </span>
+                </div>
+              </div>
+
+              {hasPermission && (
+                <button
+                  type="submit"
+                  disabled={savingGateways}
+                  className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 transition"
+                >
+                  {savingGateways ? '...' : (language === 'en' ? 'Save & Secure Configuration' : 'حفظ الإعدادات في قاعدة البيانات')}
+                </button>
+              )}
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

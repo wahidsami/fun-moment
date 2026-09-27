@@ -63,6 +63,88 @@ export interface User {
   country: string;
   created_at: string;
   wallet_balance?: number;
+  seller_verified?: boolean;
+  tax_number?: string;
+  business_registration?: string;
+  address?: string;
+  seller_verification?: {
+    status: number;
+    is_verified: boolean;
+    national_id?: string;
+    address?: string;
+  };
+}
+
+export interface SellerVerificationDetail {
+  user_id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  status: number; // 0=pending, 1=approved, 2=rejected
+  is_verified: boolean;
+  national_id?: string;
+  address?: string;
+  tax_number?: string;
+  business_registration?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PayoutRequestItem {
+  id: number;
+  seller_id: number;
+  seller_name: string;
+  seller_email: string;
+  seller_phone?: string;
+  amount: number;
+  payment_receipt?: string;
+  status: number; // 0=pending, 1=approved/paid, 2=rejected
+  status_label: 'pending' | 'completed' | 'rejected';
+  created_at: string;
+  updated_at: string;
+  note?: string;
+}
+
+export interface TicketMessageItem {
+  id: number;
+  support_ticket_id: number;
+  user_id: number;
+  type: 'admin' | 'user';
+  message: string;
+  attachment?: string;
+  notify?: string;
+  created_at: string;
+  sender_name: string;
+}
+
+export interface PaymentGatewaySettings {
+  paytabs: {
+    status: boolean;
+    profile_id: string;
+    server_key_masked: string;
+    client_key_masked: string;
+    currency: string;
+    sandbox_mode: boolean;
+  };
+  manual_payment: {
+    status: boolean;
+    title: string;
+    description: string;
+  };
+}
+
+export interface ImmutableAuditLogItem {
+  id: number;
+  admin_id: number;
+  admin_name: string;
+  action: string;
+  resource: string;
+  resource_id?: string;
+  details?: string;
+  previous_state?: any;
+  new_state?: any;
+  ip_address?: string;
+  created_at: string;
 }
 
 export interface AdminAccount {

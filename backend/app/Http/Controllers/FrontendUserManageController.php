@@ -59,7 +59,7 @@ class FrontendUserManageController extends Controller
     public function __construct()
     {
         $this->middleware('auth:admin');
-        $this->middleware('permission:user-list|user-create|user-edit|user-delete',['only' => ['all_user', 'apiUsers', 'apiUpdateUserStatus', 'apiUpdateUserBalance']]);
+        $this->middleware('permission:user-list|user-create|user-edit|user-delete',['only' => ['all_user', 'apiUsers', 'apiUpdateUserStatus', 'apiUpdateUserBalance', 'apiVerifySeller', 'apiGetVerification']]);
         $this->middleware('permission:user-delete',['only' => ['bulk_action','new_user_delete']]);
     }
 
@@ -118,21 +118,109 @@ class FrontendUserManageController extends Controller
         ]);
 
         $user = User::with(['country', 'sellerVerify'])->findOrFail($id);
-        Wallet::updateOrInsert(
-            ['buyer_id' => $user->id],
-            ['balance' => $validated['balance']]
+
+        if (class_exists(\Modules\Wallet\Entities\Wallet::class) && \Illuminate\Support\Facades\Schema::hasTable('wallets')) {
+            \Modules\Wallet\Entities\Wallet::updateOrInsert(
+                ['buyer_id' => $user->id],
+                ['balance' => $validated['balance']]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => __('Wallet balance updated successfully'),
+                'user' => $this->formatUserPayload($user),
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'error',
+            'message' => __('Wallet module is currently locked and cannot be updated.'),
+        ], 400);
+    }
+
+    public function apiVerifySeller(Request $request, $id): JsonResponse
+    {
+        $user = User::with(['country', 'sellerVerify'])->findOrFail($id);
+
+        if ($user->user_type !== 0) {
+            return response()->json([
+                'status' => 'error',
+                'message' => __('Only seller accounts can be verified.'),
+            ], 422);
+        }
+
+        $sellerVerify = SellerVerify::firstOrCreate(
+            ['seller_id' => $user->id],
+            ['status' => 0]
         );
+
+        $newStatus = $request->has('status') 
+            ? ($request->boolean('status') ? 1 : 0) 
+            : ($sellerVerify->status === 1 ? 0 : 1);
+
+        $sellerVerify->update(['status' => $newStatus]);
+
+        if ($newStatus === 1) {
+            try {
+                $templateMessage = get_static_option('admin_seller_verification_message') ?? '';
+                $message = str_replace(["@name"], [$user->name], $templateMessage);
+                if (!empty($user->email)) {
+                    Mail::to($user->email)->send(new BasicMail([
+                        'subject' => get_static_option('admin_seller_verification_subject') ?? __('Seller Verification Success'),
+                        'message' => $message ?: __('Congratulations, your provider account has been verified.'),
+                    ]));
+                }
+            } catch (\Throwable $e) {
+                // Ignore mail sending failure if SMTP not configured
+            }
+        }
+
+        $freshUser = User::with(['country', 'sellerVerify'])->findOrFail($id);
 
         return response()->json([
             'status' => 'success',
-            'message' => __('Wallet balance updated successfully'),
-            'user' => $this->formatUserPayload($user),
+            'message' => $newStatus === 1 
+                ? __('Seller verified successfully.') 
+                : __('Seller verification revoked.'),
+            'user' => $this->formatUserPayload($freshUser),
+        ]);
+    }
+
+    public function apiGetVerification(Request $request, $id): JsonResponse
+    {
+        $user = User::with(['country', 'sellerVerify'])->findOrFail($id);
+        $verify = $user->sellerVerify;
+
+        return response()->json([
+            'status' => 'success',
+            'verification' => [
+                'seller_id' => $user->id,
+                'seller_name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'status' => (int) optional($verify)->status,
+                'is_verified' => optional($verify)->status === 1,
+                'national_id' => optional($verify)->national_id,
+                'address' => optional($verify)->address ?? $user->seller_address ?? $user->address,
+                'tax_number' => $user->tax_number,
+                'business_registration' => $user->business_registration,
+                'created_at' => optional(optional($verify)->created_at)->toDateTimeString(),
+                'updated_at' => optional(optional($verify)->updated_at)->toDateTimeString(),
+            ],
         ]);
     }
 
     private function formatUserPayload(User $user): array
     {
-        $walletBalance = (float) (Wallet::where('buyer_id', $user->id)->value('balance') ?? 0);
+        $walletBalance = 0.0;
+        if (class_exists(\Modules\Wallet\Entities\Wallet::class) && \Illuminate\Support\Facades\Schema::hasTable('wallets')) {
+            try {
+                $walletBalance = (float) (\Modules\Wallet\Entities\Wallet::where('buyer_id', $user->id)->value('balance') ?? 0);
+            } catch (\Throwable $e) {
+                $walletBalance = 0.0;
+            }
+        }
+
         $role = (int) $user->user_type === 0 ? 'seller' : 'buyer';
         $status = (int) $user->user_status === 1 ? 'active' : 'suspended';
         $countryName = optional($user->country)->country ?? '';
@@ -142,6 +230,8 @@ class FrontendUserManageController extends Controller
             $attachment = get_attachment_image_by_id($user->image);
             $avatar = is_array($attachment) ? ($attachment['img_url'] ?? null) : null;
         }
+
+        $isVerified = optional($user->sellerVerify)->status === 1;
 
         return [
             'id' => $user->id,
@@ -155,7 +245,16 @@ class FrontendUserManageController extends Controller
             'created_at' => optional($user->created_at)->toDateString(),
             'wallet_balance' => $walletBalance,
             'email_verified' => (bool) $user->email_verified,
-            'seller_verified' => optional($user->sellerVerify)->status === 1,
+            'seller_verified' => $isVerified,
+            'tax_number' => $user->tax_number,
+            'business_registration' => $user->business_registration,
+            'address' => $user->seller_address ?? $user->address,
+            'seller_verification' => [
+                'status' => (int) optional($user->sellerVerify)->status,
+                'is_verified' => $isVerified,
+                'national_id' => optional($user->sellerVerify)->national_id,
+                'address' => optional($user->sellerVerify)->address ?? $user->seller_address ?? $user->address,
+            ],
         ];
     }
 

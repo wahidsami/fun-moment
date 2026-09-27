@@ -16,7 +16,7 @@ class Subcategory extends Model
     }
 
     public function childcategories(){
-        return $this->hasMany('App\ChildCategory');
+        return $this->hasMany(ChildCategory::class, 'sub_category_id', 'id');
     }
 
     public function services(){
