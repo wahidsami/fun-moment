@@ -179,9 +179,11 @@ class _ServicePersonalizationPageState
                               //increase page steps by one
                               BookStepsService().onNext(context);
                               //fetch shedule
+                              final bookService = Provider.of<BookService>(context, listen: false);
                               Provider.of<SheduleService>(context, listen: false)
                                   .fetchShedule(provider.sellerId,
-                                      firstThreeLetter(DateTime.now(), null));
+                                      firstThreeLetter(DateTime.now(), null),
+                                      serviceId: bookService.serviceId);
 
                               //go to shedule page
                               Navigator.push(

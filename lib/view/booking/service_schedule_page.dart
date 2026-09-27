@@ -154,12 +154,15 @@ class _ServiceSchedulePageState extends State<ServiceSchedulePage> {
                                   });
                                   print(_selectedWeekday);
 
-                                  //fetch shedule
+                                   //fetch shedule
                                   provider.fetchShedule(
                                       Provider.of<BookService>(context,
                                               listen: false)
                                           .sellerId,
-                                      _selectedWeekday);
+                                      _selectedWeekday,
+                                      serviceId: Provider.of<BookService>(
+                                              context, listen: false)
+                                          .serviceId);
                                 },
                               ),
 

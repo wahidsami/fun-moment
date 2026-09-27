@@ -7,7 +7,12 @@ import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 
 class ProviderAvailabilityPage extends StatefulWidget {
-  const ProviderAvailabilityPage({Key? key}) : super(key: key);
+  /// When [serviceId] is provided, availability is scoped to that specific service.
+  /// When null, the legacy seller-level availability is shown.
+  final int? serviceId;
+  final String? serviceTitle;
+
+  const ProviderAvailabilityPage({Key? key, this.serviceId, this.serviceTitle}) : super(key: key);
 
   @override
   State<ProviderAvailabilityPage> createState() => _ProviderAvailabilityPageState();
@@ -18,7 +23,8 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ProviderAvailabilityService>(context, listen: false).fetchDaysAndSchedules();
+      Provider.of<ProviderAvailabilityService>(context, listen: false)
+          .fetchDaysAndSchedules(serviceId: widget.serviceId);
     });
   }
 
@@ -220,6 +226,7 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
                     dayId: day.id,
                     schedule: slotString,
                     allDays: applyToAllDays,
+                    serviceId: widget.serviceId,
                   );
                 },
                 child: Text(
@@ -253,13 +260,22 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          lnProvider.getString('Working Days & Availability'),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              lnProvider.getString('Working Days & Availability'),
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            if (widget.serviceTitle != null)
+              Text(
+                widget.serviceTitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: FMColors.magenta, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+          ],
         ),
       ),
       body: Consumer<ProviderAvailabilityService>(
@@ -282,7 +298,7 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
           return RefreshIndicator(
             color: FMColors.magenta,
             backgroundColor: FMColors.surfaceDark,
-            onRefresh: () => availService.fetchDaysAndSchedules(),
+            onRefresh: () => availService.fetchDaysAndSchedules(serviceId: widget.serviceId),
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               children: [
@@ -407,10 +423,10 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
                         onChanged: (bool newVal) async {
                           if (!isConfigured) {
                             // Day doesn't exist yet in DB: create it
-                            await availService.createWorkingDay(shortName);
+                            await availService.createWorkingDay(shortName, serviceId: widget.serviceId);
                           } else {
                             // Toggle existing day
-                            await availService.toggleWorkingDay(existing.id);
+                            await availService.toggleWorkingDay(existing.id, serviceId: widget.serviceId);
                           }
                         },
                       ),
@@ -461,7 +477,7 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
                                             const SizedBox(width: 8),
                                             InkWell(
                                               onTap: () async {
-                                                await availService.deleteTimeSlot(slot.id);
+                                                await availService.deleteTimeSlot(slot.id, serviceId: widget.serviceId);
                                               },
                                               child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 16),
                                             ),

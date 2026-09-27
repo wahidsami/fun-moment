@@ -113,7 +113,9 @@ class ProviderAvailabilityService with ChangeNotifier {
   // Returns all standard 7 days sorted Sun -> Sat
   static const List<String> standardDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  Future<void> fetchDaysAndSchedules({bool showLoader = true}) async {
+  /// Fetch working days and their time slots.
+  /// Pass [serviceId] to retrieve availability scoped to a specific service.
+  Future<void> fetchDaysAndSchedules({bool showLoader = true, int? serviceId}) async {
     final connected = await checkConnection();
     if (!connected) return;
 
@@ -123,7 +125,11 @@ class ProviderAvailabilityService with ChangeNotifier {
     if (showLoader) setLoading(true);
 
     try {
-      final url = Uri.parse('$baseApi/seller/schedule-days-list');
+      String urlStr = '$baseApi/seller/schedule-days-list';
+      if (serviceId != null) {
+        urlStr += '?service_id=$serviceId';
+      }
+      final url = Uri.parse(urlStr);
       final res = await http.get(url, headers: {
         'Accept': 'application/json',
         'Authorization': 'Bearer $token',
@@ -133,7 +139,7 @@ class ProviderAvailabilityService with ChangeNotifier {
         final body = jsonDecode(res.body);
         if (body is List) {
           final loaded = body.map((item) => ProviderWorkingDay.fromJson(item as Map<String, dynamic>)).toList();
-          
+
           // Re-order strictly Sun -> Sat
           final order = {'Sun': 1, 'Mon': 2, 'Tue': 3, 'Wed': 4, 'Thu': 5, 'Fri': 6, 'Sat': 7};
           loaded.sort((a, b) => (order[a.shortName] ?? 99).compareTo(order[b.shortName] ?? 99));
@@ -147,7 +153,9 @@ class ProviderAvailabilityService with ChangeNotifier {
     }
   }
 
-  Future<bool> createWorkingDay(String dayName) async {
+  /// Create (or reactivate) a working day.
+  /// Pass [serviceId] to scope the day to a specific service.
+  Future<bool> createWorkingDay(String dayName, {int? serviceId}) async {
     final token = await _getToken();
     if (token == null) return false;
 
@@ -156,18 +164,21 @@ class ProviderAvailabilityService with ChangeNotifier {
 
     try {
       final url = Uri.parse('$baseApi/seller/create-day');
+      final bodyMap = <String, String>{'day': dayName};
+      if (serviceId != null) bodyMap['service_id'] = serviceId.toString();
+
       final res = await http.post(
         url,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: {'day': dayName},
+        body: bodyMap,
       );
 
       isSaving = false;
       if (res.statusCode == 200 || res.statusCode == 201) {
-        await fetchDaysAndSchedules(showLoader: false);
+        await fetchDaysAndSchedules(showLoader: false, serviceId: serviceId);
         return true;
       }
       return false;
@@ -178,23 +189,28 @@ class ProviderAvailabilityService with ChangeNotifier {
     }
   }
 
-  Future<bool> toggleWorkingDay(int dayId) async {
+  /// Toggle a working day on/off.
+  /// Pass [serviceId] so the backend scopes the lookup correctly.
+  Future<bool> toggleWorkingDay(int dayId, {int? serviceId}) async {
     final token = await _getToken();
     if (token == null) return false;
 
     try {
       final url = Uri.parse('$baseApi/seller/toggle-day');
+      final bodyMap = <String, String>{'id': dayId.toString()};
+      if (serviceId != null) bodyMap['service_id'] = serviceId.toString();
+
       final res = await http.post(
         url,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: {'id': dayId.toString()},
+        body: bodyMap,
       );
 
       if (res.statusCode == 200 || res.statusCode == 201) {
-        // Toggle locally
+        // Toggle locally for instant UI feedback
         final idx = days.indexWhere((d) => d.id == dayId);
         if (idx != -1) {
           days[idx].status = days[idx].status == 1 ? 0 : 1;
@@ -209,10 +225,13 @@ class ProviderAvailabilityService with ChangeNotifier {
     }
   }
 
+  /// Add a time slot to a specific day.
+  /// Pass [serviceId] to scope the slot to a specific service.
   Future<bool> addTimeSlot({
     required int dayId,
     required String schedule,
     bool allDays = false,
+    int? serviceId,
   }) async {
     final token = await _getToken();
     if (token == null) return false;
@@ -222,11 +241,12 @@ class ProviderAvailabilityService with ChangeNotifier {
 
     try {
       final url = Uri.parse('$baseApi/seller/schedule/create');
-      final body = {
+      final bodyMap = <String, String>{
         'day_id': dayId.toString(),
         'schedule': schedule,
         if (allDays) 'schedule_for_all_days': '1',
       };
+      if (serviceId != null) bodyMap['service_id'] = serviceId.toString();
 
       final res = await http.post(
         url,
@@ -234,13 +254,13 @@ class ProviderAvailabilityService with ChangeNotifier {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: body,
+        body: bodyMap,
       );
 
       isSaving = false;
       if (res.statusCode == 200 || res.statusCode == 201) {
         OthersHelper().showToast('Time slot added successfully', Colors.green);
-        await fetchDaysAndSchedules(showLoader: false);
+        await fetchDaysAndSchedules(showLoader: false, serviceId: serviceId);
         return true;
       } else {
         try {
@@ -261,7 +281,8 @@ class ProviderAvailabilityService with ChangeNotifier {
     }
   }
 
-  Future<bool> deleteTimeSlot(int slotId) async {
+  /// Delete a time slot by its ID.
+  Future<bool> deleteTimeSlot(int slotId, {int? serviceId}) async {
     final token = await _getToken();
     if (token == null) return false;
 

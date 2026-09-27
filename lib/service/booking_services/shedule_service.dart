@@ -22,7 +22,7 @@ class SheduleService with ChangeNotifier {
     notifyListeners();
   }
 
-  fetchShedule(sellerId, selectedWeek) async {
+  fetchShedule(sellerId, selectedWeek, {int? serviceId}) async {
     setLoadingTrue();
     var connection = await checkConnection();
     if (connection) {
@@ -33,9 +33,14 @@ class SheduleService with ChangeNotifier {
         // "Content-Type": "application/json"
       };
 
+      String urlStr =
+          '$baseApi/service-list/service-schedule/$selectedWeek/$sellerId';
+      if (serviceId != null) {
+        urlStr += '?service_id=$serviceId';
+      }
+
       var response = await http.get(
-          Uri.parse(
-              '$baseApi/service-list/service-schedule/$selectedWeek/$sellerId'),
+          Uri.parse(urlStr),
           headers: header);
 
       if (response.statusCode == 200 && response.body.contains('day')) {

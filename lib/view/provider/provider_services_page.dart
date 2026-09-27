@@ -73,8 +73,8 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_month_outlined, color: Colors.white),
-            tooltip: lnProvider.getString('My Availability'),
+            icon: const Icon(Icons.calendar_month_outlined, color: Colors.white70),
+            tooltip: lnProvider.getString('Global Availability'),
             onPressed: () {
               Navigator.push(
                 context,
@@ -300,7 +300,7 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
                       const Divider(color: FMColors.border, height: 1),
                       const SizedBox(height: 8),
 
-                      // Bottom actions: Active switch, Edit button, Delete button
+                      // Bottom actions: Active switch, Availability button, Edit button, Delete button
                       Row(
                         children: [
                           // Switch & label
@@ -330,13 +330,31 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
                           ),
                           const Spacer(),
 
+                          // Availability Button
+                          IconButton(
+                            icon: const Icon(Icons.schedule_rounded, color: FMColors.magenta, size: 20),
+                            tooltip: lnProvider.getString('Set Availability'),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ProviderAvailabilityPage(
+                                    serviceId: service.id,
+                                    serviceTitle: service.title,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 2),
+
                           // Edit Button
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: FMColors.magenta,
                               side: const BorderSide(color: FMColors.magenta, width: 1.2),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             ),
                             icon: const Icon(Icons.edit_outlined, size: 16),
                             label: Text(
@@ -358,7 +376,7 @@ class _ProviderServicesPageState extends State<ProviderServicesPage> {
                               }
                             },
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 2),
 
                           // Delete Button
                           IconButton(
