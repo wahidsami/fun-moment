@@ -50,6 +50,7 @@ Route::middleware(['setlang'])->group(function(){
     Route::get('/support-tickets-json', 'AdminTicketViewController@apiTickets')->name('admin.support.tickets.api');
     Route::post('/support-tickets-json/{id}/status', 'AdminTicketViewController@apiUpdateTicketStatus')->name('admin.support.tickets.status.api');
     Route::get('/support-tickets-json/{id}', 'AdminTicketViewController@apiTicketDetails')->name('admin.support.tickets.details.api');
+    Route::post('/support-tickets-json/{id}/reply', 'AdminTicketViewController@apiReplyTicket')->name('admin.support.tickets.reply.api');
     Route::get('/audit-logs-json', 'AdminDashboardController@apiAuditLogs')->name('admin.audit.logs.api');
     Route::get('/wallets-json', '\\Modules\\Wallet\\Http\\Controllers\\AdminWalletApiController@apiIndex')->name('admin.wallets.api');
     Route::get('/wallets-json/{userId}', '\\Modules\\Wallet\\Http\\Controllers\\AdminWalletApiController@apiUserWallet')->name('admin.wallets.user.api');
