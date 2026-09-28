@@ -987,6 +987,15 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex items-center justify-center gap-1">
+                                {hasPermission && service.status === 'pending' && (
+                                  <button
+                                    onClick={() => handleUpdateStatus(service.id, 'active')}
+                                    className="rounded p-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition"
+                                    title={t.btn_approve || 'Approve'}
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => setSelectedService(service)}
                                   className="rounded p-1 text-slate-500 hover:bg-slate-100 transition"
