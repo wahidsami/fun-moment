@@ -132,6 +132,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
   const [formSubcategoryId, setFormSubcategoryId] = useState<number | ''>('');
   const [formSellerId, setFormSellerId] = useState<number | ''>('');
   const [formPrice, setFormPrice] = useState<number>(100);
+  const [formDuration, setFormDuration] = useState<string>('1 day');
   const [formDescEn, setFormDescEn] = useState('');
   const [formDescAr, setFormDescAr] = useState('');
   const [formImageFile, setFormImageFile] = useState<File | null>(null);
@@ -658,7 +659,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     if (!confirmDel) return;
 
     try {
-      await LaravelAPI.deleteCategory(id, level);
+      await LaravelAPI.deleteCategory(level, id);
       await loadCategoryTree();
       showSuccess(language === 'en' ? 'Category deleted successfully!' : 'تم حذف القسم بنجاح!');
     } catch (err: any) {
@@ -683,7 +684,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
         currentStatus = item?.status ?? 'active';
       }
       const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
-      await LaravelAPI.updateLocationStatus(id, level, nextStatus);
+      await LaravelAPI.updateLocationStatus(level, id, nextStatus);
       await loadGeographies();
       showSuccess(language === 'en' ? `Location status changed to ${nextStatus}!` : `تم تحديث حالة المنطقة بنجاح!`);
     } catch (err: any) {
@@ -988,10 +989,37 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                             <td className="px-6 py-4">
                               <div className="flex items-center justify-center gap-1">
                                 {hasPermission && service.status === 'pending' && (
+                                  <>
+                                    <button
+                                      onClick={() => handleUpdateStatus(service.id, 'active')}
+                                      className="rounded p-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition"
+                                      title={t.btn_approve || 'Approve'}
+                                    >
+                                      <Check className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleUpdateStatus(service.id, 'suspended')}
+                                      className="rounded p-1 bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
+                                      title={language === 'en' ? 'Reject / Suspend' : 'رفض / إيقاف'}
+                                    >
+                                      <Ban className="h-4 w-4" />
+                                    </button>
+                                  </>
+                                )}
+                                {hasPermission && service.status === 'active' && (
+                                  <button
+                                    onClick={() => handleUpdateStatus(service.id, 'suspended')}
+                                    className="rounded p-1 bg-amber-50 text-amber-600 hover:bg-amber-100 transition"
+                                    title={t.btn_suspend || 'Suspend'}
+                                  >
+                                    <Ban className="h-4 w-4" />
+                                  </button>
+                                )}
+                                {hasPermission && service.status === 'suspended' && (
                                   <button
                                     onClick={() => handleUpdateStatus(service.id, 'active')}
                                     className="rounded p-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition"
-                                    title={t.btn_approve || 'Approve'}
+                                    title={language === 'en' ? 'Activate / Approve' : 'تفعيل / اعتماد'}
                                   >
                                     <Check className="h-4 w-4" />
                                   </button>

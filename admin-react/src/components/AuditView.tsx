@@ -72,8 +72,10 @@ export default function AuditView({ language, activeRole, onLogUpdated }: AuditV
     setLoadingImmutable(true);
     try {
       const res = await LaravelAPI.getImmutableAuditLogs();
-      if (res.logs && Array.isArray(res.logs)) {
-        setImmutableLogs(res.logs);
+      if (Array.isArray(res)) {
+        setImmutableLogs(res);
+      } else if ((res as any)?.logs && Array.isArray((res as any).logs)) {
+        setImmutableLogs((res as any).logs);
       }
     } catch (err) {
       console.error(err);

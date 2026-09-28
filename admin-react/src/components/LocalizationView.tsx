@@ -28,12 +28,6 @@ export default function LocalizationView({ language }: LocalizationViewProps) {
         </div>
       </div>
 
-      {successMsg && (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-800 font-semibold animate-fade-in flex items-center gap-1.5">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-          <span>{successMsg}</span>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Localization Options */}

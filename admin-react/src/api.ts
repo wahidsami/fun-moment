@@ -925,7 +925,7 @@ export const LaravelAPI = {
   },
 
   // Seller Verification
-  async verifySeller(id: number, status?: boolean): Promise<User> {
+  async verifySeller(id: number, status?: boolean | number): Promise<User> {
     const response = await fetch(`/admin-home/frontend-users/${id}/verify`, {
       method: 'POST',
       headers: {
@@ -1049,7 +1049,7 @@ export const LaravelAPI = {
     };
   },
 
-  async createLocation(node: { level: 'country' | 'city' | 'area'; name_en: string; name_ar?: string; code?: string; country_id?: number; city_id?: number }): Promise<any> {
+  async createLocation(node: { level: 'country' | 'city' | 'area'; name_en: string; name_ar?: string; code?: string; country_id?: number | string; city_id?: number; phone_code?: string; currency?: string }): Promise<any> {
     const response = await fetch('/admin-home/locations-json', {
       method: 'POST',
       headers: {

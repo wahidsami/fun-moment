@@ -71,8 +71,8 @@ export default function SupportView({ language, activeRole }: SupportViewProps) 
     setSendingReply(true);
     try {
       const res = await LaravelAPI.replyTicket(selectedTicket.id, replyMessage.trim());
-      if (res.message) {
-        setTicketMessages(prev => [...prev, res.message]);
+      if (res.messages && Array.isArray(res.messages)) {
+        setTicketMessages(res.messages);
       }
       setReplyMessage('');
       setSuccessMsg(language === 'en' ? 'Reply recorded and sent to customer!' : 'تم حفظ الرد وإرساله للعميل بنجاح!');
