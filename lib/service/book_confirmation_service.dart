@@ -92,7 +92,7 @@ class BookConfirmationService with ChangeNotifier {
   ) {
     var subTotal = calculateSubtotal(includedList, extrasList);
     final parsedTax = taxPercent is num
-        ? (taxPercent as num).toDouble()
+        ? taxPercent.toDouble()
         : double.tryParse(taxPercent?.toString() ?? '') ?? 0.0;
     taxPrice = (subTotal * parsedTax) / 100;
 
@@ -114,9 +114,9 @@ class BookConfirmationService with ChangeNotifier {
     var subTotal = calculateSubtotal(includedList, extrasList);
     var tax = calculateTax(taxPercent, includedList, extrasList);
     final defaultPrice = Provider.of<PersonalizationService>(context, listen: false).defaultprice;
-    final parsedDefaultPrice = defaultPrice is num
-        ? (defaultPrice as num).toDouble()
-        : double.tryParse(defaultPrice?.toString() ?? '') ?? 0.0;
+    final parsedDefaultPrice = (defaultPrice as dynamic) is num
+        ? ((defaultPrice as dynamic) as num).toDouble()
+        : 0.0;
     totalPriceOnlineServiceAfterAllCalculation = subTotal + tax + parsedDefaultPrice;
     Future.delayed(const Duration(microseconds: 500), () {
       notifyListeners();
@@ -125,7 +125,7 @@ class BookConfirmationService with ChangeNotifier {
 
   caculateTotalAfterCouponApplied(couponDiscount) {
     final parsedDiscount = couponDiscount is num
-        ? (couponDiscount as num).toDouble()
+        ? couponDiscount.toDouble()
         : double.tryParse(couponDiscount?.toString() ?? '') ?? 0.0;
     totalPriceAfterAllcalculation =
         totalPriceAfterAllcalculation - parsedDiscount;

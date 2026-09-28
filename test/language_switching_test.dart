@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
-import 'package:funmoments/view/utils/app_strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
