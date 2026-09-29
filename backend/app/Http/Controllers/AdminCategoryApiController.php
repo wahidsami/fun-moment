@@ -52,7 +52,7 @@ class AdminCategoryApiController extends Controller
                 return [
                     'id' => $cat->id,
                     'nameEn' => $cat->name,
-                    'nameAr' => $cat->name,
+                    'nameAr' => $cat->name_ar ?: $cat->name,
                     'slug' => $cat->slug ?: Str::slug($cat->name),
                     'status' => (int) $cat->status === 1 ? 'active' : 'inactive',
                     'sortOrder' => (int) ($cat->sort_order ?? 0),
@@ -67,7 +67,7 @@ class AdminCategoryApiController extends Controller
                             'id' => $sub->id,
                             'parentId' => (int) $sub->category_id,
                             'nameEn' => $sub->name,
-                            'nameAr' => $sub->name,
+                            'nameAr' => $sub->name_ar ?: $sub->name,
                             'slug' => $sub->slug ?: Str::slug($sub->name),
                             'status' => (int) $sub->status === 1 ? 'active' : 'inactive',
                             'image' => $sub->image,
@@ -78,7 +78,7 @@ class AdminCategoryApiController extends Controller
                                     'id' => $child->id,
                                     'parentId' => (int) $child->sub_category_id,
                                     'nameEn' => $child->name,
-                                    'nameAr' => $child->name,
+                                    'nameAr' => $child->name_ar ?: $child->name,
                                     'slug' => $child->slug ?: Str::slug($child->name),
                                     'status' => (int) $child->status === 1 ? 'active' : 'inactive',
                                     'image' => $child->image,
@@ -113,6 +113,7 @@ class AdminCategoryApiController extends Controller
         ]);
 
         $name = trim($validated['name_en']);
+        $nameAr = isset($validated['name_ar']) && trim($validated['name_ar']) !== '' ? trim($validated['name_ar']) : null;
         $slug = !empty($validated['slug']) ? Str::slug($validated['slug']) : Str::slug($name);
         $status = 1;
         if (isset($validated['status'])) {
@@ -126,6 +127,7 @@ class AdminCategoryApiController extends Controller
 
             $cat = Category::create([
                 'name' => $name,
+                'name_ar' => $nameAr,
                 'slug' => $slug,
                 'status' => $status,
                 'sort_order' => isset($validated['sort_order']) ? (int) $validated['sort_order'] : 0,
@@ -149,7 +151,7 @@ class AdminCategoryApiController extends Controller
                 'node' => [
                     'id' => $cat->id,
                     'nameEn' => $cat->name,
-                    'nameAr' => $cat->name,
+                    'nameAr' => $cat->name_ar ?: $cat->name,
                     'slug' => $cat->slug,
                     'status' => (int) $cat->status === 1 ? 'active' : 'inactive',
                     'sortOrder' => (int) ($cat->sort_order ?? 0),
@@ -173,6 +175,7 @@ class AdminCategoryApiController extends Controller
             $sub = Subcategory::create([
                 'category_id' => $parentCat->id,
                 'name' => $name,
+                'name_ar' => $nameAr,
                 'slug' => $slug,
                 'status' => $status,
                 'image' => $validated['image'] ?? null,
@@ -194,7 +197,7 @@ class AdminCategoryApiController extends Controller
                     'id' => $sub->id,
                     'parentId' => $sub->category_id,
                     'nameEn' => $sub->name,
-                    'nameAr' => $sub->name,
+                    'nameAr' => $sub->name_ar ?: $sub->name,
                     'slug' => $sub->slug,
                     'status' => (int) $sub->status === 1 ? 'active' : 'inactive',
                     'image' => $sub->image,
@@ -215,6 +218,7 @@ class AdminCategoryApiController extends Controller
             'category_id' => $parentSub->category_id,
             'sub_category_id' => $parentSub->id,
             'name' => $name,
+            'name_ar' => $nameAr,
             'slug' => $slug,
             'status' => $status,
             'image' => $validated['image'] ?? null,
@@ -236,7 +240,7 @@ class AdminCategoryApiController extends Controller
                 'id' => $child->id,
                 'parentId' => $child->sub_category_id,
                 'nameEn' => $child->name,
-                'nameAr' => $child->name,
+                'nameAr' => $child->name_ar ?: $child->name,
                 'slug' => $child->slug,
                 'status' => (int) $child->status === 1 ? 'active' : 'inactive',
                 'image' => $child->image,
@@ -261,6 +265,7 @@ class AdminCategoryApiController extends Controller
         ]);
 
         $name = trim($validated['name_en']);
+        $nameAr = isset($validated['name_ar']) && trim($validated['name_ar']) !== '' ? trim($validated['name_ar']) : null;
         $slug = !empty($validated['slug']) ? Str::slug($validated['slug']) : Str::slug($name);
 
         if ($level === 'parent') {
@@ -273,6 +278,7 @@ class AdminCategoryApiController extends Controller
 
             $updateData = [
                 'name' => $name,
+                'name_ar' => $nameAr,
                 'slug' => $slug,
             ];
 
@@ -316,7 +322,7 @@ class AdminCategoryApiController extends Controller
                 'node' => [
                     'id' => $cat->id,
                     'nameEn' => $cat->name,
-                    'nameAr' => $cat->name,
+                    'nameAr' => $cat->name_ar ?: $cat->name,
                     'slug' => $cat->slug,
                     'status' => (int) $cat->status === 1 ? 'active' : 'inactive',
                     'sortOrder' => (int) ($cat->sort_order ?? 0),
@@ -335,6 +341,7 @@ class AdminCategoryApiController extends Controller
 
             $updateData = [
                 'name' => $name,
+                'name_ar' => $nameAr,
                 'slug' => $slug,
             ];
 
@@ -369,7 +376,7 @@ class AdminCategoryApiController extends Controller
                     'id' => $sub->id,
                     'parentId' => $sub->category_id,
                     'nameEn' => $sub->name,
-                    'nameAr' => $sub->name,
+                    'nameAr' => $sub->name_ar ?: $sub->name,
                     'slug' => $sub->slug,
                     'status' => (int) $sub->status === 1 ? 'active' : 'inactive',
                     'image' => $sub->image,
@@ -384,6 +391,7 @@ class AdminCategoryApiController extends Controller
 
         $updateData = [
             'name' => $name,
+            'name_ar' => $nameAr,
             'slug' => $slug,
         ];
 
@@ -419,7 +427,7 @@ class AdminCategoryApiController extends Controller
                 'id' => $child->id,
                 'parentId' => $child->sub_category_id,
                 'nameEn' => $child->name,
-                'nameAr' => $child->name,
+                'nameAr' => $child->name_ar ?: $child->name,
                 'slug' => $child->slug,
                 'status' => (int) $child->status === 1 ? 'active' : 'inactive',
                 'image' => $child->image,

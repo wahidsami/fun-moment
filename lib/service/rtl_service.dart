@@ -115,48 +115,74 @@ class RtlService with ChangeNotifier {
       return;
     }
 
-    var response = await http.get(Uri.parse('$baseApi/language'));
-    print(response.body);
-    if (response.statusCode == 201) {
-      direction = jsonDecode(response.body)['language']['direction'];
-      langId = jsonDecode(response.body)['language']['id'].toString();
-      langSlug = jsonDecode(response.body)['language']['slug'].toString();
-      var now = DateTime.now();
+    try {
+      var response = await http
+          .get(Uri.parse('$baseApi/language'))
+          .timeout(const Duration(seconds: 3));
 
-      if (!srf.containsKey('langId')) {
-        print('Translating string for the first time');
-        srf.setString('langId', langId!);
-        srf.setString('slug', langSlug);
-        print('slugid$langSlug');
-        srf.setString('update_date', now.toIso8601String());
-        await Provider.of<AppStringService>(context, listen: false)
-            .fetchTranslatedStrings(context);
-      } else if (srf.getString('langId') != langId) {
-        srf.setString('update_date', now.toIso8601String());
-        print('Updating translated Strings');
-        srf.setString('langId', langId!);
-        srf.setString('slug', langSlug);
-        await Provider.of<AppStringService>(context, listen: false)
-            .fetchTranslatedStrings(context);
-      } else if (now
-              .difference(DateTime.parse(
-                  srf.getString('update_date') ?? now.toIso8601String()))
-              .inMinutes >
-          7200) {
-        srf.setString('update_date', now.toIso8601String());
-        await Provider.of<AppStringService>(context, listen: false)
-            .fetchTranslatedStrings(context);
-      } else {
-        print('Loading translations from local');
-        await Provider.of<AppStringService>(context, listen: false)
-            .fetchTranslatedStrings(context, doNotLoad: false);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final bodyData = jsonDecode(response.body);
+        if (bodyData != null && bodyData['language'] != null) {
+          direction = bodyData['language']['direction'] ?? 'ltr';
+          langId = bodyData['language']['id']?.toString();
+          langSlug = bodyData['language']['slug']?.toString() ?? 'en_US';
+          var now = DateTime.now();
+
+          if (!srf.containsKey('langId')) {
+            srf.setString('langId', langId ?? '1');
+            srf.setString('slug', langSlug);
+            srf.setString('update_date', now.toIso8601String());
+            try {
+              await Provider.of<AppStringService>(context, listen: false)
+                  .fetchTranslatedStrings(context)
+                  .timeout(const Duration(seconds: 3));
+            } catch (e) {
+              debugPrint('fetchTranslatedStrings first-time error: $e');
+            }
+          } else if (srf.getString('langId') != langId) {
+            srf.setString('update_date', now.toIso8601String());
+            srf.setString('langId', langId ?? '1');
+            srf.setString('slug', langSlug);
+            try {
+              await Provider.of<AppStringService>(context, listen: false)
+                  .fetchTranslatedStrings(context)
+                  .timeout(const Duration(seconds: 3));
+            } catch (e) {
+              debugPrint('fetchTranslatedStrings update error: $e');
+            }
+          } else if (now
+                  .difference(DateTime.parse(
+                      srf.getString('update_date') ?? now.toIso8601String()))
+                  .inMinutes >
+              7200) {
+            srf.setString('update_date', now.toIso8601String());
+            try {
+              await Provider.of<AppStringService>(context, listen: false)
+                  .fetchTranslatedStrings(context)
+                  .timeout(const Duration(seconds: 3));
+            } catch (e) {
+              debugPrint('fetchTranslatedStrings refresh error: $e');
+            }
+          } else {
+            try {
+              await Provider.of<AppStringService>(context, listen: false)
+                  .fetchTranslatedStrings(context, doNotLoad: false);
+            } catch (e) {
+              debugPrint('fetchTranslatedStrings local error: $e');
+            }
+          }
+
+          alreadyRtlLoaded = true;
+          notifyListeners();
+          return;
+        }
       }
-
-      alreadyRtlLoaded = true;
-      notifyListeners();
-    } else {
-      print('failed loading language direction');
-      print(response.body);
+    } catch (e) {
+      debugPrint('fetchDirection non-fatal error: $e');
     }
+
+    // Graceful fallback: maintain current or saved local language
+    alreadyRtlLoaded = true;
+    notifyListeners();
   }
 }

@@ -79,32 +79,82 @@ removeDollar(value) {
 }
 
 runAtstart(BuildContext context) async {
-  Provider.of<RtlService>(context, listen: false).fetchCurrency();
-  //language direction (ltr or rtl)
-  await Provider.of<RtlService>(context, listen: false).fetchDirection(context);
-  await Provider.of<ProfileService>(context, listen: false).fetchData();
-//fetch translated strings
-  // Provider.of<AppStringService>(context, listen: false)
-  //     .fetchTranslatedStrings();
+  try {
+    Provider.of<RtlService>(context, listen: false).fetchCurrency();
+  } catch (e) {
+    debugPrint('runAtstart fetchCurrency non-fatal: $e');
+  }
+
+  try {
+    await Provider.of<RtlService>(context, listen: false)
+        .fetchDirection(context)
+        .timeout(const Duration(seconds: 3));
+  } catch (e) {
+    debugPrint('runAtstart fetchDirection non-fatal: $e');
+  }
+
+  try {
+    await Provider.of<ProfileService>(context, listen: false)
+        .fetchData()
+        .timeout(const Duration(seconds: 3));
+  } catch (e) {
+    debugPrint('runAtstart fetchData non-fatal: $e');
+  }
 }
 
-runAtHome(BuildContext context) async {
-  await Provider.of<PushNotificationService>(context, listen: false)
-      .fetchPusherCredential(context: context);
-  Provider.of<SliderService>(context, listen: false).loadSlider();
-  Provider.of<CategoryService>(context, listen: false).fetchCategory();
-  Provider.of<TopRatedServicesSerivce>(context, listen: false)
-      .fetchTopService();
-  Provider.of<RecentServicesService>(context, listen: false)
-      .fetchRecentService();
-  Provider.of<RecentJobsService>(context, listen: false)
-      .fetchRecentJobs(context);
-  Provider.of<ProfileService>(context, listen: false).getProfileDetails();
-  // Provider.of<CountryStatesService>(context, listen: false)
-  //     .fetchCountries(context);
+runAtHome(BuildContext context, {bool isRefresh = false}) async {
+  try {
+    await Provider.of<PushNotificationService>(context, listen: false)
+        .fetchPusherCredential(context: context)
+        .timeout(const Duration(seconds: 4));
+  } catch (e) {
+    debugPrint('runAtHome fetchPusherCredential non-fatal: $e');
+  }
 
-  Provider.of<PermissionsService>(context, listen: false)
-      .fetchUserPermissions(context);
+  try {
+    Provider.of<SliderService>(context, listen: false).loadSlider();
+  } catch (e) {
+    debugPrint('runAtHome loadSlider non-fatal: $e');
+  }
 
-  //
+  try {
+    Provider.of<CategoryService>(context, listen: false)
+        .fetchCategory(isRefresh: isRefresh);
+  } catch (e) {
+    debugPrint('runAtHome fetchCategory non-fatal: $e');
+  }
+
+  try {
+    Provider.of<TopRatedServicesSerivce>(context, listen: false)
+        .fetchTopService();
+  } catch (e) {
+    debugPrint('runAtHome fetchTopService non-fatal: $e');
+  }
+
+  try {
+    Provider.of<RecentServicesService>(context, listen: false)
+        .fetchRecentService();
+  } catch (e) {
+    debugPrint('runAtHome fetchRecentService non-fatal: $e');
+  }
+
+  try {
+    Provider.of<RecentJobsService>(context, listen: false)
+        .fetchRecentJobs(context);
+  } catch (e) {
+    debugPrint('runAtHome fetchRecentJobs non-fatal: $e');
+  }
+
+  try {
+    Provider.of<ProfileService>(context, listen: false).getProfileDetails();
+  } catch (e) {
+    debugPrint('runAtHome getProfileDetails non-fatal: $e');
+  }
+
+  try {
+    Provider.of<PermissionsService>(context, listen: false)
+        .fetchUserPermissions(context);
+  } catch (e) {
+    debugPrint('runAtHome fetchUserPermissions non-fatal: $e');
+  }
 }

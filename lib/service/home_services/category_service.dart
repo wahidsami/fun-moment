@@ -10,25 +10,38 @@ class CategoryService with ChangeNotifier {
 
   var categoriesDropdownList = [];
 
-  fetchCategory() async {
-    if (categories == null) {
+  fetchCategory({bool isRefresh = false}) async {
+    if (categories == null || isRefresh) {
       var connection = await checkConnection();
       if (connection) {
-        var response = await http.get(Uri.parse('$baseApi/category'));
+        try {
+          var response = await http
+              .get(Uri.parse('$baseApi/category'))
+              .timeout(const Duration(seconds: 8));
 
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          categories = CategoryModel.fromJson(jsonDecode(response.body));
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            categories = CategoryModel.fromJson(jsonDecode(response.body));
 
-          categoriesDropdownList = categories.category;
+            categoriesDropdownList = categories.category;
 
-          notifyListeners();
-        } else {
-          //Something went wrong
-          categories == 'error';
+            notifyListeners();
+          } else {
+            // Something went wrong
+            if (categories == null) {
+              categories = 'error';
+              notifyListeners();
+            }
+          }
+        } catch (e) {
+          debugPrint('CategoryService.fetchCategory error: $e');
+          if (categories == null) {
+            categories = 'error';
+            notifyListeners();
+          }
         }
       }
     } else {
-      //already loaded from api
+      // already loaded from api
     }
   }
 }

@@ -42,7 +42,7 @@ class Categories extends StatelessWidget {
         }
 
         return SizedBox(
-          height: 140,
+          height: 175,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             shrinkWrap: true,
@@ -51,6 +51,7 @@ class Categories extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(width: 14),
             itemBuilder: (context, i) => CategoryCard(
               name: provider.categories.category[i].name,
+              nameAr: provider.categories.category[i].nameAr,
               id: provider.categories.category[i].id,
               cc: cc,
               index: i,
@@ -70,20 +71,25 @@ class _CategorySkeletonRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 140,
+      height: 175,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: 4,
         separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (_, __) => FMSurfaceCard(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              FMSkeletonBlock(width: 54, height: 54, radius: 27),
-              SizedBox(height: 12),
-              FMSkeletonBlock(width: 58, height: 12),
-            ],
+        itemBuilder: (_, __) => SizedBox(
+          width: 136,
+          height: 168,
+          child: FMSurfaceCard(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            borderRadius: BorderRadius.circular(20),
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FMSkeletonBlock(width: 74, height: 74, radius: 18),
+                SizedBox(height: 12),
+                FMSkeletonBlock(width: 76, height: 14),
+              ],
+            ),
           ),
         ),
       ),

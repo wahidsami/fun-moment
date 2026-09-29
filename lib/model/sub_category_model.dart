@@ -32,18 +32,29 @@ class SubCategory {
   SubCategory({
     this.id,
     this.name,
+    this.nameAr,
   });
 
   dynamic id;
   String? name;
+  String? nameAr;
 
   factory SubCategory.fromJson(Map<String, dynamic> json) => SubCategory(
         id: json["id"],
         name: json["name"],
+        nameAr: json["name_ar"],
       );
 
   Map<String, dynamic> toJson() => {
         "id": id,
         "name": name,
+        "name_ar": nameAr,
       };
+
+  String displayName(bool isArabic) {
+    if (isArabic) {
+      return (nameAr != null && nameAr!.trim().isNotEmpty) ? nameAr! : (name ?? '');
+    }
+    return name ?? '';
+  }
 }

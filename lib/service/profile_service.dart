@@ -79,38 +79,47 @@ class ProfileService with ChangeNotifier {
       "Authorization": "Bearer $token",
     };
 
-    var response =
-        await http.get(Uri.parse('$baseApi/user/profile'), headers: header);
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      var data = ProfileModel.fromJson(jsonDecode(response.body));
-      profileDetails = data;
-      hasError = false;
-      if (data.userDetails.userType != null) {
-        _cachedUserType = data.userDetails.userType;
-        prefs.setInt('userType', data.userDetails.userType!);
-      }
+    try {
+      var response = await http
+          .get(Uri.parse('$baseApi/user/profile'), headers: header)
+          .timeout(const Duration(seconds: 3));
 
-      ordersList[0] = data.pendingOrder;
-      ordersList[1] = data.activeOrder;
-      ordersList[2] = data.completeOrder;
-      ordersList[3] = data.totalOrder;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        var data = ProfileModel.fromJson(jsonDecode(response.body));
+        profileDetails = data;
+        hasError = false;
+        if (data.userDetails.userType != null) {
+          _cachedUserType = data.userDetails.userType;
+          prefs.setInt('userType', data.userDetails.userType!);
+        }
 
-      if (jsonDecode(response.body)['profile_image'] is List) {
-        //then dont do anything because it means image is missing from database
+        ordersList[0] = data.pendingOrder;
+        ordersList[1] = data.activeOrder;
+        ordersList[2] = data.completeOrder;
+        ordersList[3] = data.totalOrder;
+
+        if (jsonDecode(response.body)['profile_image'] is List) {
+          //then dont do anything because it means image is missing from database
+        } else {
+          profileImage = jsonDecode(response.body)['profile_image']['img_url'];
+        }
+
+        setLoadingFalse();
+        notifyListeners();
+        return true;
       } else {
-        profileImage = jsonDecode(response.body)['profile_image']['img_url'];
+        profileDetails = null;
+        hasError = true;
+        setLoadingFalse();
+        notifyListeners();
+        return false;
       }
-
-      setLoadingFalse();
-      notifyListeners();
-      return true;
-    } else {
-      print(response.body);
+    } catch (e) {
+      debugPrint('ProfileService.fetchData non-fatal error: $e');
       profileDetails = null;
       hasError = true;
       setLoadingFalse();
       notifyListeners();
-
       return false;
     }
   }

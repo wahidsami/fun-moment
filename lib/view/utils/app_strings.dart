@@ -577,7 +577,14 @@ var appStrings = {
       "Your service has been submitted and is pending admin approval.",
   "View My Services": "View My Services",
   "Awaiting admin approval before publishing to customers":
-      "Awaiting admin approval before publishing to customers"
+      "Awaiting admin approval before publishing to customers",
+  "Music & DJ": "Music & DJ",
+  "Food & Hospitality": "Food & Hospitality",
+  "Sound & Lighting": "Sound & Lighting",
+  "Event Setup & Equipment": "Event Setup & Equipment",
+  "Decor & Event Styling": "Decor & Event Styling",
+  "Photography & Video": "Photography & Video",
+  "Entertainment Activities": "Entertainment Activities"
 };
 
 var translations = {
@@ -1153,5 +1160,12 @@ var translations = {
       "تم إرسال الخدمة بنجاح وهي الآن قيد المراجعة والموافقة من قبل الإدارة.",
   "View My Services": "عرض خدماتي",
   "Awaiting admin approval before publishing to customers":
-      "في انتظار موافقة الإدارة قبل النشر للعملاء"
+      "في انتظار موافقة الإدارة قبل النشر للعملاء",
+  "Music & DJ": "الموسيقى والـ DJ",
+  "Food & Hospitality": "الأطعمة والضيافة",
+  "Sound & Lighting": "الصوت والإضاءة",
+  "Event Setup & Equipment": "تجهيز الفعاليات والمعدات",
+  "Decor & Event Styling": "الديكور وتنسيق المناسبات",
+  "Photography & Video": "التصوير والفيديو",
+  "Entertainment Activities": "الترفيه والأنشطة"
 };

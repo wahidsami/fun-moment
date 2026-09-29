@@ -93,7 +93,11 @@ void main() async {
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await PushNotificationService().initializeFCM();
 
-  await HomepageHelper().locationPermissionCheck();
+  // Trigger location permission check asynchronously so it never blocks runApp
+  HomepageHelper().locationPermissionCheck().catchError((e) {
+    debugPrint('locationPermissionCheck non-fatal error: $e');
+    return false;
+  });
 
   runApp(const MyApp());
 

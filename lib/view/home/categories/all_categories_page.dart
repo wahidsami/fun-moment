@@ -48,7 +48,7 @@ class _AllCategoriesPageState extends State<AllCategoriesPage> {
                   crossAxisCount: 2,
                   mainAxisSpacing: 19,
                   crossAxisSpacing: 19,
-                  height: 100),
+                  height: 168),
               padding: const EdgeInsets.only(top: 12),
               itemCount: provider.categories.category.length,
               shrinkWrap: true,
@@ -57,6 +57,7 @@ class _AllCategoriesPageState extends State<AllCategoriesPage> {
                     ? provider.categories != 'error'
                         ? CategoryCard(
                             name: provider.categories.category[index].name,
+                            nameAr: provider.categories.category[index].nameAr,
                             id: provider.categories.category[index].id,
                             cc: cc,
                             index: index,

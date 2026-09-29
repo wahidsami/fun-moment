@@ -56,10 +56,16 @@ class _HomepageState extends State<Homepage> {
     return Scaffold(
       backgroundColor: FMColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: physicsCommon,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: RefreshIndicator(
+          color: FMColors.magenta,
+          backgroundColor: FMColors.card,
+          onRefresh: () async {
+            await runAtHome(context, isRefresh: true);
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -217,8 +223,9 @@ class _HomepageState extends State<Homepage> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _DarkLoadingCard extends StatelessWidget {

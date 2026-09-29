@@ -35,15 +35,46 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _startInitialization() async {
-    await Provider.of<RtlService>(context, listen: false).loadSavedLanguage(context);
-    await runAtstart(context);
-    screenSizeAndPlatform(context);
-    initializeLNProvider(context);
-    final prefs = await SharedPreferences.getInstance();
-    final intro = prefs.getBool('intro');
+    // 1. Load local saved language with fast timeout
+    try {
+      await Provider.of<RtlService>(context, listen: false)
+          .loadSavedLanguage(context)
+          .timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('SplashScreen loadSavedLanguage non-fatal: $e');
+    }
+
+    // 2. Perform background startup requests with timeout protection
+    try {
+      await runAtstart(context).timeout(const Duration(seconds: 3));
+    } catch (e) {
+      debugPrint('SplashScreen runAtstart non-fatal: $e');
+    }
+
     if (!mounted) return;
 
-    if (intro == null) {
+    // 3. Local UI & provider initialization
+    try {
+      screenSizeAndPlatform(context);
+      initializeLNProvider(context);
+    } catch (e) {
+      debugPrint('SplashScreen screenSize/LNProvider non-fatal: $e');
+    }
+
+    // 4. Check intro status with fallback
+    bool hasSeenIntro = false;
+    try {
+      final prefs = await SharedPreferences.getInstance().timeout(const Duration(seconds: 2));
+      hasSeenIntro = prefs.getBool('intro') != null;
+    } catch (e) {
+      debugPrint('SplashScreen prefs check non-fatal: $e');
+      hasSeenIntro = true; // Fallback to landing page on prefs error
+    }
+
+    if (!mounted) return;
+
+    // 5. Guaranteed navigation
+    if (!hasSeenIntro) {
       Navigator.pushReplacement<void, void>(
         context,
         MaterialPageRoute<void>(

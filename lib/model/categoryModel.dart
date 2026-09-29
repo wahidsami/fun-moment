@@ -30,18 +30,21 @@ class Category {
   Category({
     this.id,
     this.name,
+    this.nameAr,
     this.icon,
     this.mobileIcon,
   });
 
   dynamic id;
   String? name;
+  String? nameAr;
   String? icon;
   String? mobileIcon;
 
   factory Category.fromJson(Map<String, dynamic> json) => Category(
         id: json["id"],
         name: json["name"],
+        nameAr: json["name_ar"],
         icon: json["icon"],
         mobileIcon: json["mobile_icon"],
       );
@@ -49,7 +52,15 @@ class Category {
   Map<String, dynamic> toJson() => {
         "id": id,
         "name": name,
+        "name_ar": nameAr,
         "icon": icon,
         "mobile_icon": mobileIcon,
       };
+
+  String displayName(bool isArabic) {
+    if (isArabic) {
+      return (nameAr != null && nameAr!.trim().isNotEmpty) ? nameAr! : (name ?? '');
+    }
+    return name ?? '';
+  }
 }
