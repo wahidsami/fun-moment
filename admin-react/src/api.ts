@@ -137,6 +137,15 @@ export const LaravelAPI = {
           credentials: 'include',
         });
 
+        if (response.status === 403) {
+          console.warn('Admin directory restricted to Super Admin accounts.');
+          return { admins: [], roles: [] };
+        }
+
+        if (!response.ok) {
+          return { admins: [], roles: [] };
+        }
+
         const payload = await response.json();
         if (Array.isArray(payload?.admins) && Array.isArray(payload?.roles)) {
           return {
@@ -215,6 +224,9 @@ export const LaravelAPI = {
         if (serviceData.subcategory_id) {
           fd.append('subcategory_id', String(serviceData.subcategory_id));
         }
+        if (serviceData.child_category_id) {
+          fd.append('child_category_id', String(serviceData.child_category_id));
+        }
         fd.append('seller_id', String(serviceData.seller_id));
         fd.append('price', String(serviceData.price));
         fd.append('duration', serviceData.duration || '');
@@ -228,7 +240,8 @@ export const LaravelAPI = {
           title_en: serviceData.title_en,
           title_ar: serviceData.title_ar,
           category_id: serviceData.category_id || 1,
-          subcategory_id: serviceData.subcategory_id,
+          subcategory_id: serviceData.subcategory_id || null,
+          child_category_id: serviceData.child_category_id || null,
           seller_id: serviceData.seller_id,
           price: serviceData.price,
           duration: serviceData.duration,
@@ -278,6 +291,9 @@ export const LaravelAPI = {
         if (serviceData.subcategory_id) {
           fd.append('subcategory_id', String(serviceData.subcategory_id));
         }
+        if (serviceData.child_category_id) {
+          fd.append('child_category_id', String(serviceData.child_category_id));
+        }
         fd.append('seller_id', String(serviceData.seller_id));
         fd.append('price', String(serviceData.price));
         fd.append('duration', serviceData.duration || '');
@@ -291,7 +307,8 @@ export const LaravelAPI = {
           title_en: serviceData.title_en,
           title_ar: serviceData.title_ar,
           category_id: serviceData.category_id || 1,
-          subcategory_id: serviceData.subcategory_id,
+          subcategory_id: serviceData.subcategory_id || null,
+          child_category_id: serviceData.child_category_id || null,
           seller_id: serviceData.seller_id,
           price: serviceData.price,
           duration: serviceData.duration,
@@ -1088,8 +1105,40 @@ export const LaravelAPI = {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err?.message || `Failed to delete category (${response.status})`);
+      const errorObj: any = new Error(err?.message || `Failed to delete category (${response.status})`);
+      errorObj.dependency_type = err?.dependency_type;
+      errorObj.count = err?.count;
+      errorObj.services = err?.services;
+      errorObj.children = err?.children;
+      errorObj.status = response.status;
+      throw errorObj;
     }
+  },
+
+  async reassignCategoryServices(payload: {
+    from_level: 'parent' | 'sub' | 'child';
+    from_id: number;
+    to_category_id: number;
+    to_subcategory_id?: number;
+    to_child_category_id?: number;
+    service_ids?: number[];
+  }): Promise<{ message: string; reassigned_count: number }> {
+    const response = await fetch('/admin-home/categories-json/reassign-services', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to reassign services (${response.status})`);
+    }
+
+    return response.json();
   },
 
   // Locations / Coverage

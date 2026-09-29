@@ -42,6 +42,7 @@ Route::middleware(['setlang'])->group(function(){
     Route::get('/categories-json', 'AdminCategoryApiController@apiCategories')->name('admin.categories.api');
     Route::post('/categories-json', 'AdminCategoryApiController@apiCreateCategory')->name('admin.categories.create.api');
     Route::post('/categories-json/reorder', 'AdminCategoryApiController@apiReorderCategories')->name('admin.categories.reorder.api');
+    Route::post('/categories-json/reassign-services', 'AdminCategoryApiController@apiReassignServices')->name('admin.categories.reassign.services.api');
     Route::post('/categories-json/{level}/{id}', 'AdminCategoryApiController@apiUpdateCategory')->name('admin.categories.update.api');
     Route::post('/categories-json/{level}/{id}/status', 'AdminCategoryApiController@apiUpdateCategoryStatus')->name('admin.categories.status.api');
     Route::post('/categories-json/{level}/{id}/delete', 'AdminCategoryApiController@apiDeleteCategory')->name('admin.categories.delete.api');

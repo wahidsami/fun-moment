@@ -52,9 +52,14 @@ class ServiceController extends Controller
                 return $this->formatServicePayload($service);
             })->values();
 
-        $categories = Category::with(['subcategories' => function($q) {
-            $q->select('id', 'category_id', 'name')->where('status', 1)->orderBy('name');
-        }])->select('id', 'name')->where('status', 1)->orderBy('name')->get();
+        $categories = Category::with([
+            'subcategories' => function($q) {
+                $q->select('id', 'category_id', 'name')->where('status', 1)->orderBy('name');
+            },
+            'subcategories.childcategories' => function($q) {
+                $q->select('id', 'sub_category_id', 'category_id', 'name')->where('status', 1)->orderBy('name');
+            }
+        ])->select('id', 'name')->where('status', 1)->orderBy('name')->get();
         $sellers = User::select('id', 'name', 'email')
             ->where('user_type', 0)
             ->where('user_status', 1)
@@ -101,10 +106,26 @@ class ServiceController extends Controller
             }
         }
 
+        $subcategoryId = $request->integer('subcategory_id') ?: null;
+        $childCategoryId = $request->integer('child_category_id') ?: null;
+
+        if ($childCategoryId) {
+            $childCat = ChildCategory::find($childCategoryId);
+            if ($childCat) {
+                $subcategoryId = $childCat->sub_category_id;
+                $category = Category::find($childCat->category_id) ?? $category;
+            }
+        } elseif ($subcategoryId) {
+            $subCat = Subcategory::find($subcategoryId);
+            if ($subCat) {
+                $category = Category::find($subCat->category_id) ?? $category;
+            }
+        }
+
         $service = Service::create([
             'category_id' => $category->id,
-            'subcategory_id' => $request->integer('subcategory_id') ?: null,
-            'child_category_id' => $request->integer('child_category_id') ?: null,
+            'subcategory_id' => $subcategoryId,
+            'child_category_id' => $childCategoryId,
             'seller_id' => $seller->id,
             'service_city_id' => $cityId,
             'service_area_id' => $seller->service_area ?: ($request->integer('service_area_id') ?: null),
@@ -162,10 +183,26 @@ class ServiceController extends Controller
             }
         }
 
+        $subcategoryId = $request->integer('subcategory_id') ?: null;
+        $childCategoryId = $request->integer('child_category_id') ?: null;
+
+        if ($childCategoryId) {
+            $childCat = ChildCategory::find($childCategoryId);
+            if ($childCat) {
+                $subcategoryId = $childCat->sub_category_id;
+                $category = Category::find($childCat->category_id) ?? $category;
+            }
+        } elseif ($subcategoryId) {
+            $subCat = Subcategory::find($subcategoryId);
+            if ($subCat) {
+                $category = Category::find($subCat->category_id) ?? $category;
+            }
+        }
+
         $service->update([
             'category_id' => $category->id,
-            'subcategory_id' => $request->integer('subcategory_id') ?: null,
-            'child_category_id' => $request->integer('child_category_id') ?: null,
+            'subcategory_id' => $subcategoryId,
+            'child_category_id' => $childCategoryId,
             'seller_id' => $seller->id,
             'service_city_id' => $cityId,
             'service_area_id' => $seller->service_area ?: ($request->integer('service_area_id') ?: $service->service_area_id),
@@ -288,13 +325,17 @@ class ServiceController extends Controller
         $imgData = get_attachment_image_by_id($service->image);
         $imageUrl = !empty($imgData) ? ($imgData['img_url'] ?? null) : null;
 
+        $childcategoryName = optional($service->childcategory)->name ?? '';
+
         return [
             'id' => $service->id,
             'title_en' => $title,
             'title_ar' => $title,
             'category_id' => (int) $service->category_id,
-            'category_en' => $subcategoryName ?: $categoryName,
-            'category_ar' => $subcategoryName ?: $categoryName,
+            'subcategory_id' => $service->subcategory_id ? (int) $service->subcategory_id : null,
+            'child_category_id' => $service->child_category_id ? (int) $service->child_category_id : null,
+            'category_en' => $childcategoryName ?: ($subcategoryName ?: $categoryName),
+            'category_ar' => $childcategoryName ?: ($subcategoryName ?: $categoryName),
             'seller_id' => (int) $service->seller_id,
             'seller_name' => $sellerName,
             'price' => (float) $service->price,

@@ -522,6 +522,88 @@ class AdminCategoryApiController extends Controller
         return response()->json(['status' => 'success', 'message' => __('Status updated.'), 'new_status' => $newStatus == 1 ? 'active' : 'inactive']);
     }
 
+    public function apiReassignServices(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'from_level' => 'required|in:parent,sub,child',
+            'from_id' => 'required|integer',
+            'to_category_id' => 'required|integer|exists:categories,id',
+            'to_subcategory_id' => 'nullable|integer',
+            'to_child_category_id' => 'nullable|integer',
+            'service_ids' => 'nullable|array',
+            'service_ids.*' => 'integer',
+        ]);
+
+        $toCat = Category::findOrFail($validated['to_category_id']);
+        $toSub = null;
+        if (!empty($validated['to_subcategory_id'])) {
+            $toSub = Subcategory::where('id', $validated['to_subcategory_id'])
+                ->where('category_id', $toCat->id)
+                ->first();
+            if (!$toSub) {
+                return response()->json(['status' => 'error', 'message' => __('Selected subcategory does not belong to target category.')], 422);
+            }
+        }
+
+        $toChild = null;
+        if (!empty($validated['to_child_category_id'])) {
+            if (!$toSub) {
+                return response()->json(['status' => 'error', 'message' => __('Cannot assign child category without valid subcategory.')], 422);
+            }
+            $toChild = ChildCategory::where('id', $validated['to_child_category_id'])
+                ->where('sub_category_id', $toSub->id)
+                ->first();
+            if (!$toChild) {
+                return response()->json(['status' => 'error', 'message' => __('Selected child category does not belong to target subcategory.')], 422);
+            }
+        }
+
+        $fromLevel = $validated['from_level'];
+        $fromId = (int) $validated['from_id'];
+
+        $column = 'child_category_id';
+        if ($fromLevel === 'parent') {
+            $column = 'category_id';
+        } elseif ($fromLevel === 'sub') {
+            $column = 'subcategory_id';
+        }
+
+        $query = Service::where($column, $fromId);
+        if (!empty($validated['service_ids'])) {
+            $query->whereIn('id', $validated['service_ids']);
+        }
+
+        $affectedIds = $query->pluck('id')->all();
+        if (empty($affectedIds)) {
+            return response()->json(['status' => 'error', 'message' => __('No services found matching this category.')], 404);
+        }
+
+        $updateData = [
+            'category_id' => $toCat->id,
+            'subcategory_id' => $toSub ? $toSub->id : null,
+            'child_category_id' => $toChild ? $toChild->id : null,
+        ];
+
+        DB::transaction(function () use ($affectedIds, $updateData) {
+            Service::whereIn('id', $affectedIds)->update($updateData);
+        });
+
+        AdminAuditLog::record([
+            'action' => 'services_reassign',
+            'resource_type' => 'Service',
+            'resource_id' => implode(',', $affectedIds),
+            'details_en' => "Reassigned " . count($affectedIds) . " service(s) from {$fromLevel} #{$fromId} to category #{$toCat->id}" . ($toSub ? ", sub #{$toSub->id}" : "") . ($toChild ? ", child #{$toChild->id}" : ""),
+            'details_ar' => "تمت إعادة تعيين " . count($affectedIds) . " خدمة من {$fromLevel} #{$fromId} إلى التصنيف #{$toCat->id}",
+            'new_values' => $updateData,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => __(':count services reassigned successfully.', ['count' => count($affectedIds)]),
+            'reassigned_count' => count($affectedIds),
+        ]);
+    }
+
     public function apiDeleteCategory(Request $request, string $level, int $id): JsonResponse
     {
         if ($level === 'parent') {
@@ -533,15 +615,21 @@ class AdminCategoryApiController extends Controller
                 return response()->json([
                     'status' => 'error',
                     'message' => __("Cannot delete category because it has :count subcategories linked to it. Please remove or reassign subcategories first.", ['count' => $subCount]),
+                    'dependency_type' => 'subcategories',
+                    'count' => $subCount,
                 ], 422);
             }
 
             // Safety check 2: attached services
             $serviceCount = Service::where('category_id', $id)->count();
             if ($serviceCount > 0) {
+                $services = Service::where('category_id', $id)->select('id', 'title')->take(10)->get();
                 return response()->json([
                     'status' => 'error',
                     'message' => __("Cannot delete category because it has :count services linked to it.", ['count' => $serviceCount]),
+                    'dependency_type' => 'services',
+                    'count' => $serviceCount,
+                    'services' => $services,
                 ], 422);
             }
 
@@ -565,15 +653,21 @@ class AdminCategoryApiController extends Controller
                 return response()->json([
                     'status' => 'error',
                     'message' => __("Cannot delete subcategory because it has :count child categories linked to it. Please remove or reassign child categories first.", ['count' => $childCount]),
+                    'dependency_type' => 'child_categories',
+                    'count' => $childCount,
                 ], 422);
             }
 
             // Safety check 2: attached services
             $serviceCount = Service::where('subcategory_id', $id)->count();
             if ($serviceCount > 0) {
+                $services = Service::where('subcategory_id', $id)->select('id', 'title')->take(10)->get();
                 return response()->json([
                     'status' => 'error',
                     'message' => __("Cannot delete subcategory because it has :count services linked to it.", ['count' => $serviceCount]),
+                    'dependency_type' => 'services',
+                    'count' => $serviceCount,
+                    'services' => $services,
                 ], 422);
             }
 
@@ -593,9 +687,13 @@ class AdminCategoryApiController extends Controller
         // Safety check: attached services
         $serviceCount = Service::where('child_category_id', $id)->count();
         if ($serviceCount > 0) {
+            $services = Service::where('child_category_id', $id)->select('id', 'title')->take(10)->get();
             return response()->json([
                 'status' => 'error',
                 'message' => __("Cannot delete child category because it has :count services linked to it.", ['count' => $serviceCount]),
+                'dependency_type' => 'services',
+                'count' => $serviceCount,
+                'services' => $services,
             ], 422);
         }
 

@@ -19,9 +19,43 @@ class AdminRoleManageController extends Controller
     const BASE_PATH ='backend.admin-role-manage.';
     public function __construct()
     {
+        $this->middleware('auth:admin');
+        $this->middleware(function ($request, $next) {
+            $admin = Auth::guard('admin')->user();
+            if (!$admin) {
+                if ($request->expectsJson() || $request->is('admin-home/*-json*') || $request->is('admin-home/admin-directory')) {
+                    return response()->json(['status' => 'error', 'message' => __('Unauthenticated.')], 401);
+                }
+                return redirect()->route('admin.login');
+            }
 
-        $this->middleware(['auth:admin','role:Super Admin']);
+            // Check Spatie role 'Super Admin' or legacy role column 'super_admin' / 'Super Admin'
+            $hasSpatieRole = method_exists($admin, 'hasRole') && ($admin->hasRole('Super Admin') || $admin->hasRole('super_admin'));
+            $hasLegacyRole = in_array(strtolower(trim($admin->role ?? '')), ['super admin', 'super_admin'], true);
 
+            // Lazy sync Spatie role for legacy super_admin if not already linked
+            if ($hasLegacyRole && !$hasSpatieRole && class_exists(Role::class)) {
+                try {
+                    $spatieRole = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'admin']);
+                    $admin->assignRole($spatieRole);
+                    $hasSpatieRole = true;
+                } catch (\Throwable $e) {
+                    // Fallback to legacy check if schema is locked
+                }
+            }
+
+            if (!$hasSpatieRole && !$hasLegacyRole) {
+                if ($request->expectsJson() || $request->is('admin-home/*-json*') || $request->is('admin-home/admin-directory')) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => __('Unauthorized. Super Admin access required.')
+                    ], 403);
+                }
+                abort(403, __('Unauthorized. Super Admin access required.'));
+            }
+
+            return $next($request);
+        });
     }
 
     public function apiDirectory(): JsonResponse

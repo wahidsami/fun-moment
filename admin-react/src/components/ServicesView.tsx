@@ -33,7 +33,8 @@ import {
   ArrowDown,
   Smartphone,
   Monitor,
-  Tag
+  Tag,
+  Loader2
 } from 'lucide-react';
 
 interface ServicesViewProps {
@@ -145,6 +146,21 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
   const [formCategoryAr, setFormCategoryAr] = useState('');
   const [formCategoryId, setFormCategoryId] = useState<number | ''>('');
   const [formSubcategoryId, setFormSubcategoryId] = useState<number | ''>('');
+  const [formChildCategoryId, setFormChildCategoryId] = useState<number | ''>('');
+  const [deletingNodeKey, setDeletingNodeKey] = useState<string | null>(null);
+  const [categoryActionError, setCategoryActionError] = useState<string | null>(null);
+  const [depResolutionModal, setDepResolutionModal] = useState<{
+    level: 'parent' | 'sub' | 'child';
+    id: number;
+    name: string;
+    message: string;
+    servicesCount?: number;
+    services?: Array<{ id: number; title: string }>;
+  } | null>(null);
+  const [reassignTargetCatId, setReassignTargetCatId] = useState<number | ''>('');
+  const [reassignTargetSubId, setReassignTargetSubId] = useState<number | ''>('');
+  const [reassignTargetChildId, setReassignTargetChildId] = useState<number | ''>('');
+  const [isReassigning, setIsReassigning] = useState<boolean>(false);
   const [formSellerId, setFormSellerId] = useState<number | ''>('');
   const [formPrice, setFormPrice] = useState<number>(100);
   const [formDuration, setFormDuration] = useState<string>('1 day');
@@ -465,6 +481,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     setFormCategoryEn(defaultCatName);
     setFormCategoryAr(defaultCatName);
     setFormSubcategoryId('');
+    setFormChildCategoryId('');
     setFormSellerId(sellers[0]?.id ?? '');
     setFormPrice(450);
     setFormDuration('1 day');
@@ -486,6 +503,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     setFormCategoryEn(service.category_en);
     setFormCategoryAr(service.category_ar);
     setFormSubcategoryId(service.subcategory_id || '');
+    setFormChildCategoryId(service.child_category_id || '');
     setFormSellerId(service.seller_id);
     setFormPrice(service.price);
     setFormDuration(service.duration);
@@ -528,6 +546,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
           title_ar: formTitleAr,
           category_id: Number(formCategoryId),
           subcategory_id: formSubcategoryId ? Number(formSubcategoryId) : undefined,
+          child_category_id: formChildCategoryId ? Number(formChildCategoryId) : undefined,
           category_en: formCategoryEn,
           category_ar: formCategoryAr,
           price: formPrice,
@@ -549,6 +568,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
           title_ar: formTitleAr,
           category_id: Number(formCategoryId),
           subcategory_id: formSubcategoryId ? Number(formSubcategoryId) : undefined,
+          child_category_id: formChildCategoryId ? Number(formChildCategoryId) : undefined,
           category_en: formCategoryEn,
           category_ar: formCategoryAr,
           price: formPrice,
@@ -873,22 +893,96 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     }
   };
 
-  // Delete category node helper
-  const handleDeleteCategoryNode = async (id: number, level: 'parent' | 'sub' | 'child') => {
+  // Delete category node helper with loading/disabled guard and dependency resolution modal
+  const handleDeleteCategoryNode = async (id: number, level: 'parent' | 'sub' | 'child', nodeName?: string) => {
     if (!hasPermission) {
       alert(language === 'en' ? "Access Denied." : "تم رفض الوصول.");
       return;
     }
-    const confirmDel = window.confirm(language === 'en' ? `Are you sure you want to delete this category?` : `هل أنت متأكد من حذف هذا القسم؟`);
+    if (deletingNodeKey) return; // Prevent repeated clicks
+
+    const confirmDel = window.confirm(
+      language === 'en'
+        ? `Are you sure you want to delete this category${nodeName ? ` "${nodeName}"` : ''}?`
+        : `هل أنت متأكد من حذف هذا القسم${nodeName ? ` "${nodeName}"` : ''}؟`
+    );
     if (!confirmDel) return;
+
+    const nodeKey = `${level}_${id}`;
+    setDeletingNodeKey(nodeKey);
+    setCategoryActionError(null);
 
     try {
       await LaravelAPI.deleteCategory(level, id);
       await loadCategoryTree();
       showSuccess(language === 'en' ? 'Category deleted successfully!' : 'تم حذف القسم بنجاح!');
     } catch (err: any) {
+      console.error('Category delete error:', err);
+      const errMsg = err?.message || (language === 'en' ? 'Failed to delete category (it may have dependent services or subcategories).' : 'فشل حذف التصنيف (قد يرتبط به خدمات أو أقسام فرعية).');
+      setCategoryActionError(errMsg);
+
+      // Trigger dependency resolution modal if services or children are attached
+      setDepResolutionModal({
+        level,
+        id,
+        name: nodeName || `#${id}`,
+        message: errMsg,
+        servicesCount: err?.count || 0,
+        services: err?.services || [],
+      });
+
+      // Pre-select first eligible destination category
+      const eligibleCats = categories.filter(c => level !== 'parent' || c.id !== id);
+      if (eligibleCats.length > 0) {
+        const destCat = eligibleCats[0];
+        setReassignTargetCatId(destCat.id);
+        const destSubs = destCat.subcategories?.filter(s => level !== 'sub' || s.id !== id) || [];
+        if (destSubs.length > 0) {
+          setReassignTargetSubId(destSubs[0].id);
+          const destChildren = destSubs[0].childCategories?.filter(ch => level !== 'child' || ch.id !== id) || [];
+          if (destChildren.length > 0) {
+            setReassignTargetChildId(destChildren[0].id);
+          } else {
+            setReassignTargetChildId('');
+          }
+        } else {
+          setReassignTargetSubId('');
+          setReassignTargetChildId('');
+        }
+      }
+    } finally {
+      setDeletingNodeKey(null);
+    }
+  };
+
+  // Bulk Reassign attached services handler
+  const handleExecuteReassignment = async () => {
+    if (!depResolutionModal) return;
+    if (!reassignTargetCatId) {
+      alert(language === 'en' ? 'Please select a destination category.' : 'يرجى اختيار التصنيف المستهدف.');
+      return;
+    }
+
+    setIsReassigning(true);
+    try {
+      const res = await LaravelAPI.reassignCategoryServices({
+        from_level: depResolutionModal.level,
+        from_id: depResolutionModal.id,
+        to_category_id: Number(reassignTargetCatId),
+        to_subcategory_id: reassignTargetSubId ? Number(reassignTargetSubId) : undefined,
+        to_child_category_id: reassignTargetChildId ? Number(reassignTargetChildId) : undefined,
+      });
+
+      showSuccess(res.message || (language === 'en' ? 'Services reassigned successfully! You can now safely delete the category.' : 'تمت إعادة تعيين الخدمات بنجاح! يمكنك الآن حذف القسم بأمان.'));
+      setDepResolutionModal(null);
+      setCategoryActionError(null);
+      await loadCategoryTree();
+      await loadServices();
+    } catch (err: any) {
       console.error(err);
-      setValidationError(err?.message || 'Failed to delete category (it may have dependent services or subcategories).');
+      alert(err?.message || (language === 'en' ? 'Failed to reassign services.' : 'فشل إعادة تعيين الخدمات.'));
+    } finally {
+      setIsReassigning(false);
     }
   };
 
@@ -1353,6 +1447,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                         setFormCategoryAr(cat.name);
                       }
                       setFormSubcategoryId('');
+                      setFormChildCategoryId('');
                     }}
                     className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs outline-hidden focus:border-indigo-500 bg-white"
                     required
@@ -1373,7 +1468,10 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                   </label>
                   <select
                     value={formSubcategoryId}
-                    onChange={(e) => setFormSubcategoryId(e.target.value ? Number(e.target.value) : '')}
+                    onChange={(e) => {
+                      setFormSubcategoryId(e.target.value ? Number(e.target.value) : '');
+                      setFormChildCategoryId('');
+                    }}
                     className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs outline-hidden focus:border-indigo-500 bg-white"
                   >
                     <option value="">{language === 'en' ? '— None / Main Category —' : '— بدون قسم فرعي —'}</option>
@@ -1382,6 +1480,29 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                       ?.subcategories?.map((sub: any) => (
                         <option key={sub.id} value={sub.id}>
                           {sub.name} (ID: #{sub.id})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {/* Child Category Selection */}
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                    {language === 'en' ? 'Child Category (Optional)' : 'التصنيف الفرعي الثالث (اختياري)'}
+                  </label>
+                  <select
+                    value={formChildCategoryId}
+                    onChange={(e) => setFormChildCategoryId(e.target.value ? Number(e.target.value) : '')}
+                    disabled={!formSubcategoryId}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs outline-hidden focus:border-indigo-500 bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">{language === 'en' ? '— None / Subcategory —' : '— بدون تصنيف فرعي ثالث —'}</option>
+                    {categoryOptions
+                      .find((c) => c.id === Number(formCategoryId))
+                      ?.subcategories?.find((s: any) => s.id === Number(formSubcategoryId))
+                      ?.childcategories?.map((child: any) => (
+                        <option key={child.id} value={child.id}>
+                          {child.name} (ID: #{child.id})
                         </option>
                       ))}
                   </select>
@@ -1598,6 +1719,26 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
             )}
           </div>
 
+          {/* Action Error Banner */}
+          {categoryActionError && (
+            <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-800 animate-fade-in flex items-start justify-between gap-3 shadow-xs">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-rose-900">{language === 'en' ? 'Category Action Blocked' : 'تعذر إتمام الإجراء على التصنيف'}</div>
+                  <p className="mt-0.5 leading-relaxed text-rose-700">{categoryActionError}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCategoryActionError(null)}
+                className="text-rose-400 hover:text-rose-700 font-bold p-1 rounded-md"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {/* Interactive Nested List Canvas */}
           <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-xs space-y-6">
             {categories.map((cat, index) => (
@@ -1723,11 +1864,16 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
 
                       {/* Delete */}
                       <button
-                        onClick={() => handleDeleteCategoryNode(cat.id, 'parent')}
-                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                        onClick={() => handleDeleteCategoryNode(cat.id, 'parent', cat.nameEn)}
+                        disabled={Boolean(deletingNodeKey)}
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 disabled:opacity-40 rounded-lg transition"
                         title={language === 'en' ? 'Delete Category' : 'حذف القسم'}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {deletingNodeKey === `parent_${cat.id}` ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
                       </button>
                     </div>
                   )}
@@ -1798,11 +1944,16 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                                 + Child Category
                               </button>
                               <button
-                                onClick={() => handleDeleteCategoryNode(sub.id, 'sub')}
-                                className="p-1 text-rose-500 hover:bg-rose-50 rounded"
+                                onClick={() => handleDeleteCategoryNode(sub.id, 'sub', sub.nameEn)}
+                                disabled={Boolean(deletingNodeKey)}
+                                className="p-1 text-rose-500 hover:bg-rose-50 disabled:opacity-40 rounded"
                                 title="Delete Subcategory"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                {deletingNodeKey === `sub_${sub.id}` ? (
+                                  <Loader2 className="h-3 w-3 animate-spin text-rose-500" />
+                                ) : (
+                                  <Trash2 className="h-3 w-3" />
+                                )}
                               </button>
                             </div>
                           )}
@@ -1838,11 +1989,16 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                                       <Edit2 className="w-2.5 h-2.5" />
                                     </button>
                                     <button
-                                      onClick={() => handleDeleteCategoryNode(child.id, 'child')}
-                                      className="text-rose-400 hover:text-rose-600 p-0.5"
+                                      onClick={() => handleDeleteCategoryNode(child.id, 'child', child.nameEn)}
+                                      disabled={Boolean(deletingNodeKey)}
+                                      className="text-rose-400 hover:text-rose-600 disabled:opacity-40 p-0.5"
                                       title="Delete"
                                     >
-                                      ✕
+                                      {deletingNodeKey === `child_${child.id}` ? (
+                                        <Loader2 className="w-2.5 h-2.5 animate-spin text-rose-500" />
+                                      ) : (
+                                        '✕'
+                                      )}
                                     </button>
                                   </div>
                                 )}
@@ -3212,6 +3368,193 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
               </button>
             </div>
           </form>
+        </div>
+      )}
+      {/* ======================= DEPENDENCY RESOLUTION MODAL ======================= */}
+      {depResolutionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl animate-scale-in space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-rose-600">
+                <AlertTriangle className="w-5 h-5 shrink-0" />
+                <h3 className="text-sm font-bold text-slate-900">
+                  {language === 'en' ? 'Cannot Delete Category (Dependencies Detected)' : 'لا يمكن حذف التصنيف (توجد عناصر مرتبطة به)'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDepResolutionModal(null)}
+                className="text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl bg-amber-50/80 border border-amber-200 p-3.5 text-xs text-amber-900 space-y-1.5">
+              <p className="font-semibold text-amber-950">{depResolutionModal.message}</p>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                {language === 'en'
+                  ? 'To safely delete this category, you can reassign all attached services to an alternative destination category below, or inspect individual services in the directory.'
+                  : 'لحذف هذا القسم بأمان، يمكنك إعادة تعيين كافة الخدمات المرتبطة إلى تصنيف بديل أدناه، أو فحص الخدمات بشكل فردي في القائمة.'}
+              </p>
+            </div>
+
+            {/* List attached services if any */}
+            {depResolutionModal.services && depResolutionModal.services.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase text-slate-400">
+                  {language === 'en' ? 'Attached Services' : 'الخدمات المرتبطة'} ({depResolutionModal.services.length})
+                </label>
+                <div className="max-h-32 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100 bg-slate-50/50">
+                  {depResolutionModal.services.map((s) => (
+                    <div key={s.id} className="p-2 text-xs flex items-center justify-between">
+                      <span className="font-medium text-slate-700 truncate max-w-[280px]">#{s.id} {s.title}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sTitle = s.title;
+                          setDepResolutionModal(null);
+                          setActiveSubTab('services');
+                          setSearch(sTitle);
+                        }}
+                        className="text-[10px] text-indigo-600 hover:underline font-semibold"
+                      >
+                        {language === 'en' ? 'Inspect' : 'معاينة'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Reassignment Target Form */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+              <div className="text-xs font-bold text-slate-800">
+                {language === 'en' ? 'Bulk Reassign Services to Destination Category' : 'إعادة تعيين جماعية للخدمات إلى تصنيف بديل'}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400">
+                  {language === 'en' ? 'Target Main Category' : 'التصنيف الرئيسي المستهدف'} *
+                </label>
+                <select
+                  value={reassignTargetCatId}
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    setReassignTargetCatId(id);
+                    const cat = categories.find(c => c.id === id);
+                    if (cat?.subcategories && cat.subcategories.length > 0) {
+                      setReassignTargetSubId(cat.subcategories[0].id);
+                      if (cat.subcategories[0].childCategories && cat.subcategories[0].childCategories.length > 0) {
+                        setReassignTargetChildId(cat.subcategories[0].childCategories[0].id);
+                      } else {
+                        setReassignTargetChildId('');
+                      }
+                    } else {
+                      setReassignTargetSubId('');
+                      setReassignTargetChildId('');
+                    }
+                  }}
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white outline-hidden focus:border-indigo-500"
+                >
+                  <option value="">{language === 'en' ? '— Select Target Category —' : '— اختر التصنيف المستهدف —'}</option>
+                  {categories
+                    .filter(c => depResolutionModal.level !== 'parent' || c.id !== depResolutionModal.id)
+                    .map(c => (
+                      <option key={c.id} value={c.id}>{language === 'en' ? c.nameEn : c.nameAr}</option>
+                    ))}
+                </select>
+              </div>
+
+              {/* Target Subcategory */}
+              {reassignTargetCatId && (
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400">
+                    {language === 'en' ? 'Target Subcategory' : 'القسم الفرعي المستهدف'}
+                  </label>
+                  <select
+                    value={reassignTargetSubId}
+                    onChange={(e) => {
+                      const id = e.target.value ? Number(e.target.value) : '';
+                      setReassignTargetSubId(id);
+                      const sub = categories
+                        .find(c => c.id === Number(reassignTargetCatId))
+                        ?.subcategories?.find(s => s.id === id);
+                      if (sub?.childCategories && sub.childCategories.length > 0) {
+                        setReassignTargetChildId(sub.childCategories[0].id);
+                      } else {
+                        setReassignTargetChildId('');
+                      }
+                    }}
+                    className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white outline-hidden focus:border-indigo-500"
+                  >
+                    <option value="">{language === 'en' ? '— None / Top Level —' : '— بدون قسم فرعي —'}</option>
+                    {categories
+                      .find(c => c.id === Number(reassignTargetCatId))
+                      ?.subcategories?.filter(s => depResolutionModal.level !== 'sub' || s.id !== depResolutionModal.id)
+                      .map(s => (
+                        <option key={s.id} value={s.id}>{language === 'en' ? s.nameEn : s.nameAr}</option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Target Child Category */}
+              {reassignTargetSubId && (
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400">
+                    {language === 'en' ? 'Target Child Category' : 'التصنيف الفرعي الثالث المستهدف'}
+                  </label>
+                  <select
+                    value={reassignTargetChildId}
+                    onChange={(e) => setReassignTargetChildId(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white outline-hidden focus:border-indigo-500"
+                  >
+                    <option value="">{language === 'en' ? '— None / Subcategory Level —' : '— بدون تصنيف فرعي ثالث —'}</option>
+                    {categories
+                      .find(c => c.id === Number(reassignTargetCatId))
+                      ?.subcategories?.find(s => s.id === Number(reassignTargetSubId))
+                      ?.childCategories?.filter(ch => depResolutionModal.level !== 'child' || ch.id !== depResolutionModal.id)
+                      .map(ch => (
+                        <option key={ch.id} value={ch.id}>{language === 'en' ? ch.nameEn : ch.nameAr}</option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleExecuteReassignment}
+                disabled={isReassigning || !reassignTargetCatId}
+                className="w-full mt-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2 transition"
+              >
+                {isReassigning && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{language === 'en' ? 'Reassign Services Now' : 'نقل وإعادة تعيين الخدمات الآن'}</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  const nodeName = depResolutionModal.name;
+                  setDepResolutionModal(null);
+                  setActiveSubTab('services');
+                  setSearch(nodeName);
+                }}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                {language === 'en' ? 'Inspect in Services Directory' : 'معاينة في دليل الخدمات'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDepResolutionModal(null)}
+                className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 transition"
+              >
+                {language === 'en' ? 'Close' : 'إغلاق'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
