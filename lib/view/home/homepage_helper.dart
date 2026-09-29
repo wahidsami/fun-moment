@@ -10,6 +10,7 @@ import '../../service/service_details_service.dart';
 import '../services/service_details_page.dart';
 import '../utils/common_helper.dart';
 import '../utils/constant_styles.dart';
+import '../utils/others_helper.dart';
 
 class HomepageHelper {
   static ValueNotifier<int> tabIndex = ValueNotifier(0);
@@ -97,7 +98,8 @@ class HomepageHelper {
                           height: 128,
                           width: double.infinity,
                           fit: BoxFit.cover,
-                          imageUrl: imageUrl ?? "",
+                          imageUrl: sanitizeImageUrl(imageUrl),
+                          memCacheWidth: 400,
                           placeholder: (context, url) {
                             return Image.asset(
                                 'assets/images/loading_image.png');

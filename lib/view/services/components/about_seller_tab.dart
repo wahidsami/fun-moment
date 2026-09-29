@@ -36,12 +36,23 @@ class AboutSellerTab extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: CachedNetworkImage(
-                  imageUrl:
-                      provider.serviceAllDetails.serviceSellerImage?.imgUrl ??
-                          userPlaceHolderUrl,
+                  imageUrl: sanitizeImageUrl(
+                    provider.serviceAllDetails.serviceSellerImage?.imgUrl,
+                    fallback: userPlaceHolderUrl,
+                  ),
+                  memCacheWidth: 120,
+                  memCacheHeight: 120,
                   placeholder: (context, url) {
                     return Image.asset('assets/images/loading_image.png');
                   },
+                  errorWidget: (context, url, error) => Image.network(
+                    userPlaceHolderUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.person, color: Colors.grey),
+                    ),
+                  ),
                   height: 60,
                   width: 60,
                   fit: BoxFit.cover,

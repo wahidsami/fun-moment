@@ -30,6 +30,18 @@ String mapApiKey = const String.fromEnvironment(
 //only needed for apple sign-in setup
 String clientSecret = '';
 
+String sanitizeImageUrl(dynamic url, {String? fallback}) {
+  final defaultFallback = fallback ?? placeHolderUrl;
+  if (url == null) return defaultFallback;
+  final str = url.toString().trim();
+  if (str.isEmpty) return defaultFallback;
+  final lower = str.toLowerCase();
+  if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
+    return defaultFallback;
+  }
+  return str;
+}
+
 class OthersHelper with ChangeNotifier {
   ConstantColors cc = ConstantColors();
   int deliveryCharge = 60;

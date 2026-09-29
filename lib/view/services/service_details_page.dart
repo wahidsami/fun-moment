@@ -84,13 +84,9 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage>
                                   ImageBig(
                                     serviceName:
                                         asProvider.getString('Service Name'),
-                                    imageLink: provider.serviceAllDetails
-                                                ?.serviceImage !=
-                                            null
-                                        ? provider.serviceAllDetails
-                                                .serviceImage.imgUrl ??
-                                            placeHolderUrl
-                                        : placeHolderUrl,
+                                    imageLink: sanitizeImageUrl(
+                                      provider.serviceAllDetails?.serviceImage?.imgUrl,
+                                    ),
                                   ),
 
                                   const SizedBox(
@@ -208,12 +204,10 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage>
                                               .serviceDetails.price,
                                           provider.serviceAllDetails
                                               .serviceDetails.sellerId,
-                                          image: provider.serviceAllDetails
-                                                      .serviceImage !=
-                                                  null
-                                              ? provider.serviceAllDetails
-                                                  .serviceImage.imgUrl
-                                              : placeHolderUrl,
+                                          image: sanitizeImageUrl(
+                                            provider.serviceAllDetails
+                                                ?.serviceImage?.imgUrl,
+                                          ),
                                         );
 
                                         //==========>
@@ -256,9 +250,63 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage>
                         ),
                       ],
                     )
-                  : Container(
-                      alignment: Alignment.center,
-                      child: Text(asProvider.getString('Something went wrong')),
+                  : Scaffold(
+                      backgroundColor: FMColors.background,
+                      appBar: AppBar(
+                        backgroundColor: Colors.transparent,
+                        elevation: 0,
+                        leading: IconButton(
+                          icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ),
+                      body: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline_rounded,
+                                size: 54,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                asProvider.getString(provider.errorMessage ?? 'Something went wrong'),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                height: 44,
+                                width: 140,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    provider.retry();
+                                  },
+                                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                                  label: Text(
+                                    asProvider.getString('Retry'),
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: FMColors.magenta,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     )
               : OthersHelper().showLoading(cc.primaryColor),
         ),

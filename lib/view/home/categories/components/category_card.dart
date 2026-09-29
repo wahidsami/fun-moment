@@ -100,6 +100,7 @@ class CategoryCard extends StatelessWidget {
                           imagelink.toString() != placeHolderUrl)
                       ? CachedNetworkImage(
                           imageUrl: imagelink.toString(),
+                          memCacheWidth: 150,
                           fit: BoxFit.contain,
                           errorWidget: (context, url, error) => Image.asset(
                             FMAssets.categoryFallbackForIndex(index),

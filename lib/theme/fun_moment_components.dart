@@ -399,6 +399,8 @@ class FMNetworkImageFrame extends StatelessWidget {
           validUrl != null
               ? CachedNetworkImage(
                   imageUrl: validUrl,
+                  memCacheWidth: 600,
+                  maxWidthDiskCache: 900,
                   height: height,
                   width: width,
                   fit: fit,

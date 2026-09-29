@@ -161,6 +161,10 @@ var appStrings = {
   "Did not receive": "Didn't receive",
   "Send again": "Send again",
   "Something went wrong": "Something went wrong",
+  "Retry": "Retry",
+  "Service not found": "Service not found",
+  "Request timed out. Please try again.": "Request timed out. Please try again.",
+  "Network connection failed": "Network connection failed",
   "Please wait while the profile is updating":
       "Please wait while the profile is updating",
   "Please enter your email": "Please enter your email",
@@ -773,6 +777,10 @@ var translations = {
   "Didn't receive": "لم تتلقى",
   "Send again": "أرسل مرة أخرى",
   "Something went wrong": "حدث خطأ ما",
+  "Retry": "إعادة المحاولة",
+  "Service not found": "الخدمة غير متوفرة",
+  "Request timed out. Please try again.": "انتهت مهلة الطلب. يرجى المحاولة مرة أخرى",
+  "Network connection failed": "فشل الاتصال بالشبكة",
   "Please wait while the profile is updating":
       "يرجى الانتظار أثناء تحديث الملف الشخصي",
   "Please enter your email": "الرجاء إدخال بريدك الإلكتروني",

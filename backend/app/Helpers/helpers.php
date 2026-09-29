@@ -392,7 +392,11 @@ function get_attachment_image_by_id($id, $size = null, $default = false)
     if (!empty($image_details)) {
         $return_val['image_id'] = $image_details->id;
         $return_val['path'] = $image_details->path;
-        $return_val['img_url'] = $image_url;
+        if (empty($image_url) && $default) {
+            $return_val['img_url'] = asset('assets/uploads/no-image.png');
+        } else {
+            $return_val['img_url'] = !empty($image_url) ? $image_url : null;
+        }
         $return_val['img_alt'] = $image_details->alt;
     }elseif (empty($image_details) && $default) {
         $return_val['img_url'] = asset('assets/uploads/no-image.png');

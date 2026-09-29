@@ -8,6 +8,7 @@ import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/service/service_details_service.dart';
 import 'package:funmoments/view/services/seller_all_service_page.dart';
 import 'package:funmoments/view/utils/constant_colors.dart';
+import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
 import '../../utils/constant_styles.dart';
@@ -231,14 +232,22 @@ class ServiceTitleAndUser extends StatelessWidget {
           },
           child: Row(
             children: [
-              userImg != null
+              (userImg != null && userImg.toString().trim().isNotEmpty)
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(100),
                       child: CachedNetworkImage(
-                        imageUrl: userImg,
+                        imageUrl: sanitizeImageUrl(userImg, fallback: userPlaceHolderUrl),
+                        memCacheWidth: 80,
+                        memCacheHeight: 80,
                         placeholder: (context, url) {
                           return Image.asset('assets/images/loading_image.png');
                         },
+                        errorWidget: (context, url, error) => Image.asset(
+                          'assets/images/avatar.png',
+                          height: 40,
+                          width: 40,
+                          fit: BoxFit.cover,
+                        ),
                         height: 40,
                         width: 40,
                         fit: BoxFit.cover,

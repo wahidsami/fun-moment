@@ -147,70 +147,88 @@ class ServiceController extends Controller
     // service details
     public function serviceDetails($id=null){
     
-        $service_details =  Service::with('serviceFaq')->where('id',$id)->where('status',1)->where('is_service_on',1)->first();
+        $service_details = Service::with([
+            'serviceFaq',
+            'seller_for_mobile',
+            'reviews_for_mobile.buyer',
+            'serviceCity'
+        ])->where('id', $id)->where('status', 1)->where('is_service_on', 1)->first();
         
-        if(auth('sanctum')->check() && auth('sanctum')->user()->user_type === 0){
-            $service_details = Service::with('serviceFaq')->where('id',$id)->first();
+        if (auth('sanctum')->check() && auth('sanctum')->user()->user_type === 0) {
+            $service_details = Service::with([
+                'serviceFaq',
+                'seller_for_mobile',
+                'reviews_for_mobile.buyer',
+                'serviceCity'
+            ])->where('id', $id)->first();
         }
 
-        if(is_null($service_details)){
-            return response(["msg" => __("service not found")],500);
+        if (is_null($service_details)) {
+            return response()->json(["msg" => __("service not found")], 404);
         }
         $service_image = get_attachment_image_by_id($service_details->image);
         $service_seller_name = optional($service_details->seller_for_mobile)->name;
         $service_seller_image_Id = optional($service_details->seller_for_mobile)->image;
         $service_seller_image = get_attachment_image_by_id($service_seller_image_Id);
-        $seller_complete_order = Order::where('seller_id',$service_details->seller_id)->where('status',2)->count();
+        $seller_complete_order = Order::where('seller_id', $service_details->seller_id)->where('status', 2)->count();
         $seller_cancelled_order = Order::where('seller_id', $service_details->seller_id)->where('status', 4)->count();
         $seller_rating = Review::where('seller_id', $service_details->seller_id)->avg('rating');
         $seller_rating_percentage_value = round($seller_rating * 20);
         $seller_from = optional(optional($service_details->seller_for_mobile)->country)->country;
         $seller_since = User::select('created_at')->where('id', $service_details->seller_id)->where('user_status', 1)->first();
-        $service_includes = Serviceinclude::select('id','service_id','include_service_title')->where('service_id', $service_details->id)->get();
-        $service_benifits = Servicebenifit::select('id','service_id','benifits')->where('service_id', $service_details->id)->get();
+        $service_includes = Serviceinclude::select('id', 'service_id', 'include_service_title')->where('service_id', $service_details->id)->get();
+        $service_benifits = Servicebenifit::select('id', 'service_id', 'benifits')->where('service_id', $service_details->id)->get();
 
         $order_completion_rate = 0;
         if ($seller_complete_order > 0 || $seller_cancelled_order > 0) {
             $order_completion_rate = $seller_complete_order / ($seller_complete_order + $seller_cancelled_order) * 100;
         }
 
-        $service_reviews = $service_details->reviews_for_mobile->transform(function($item){
-            $buyer_details = User::find($item->buyer_id);
-            $item->buyer_name = !is_null($buyer_details) ? $buyer_details->name : 'Unknown';// $item->buyer_id;
-            $image_url =  get_attachment_image_by_id(optional($buyer_details)->image) ? get_attachment_image_by_id($buyer_details->image)['img_url'] : null;
-            $item->buyer_image = !is_null($buyer_details) ? $image_url : null;// $item->buyer_id;
+        $service_reviews = $service_details->reviews_for_mobile->transform(function ($item) {
+            $buyer_details = $item->buyer;
+            $item->buyer_name = !is_null($buyer_details) ? $buyer_details->name : 'Unknown';
+            $image_url = null;
+            if (!is_null($buyer_details) && !empty($buyer_details->image)) {
+                $img_attachment = get_attachment_image_by_id($buyer_details->image);
+                $image_url = (!empty($img_attachment) && !empty($img_attachment['img_url'])) ? $img_attachment['img_url'] : null;
+            }
+            $item->buyer_image = $image_url;
             return $item;
-            
         });
-        $reviewer_image=[];
-        foreach($service_details->reviews_for_mobile as $review){
-            $reviewer_image[]=get_attachment_image_by_id(optional($review->buyer_for_mobile)->image);
+
+        $reviewer_image = [];
+        foreach ($service_details->reviews_for_mobile as $review) {
+            $buyer_img_id = optional($review->buyer)->image;
+            $img_data = !empty($buyer_img_id) ? get_attachment_image_by_id($buyer_img_id) : null;
+            $reviewer_image[] = (!empty($img_data) && !empty($img_data['img_url'])) ? $img_data : null;
         }
 
         $service_video_url = $service_details->video;
-         preg_match('/src="([^"]+)"/', $service_video_url, $service_video_url_match);
-
-        if($service_details){
-            return response()->success([
-                'service_details'=>$service_details,
-                'service_image'=>$service_image,
-                'service_seller_name'=>$service_seller_name,
-                'service_seller_image'=> is_array($service_seller_image) && !empty($service_seller_image) ? $service_seller_image : null,
-                'seller_complete_order'=>$seller_complete_order,
-                'seller_rating'=>$seller_rating_percentage_value,
-                'order_completion_rate'=>round($order_completion_rate),
-                'seller_from'=>$seller_from,
-                'seller_since'=>$seller_since,
-                'service_includes'=>$service_includes,
-                'service_benifits'=>$service_benifits,
-                'service_reviews'=>$service_reviews,
-                'reviewer_image'=>$reviewer_image,
-                'video_url' => is_null($service_video_url) ? null : end($service_video_url_match)
-            ]);
+        $video_match_url = null;
+        if (!empty($service_video_url)) {
+            if (preg_match('/src="([^"]+)"/', $service_video_url, $service_video_url_match)) {
+                $video_match_url = end($service_video_url_match);
+            } else {
+                $video_match_url = $service_video_url;
+            }
         }
-        return response()->error([
-            'message'=>__('Service Not Available'),
-        ]);
+
+        return response()->json([
+            'service_details' => $service_details,
+            'service_image' => $service_image,
+            'service_seller_name' => $service_seller_name,
+            'service_seller_image' => is_array($service_seller_image) && !empty($service_seller_image) ? $service_seller_image : null,
+            'seller_complete_order' => $seller_complete_order,
+            'seller_rating' => $seller_rating_percentage_value,
+            'order_completion_rate' => round($order_completion_rate),
+            'seller_from' => $seller_from,
+            'seller_since' => $seller_since,
+            'service_includes' => $service_includes,
+            'service_benifits' => $service_benifits,
+            'service_reviews' => $service_reviews,
+            'reviewer_image' => $reviewer_image,
+            'video_url' => $video_match_url,
+        ], 200);
     }
 
     //service rating
@@ -579,13 +597,24 @@ class ServiceController extends Controller
 
         if(!empty($coupon_code)){
 
-            if($coupon_code->seller_id != $request->seller_id){
+            // Inactive coupon check
+            if($coupon_code->status != 1){
+                return response()->error([
+                    'status' => __('inactive'),
+                    'msg' => __('Coupon is Inactive'),
+                ]);
+            }
+
+            // Admin coupons (user_type === 'admin' or seller_id is null) are platform-wide.
+            // Seller coupons are restricted to that seller's services.
+            $isAdminCoupon = ($coupon_code->user_type === 'admin' || is_null($coupon_code->seller_id));
+            if(!$isAdminCoupon && (int)$coupon_code->seller_id !== (int)$request->seller_id){
                 return response()->error([
                     'message'=>__('Coupon is not Applicable for this Service'),
                 ]);
             }
 
-            if($coupon_code->code == $request->coupon_code && $coupon_code->expire_date > $current_date){
+            if($coupon_code->code == $request->coupon_code && $coupon_code->expire_date >= $current_date){
 
                 if($coupon_code->discount_type == 'percentage'){
                     $coupon_amount = ($request->total_amount * $coupon_code->discount)/100;
@@ -1090,21 +1119,22 @@ class ServiceController extends Controller
             $coupon_code = ServiceCoupon::where('code',$request->coupon_code)->first();
             $current_date = date('Y-m-d');
             if(!empty($coupon_code)){
-                if($coupon_code->seller_id == $request->seller_id){
-                    if($coupon_code->code == $request->coupon_code && $coupon_code->expire_date > $current_date){
-                        if($coupon_code->discount_type == 'percentage'){
-                            $coupon_amount = ($total * $coupon_code->discount)/100;
-                            $total = $total-$coupon_amount;
-                            $coupon_code = $request->coupon_code;
-                            $coupon_type = 'percentage';
-                        }else{
-                            $coupon_amount = $coupon_code->discount;
-                            $total = $total-$coupon_amount;
-                            $coupon_code = $request->coupon_code;
-                            $coupon_type = 'amount';
-                        }
+                $isAdminCoupon = ($coupon_code->user_type === 'admin' || is_null($coupon_code->seller_id));
+                $isSellerMatch = $isAdminCoupon || ((int)$coupon_code->seller_id === (int)$request->seller_id);
+                $isActive = ((int)$coupon_code->status === 1);
+                $isValidDate = ($coupon_code->expire_date >= $current_date);
+
+                if($isActive && $isSellerMatch && $isValidDate){
+                    if($coupon_code->discount_type == 'percentage'){
+                        $coupon_amount = ($total * $coupon_code->discount)/100;
+                        $total = $total-$coupon_amount;
+                        $coupon_code = $request->coupon_code;
+                        $coupon_type = 'percentage';
                     }else{
-                        $coupon_code = '';
+                        $coupon_amount = $coupon_code->discount;
+                        $total = $total-$coupon_amount;
+                        $coupon_code = $request->coupon_code;
+                        $coupon_type = 'amount';
                     }
                 }else{
                     $coupon_code = '';

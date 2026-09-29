@@ -2,23 +2,47 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/rtl_service.dart';
+import 'package:funmoments/view/utils/others_helper.dart';
 
 class ImageBig extends StatelessWidget {
   const ImageBig({Key? key, required this.serviceName, required this.imageLink})
       : super(key: key);
-  final serviceName;
-  final imageLink;
+  final dynamic serviceName;
+  final dynamic imageLink;
 
   @override
   Widget build(BuildContext context) {
+    final validUrl = sanitizeImageUrl(imageLink);
+
     return Stack(
       children: [
         SizedBox(
             height: 295,
             width: double.infinity,
             child: CachedNetworkImage(
-              imageUrl: imageLink,
-              errorWidget: (context, url, error) => const Icon(Icons.error),
+              imageUrl: validUrl,
+              memCacheWidth: 800,
+              maxWidthDiskCache: 1200,
+              errorWidget: (context, url, error) => Image.network(
+                placeHolderUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.grey[200],
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey, size: 40),
+                  ),
+                ),
+              ),
+              placeholder: (context, url) => Container(
+                color: Colors.grey[200],
+                child: const Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
               fit: BoxFit.cover,
             )),
         Container(

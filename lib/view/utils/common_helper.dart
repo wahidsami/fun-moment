@@ -189,11 +189,16 @@ class CommonHelper {
     );
   }
 
-  profileImage(String imageLink, double height, double width) {
+  profileImage(dynamic imageLink, double height, double width) {
+    final validUrl = sanitizeImageUrl(imageLink, fallback: userPlaceHolderUrl);
+    final cacheW = (width * 2).toInt().clamp(40, 500);
+    final cacheH = (height * 2).toInt().clamp(40, 500);
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
       child: CachedNetworkImage(
-        imageUrl: imageLink,
+        imageUrl: validUrl,
+        memCacheWidth: cacheW,
+        memCacheHeight: cacheH,
         placeholder: (context, url) {
           return Image.asset('assets/images/loading_image.png');
         },
