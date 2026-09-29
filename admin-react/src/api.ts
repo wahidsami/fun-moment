@@ -978,7 +978,18 @@ export const LaravelAPI = {
     return Array.isArray(payload?.categories) ? payload.categories : [];
   },
 
-  async createCategory(node: { level: 'parent' | 'sub' | 'child'; name_en: string; name_ar?: string; slug?: string; parent_id?: number }): Promise<any> {
+  async createCategory(node: {
+    level: 'parent' | 'sub' | 'child';
+    name_en: string;
+    name_ar?: string;
+    slug?: string;
+    parent_id?: number;
+    sort_order?: number;
+    mobile_icon?: number | null;
+    image?: number | null;
+    icon?: string | null;
+    status?: 'active' | 'inactive';
+  }): Promise<any> {
     const response = await fetch('/admin-home/categories-json', {
       method: 'POST',
       headers: {
@@ -998,6 +1009,57 @@ export const LaravelAPI = {
     return payload?.node;
   },
 
+  async updateCategory(
+    level: 'parent' | 'sub' | 'child',
+    id: number,
+    data: {
+      name_en: string;
+      name_ar?: string;
+      slug?: string;
+      parent_id?: number;
+      sort_order?: number;
+      mobile_icon?: number | null;
+      image?: number | null;
+      icon?: string | null;
+      status?: 'active' | 'inactive';
+    }
+  ): Promise<any> {
+    const response = await fetch(`/admin-home/categories-json/${level}/${id}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to update category (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload?.node;
+  },
+
+  async reorderCategories(orderedIds: number[]): Promise<void> {
+    const response = await fetch('/admin-home/categories-json/reorder', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ ordered_ids: orderedIds }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to reorder categories (${response.status})`);
+    }
+  },
+
   async updateCategoryStatus(level: 'parent' | 'sub' | 'child', id: number, status?: 'active' | 'inactive'): Promise<any> {
     const response = await fetch(`/admin-home/categories-json/${level}/${id}/status`, {
       method: 'POST',
@@ -1010,7 +1072,8 @@ export const LaravelAPI = {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to update category status (${response.status})`);
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to update category status (${response.status})`);
     }
 
     return response.json();

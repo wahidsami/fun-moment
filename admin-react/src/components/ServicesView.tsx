@@ -28,7 +28,12 @@ import {
   Link,
   ChevronDown,
   Check,
-  Globe
+  Globe,
+  ArrowUp,
+  ArrowDown,
+  Smartphone,
+  Monitor,
+  Tag
 } from 'lucide-react';
 
 interface ServicesViewProps {
@@ -43,6 +48,12 @@ interface CategoryNode {
   nameAr: string;
   slug: string;
   status: 'active' | 'inactive';
+  sortOrder?: number;
+  icon?: string | null;
+  image?: number | null;
+  imageUrl?: string | null;
+  mobileIcon?: number | null;
+  mobileIconUrl?: string | null;
   servicesCount: number;
   subcategories?: SubcategoryNode[];
 }
@@ -54,6 +65,8 @@ interface SubcategoryNode {
   nameAr: string;
   slug: string;
   status: 'active' | 'inactive';
+  image?: number | null;
+  imageUrl?: string | null;
   servicesCount: number;
   childCategories?: ChildCategoryNode[];
 }
@@ -65,6 +78,8 @@ interface ChildCategoryNode {
   nameAr: string;
   slug: string;
   status: 'active' | 'inactive';
+  image?: number | null;
+  imageUrl?: string | null;
   servicesCount: number;
 }
 
@@ -155,6 +170,34 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
   const [newCatEn, setNewCatEn] = useState('');
   const [newCatAr, setNewCatAr] = useState('');
   const [newCatSlug, setNewCatSlug] = useState('');
+  const [newCatSortOrder, setNewCatSortOrder] = useState<number>(0);
+  const [newCatStatus, setNewCatStatus] = useState<'active' | 'inactive'>('active');
+  const [newCatIcon, setNewCatIcon] = useState('');
+  const [newCatMobileIcon, setNewCatMobileIcon] = useState<number | null>(null);
+  const [newCatMobileIconUrl, setNewCatMobileIconUrl] = useState<string | null>(null);
+  const [newCatImage, setNewCatImage] = useState<number | null>(null);
+  const [newCatImageUrl, setNewCatImageUrl] = useState<string | null>(null);
+
+  // Edit category state
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
+  const [editCatId, setEditCatId] = useState<number>(0);
+  const [editCatLevel, setEditCatLevel] = useState<'parent' | 'sub' | 'child'>('parent');
+  const [editCatParentId, setEditCatParentId] = useState<number | undefined>(undefined);
+  const [editCatEn, setEditCatEn] = useState('');
+  const [editCatAr, setEditCatAr] = useState('');
+  const [editCatSlug, setEditCatSlug] = useState('');
+  const [editCatSortOrder, setEditCatSortOrder] = useState<number>(0);
+  const [editCatStatus, setEditCatStatus] = useState<'active' | 'inactive'>('active');
+  const [editCatIcon, setEditCatIcon] = useState('');
+  const [editCatMobileIcon, setEditCatMobileIcon] = useState<number | null>(null);
+  const [editCatMobileIconUrl, setEditCatMobileIconUrl] = useState<string | null>(null);
+  const [editCatImage, setEditCatImage] = useState<number | null>(null);
+  const [editCatImageUrl, setEditCatImageUrl] = useState<string | null>(null);
+
+  // Media Picker Target & File Upload
+  const [mediaPickerTarget, setMediaPickerTarget] = useState<'service' | 'new_cat_mobile' | 'new_cat_image' | 'edit_cat_mobile' | 'edit_cat_image'>('service');
+  const catUploadInputRef = React.useRef<HTMLInputElement>(null);
+  const [catUploadTarget, setCatUploadTarget] = useState<'new_cat_mobile' | 'new_cat_image' | 'edit_cat_mobile' | 'edit_cat_image'>('new_cat_mobile');
 
   // Geography initial state
   const [countries, setCountries] = useState<Country[]>([]);
@@ -583,6 +626,40 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
     }
   };
 
+  // Direct file upload for Category modals
+  const handleUploadCategoryAsset = async (file: File, target: 'new_cat_mobile' | 'new_cat_image' | 'edit_cat_mobile' | 'edit_cat_image') => {
+    try {
+      const item = await LaravelAPI.uploadMedia(file);
+      if (item && item.id) {
+        if (target === 'new_cat_mobile') {
+          setNewCatMobileIcon(item.id);
+          setNewCatMobileIconUrl(item.url);
+        } else if (target === 'new_cat_image') {
+          setNewCatImage(item.id);
+          setNewCatImageUrl(item.url);
+        } else if (target === 'edit_cat_mobile') {
+          setEditCatMobileIcon(item.id);
+          setEditCatMobileIconUrl(item.url);
+        } else if (target === 'edit_cat_image') {
+          setEditCatImage(item.id);
+          setEditCatImageUrl(item.url);
+        }
+        setMediaFiles(prev => [{
+          id: item.id,
+          name: item.title,
+          size: item.size || 'Unknown',
+          type: 'image',
+          url: item.url,
+          uploadedAt: 'Just now'
+        }, ...prev]);
+        showSuccess(language === 'en' ? 'Asset uploaded and assigned!' : 'تم رفع الملف وربطه بالتصنيف بنجاح!');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || (language === 'en' ? 'Failed to upload asset' : 'فشل رفع الملف'));
+    }
+  };
+
   // Category Tree add node handler
   const handleAddCategoryNode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -599,7 +676,12 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
         name_en: newCatEn,
         name_ar: newCatAr,
         slug: newCatSlug,
-        parent_id: parentId
+        parent_id: parentId,
+        sort_order: catLevel === 'parent' ? newCatSortOrder : undefined,
+        mobile_icon: catLevel === 'parent' ? newCatMobileIcon : undefined,
+        image: catLevel === 'parent' ? newCatImage : newCatImage,
+        icon: catLevel === 'parent' ? newCatIcon : undefined,
+        status: newCatStatus
       });
 
       await loadCategoryTree();
@@ -607,10 +689,150 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
       setNewCatEn('');
       setNewCatAr('');
       setNewCatSlug('');
+      setNewCatSortOrder(0);
+      setNewCatStatus('active');
+      setNewCatIcon('');
+      setNewCatMobileIcon(null);
+      setNewCatMobileIconUrl(null);
+      setNewCatImage(null);
+      setNewCatImageUrl(null);
       showSuccess(language === 'en' ? 'Category created and persisted to database!' : 'تم إنشاء التصنيف وحفظه في قاعدة البيانات بنجاح!');
     } catch (err: any) {
       console.error(err);
       setValidationError(err?.message || 'Failed to create category');
+    }
+  };
+
+  // Open Edit Category Modal
+  const openEditCategory = (node: CategoryNode | SubcategoryNode | ChildCategoryNode, level: 'parent' | 'sub' | 'child') => {
+    setEditCatId(node.id);
+    setEditCatLevel(level);
+    setEditCatEn(node.nameEn || '');
+    setEditCatAr(node.nameAr || '');
+    setEditCatSlug(node.slug || '');
+    setEditCatStatus(node.status || 'active');
+
+    if (level === 'parent') {
+      const parentNode = node as CategoryNode;
+      setEditCatSortOrder(parentNode.sortOrder ?? 0);
+      setEditCatIcon(parentNode.icon || '');
+      setEditCatMobileIcon(parentNode.mobileIcon ?? null);
+      setEditCatMobileIconUrl(parentNode.mobileIconUrl ?? null);
+      setEditCatImage(parentNode.image ?? null);
+      setEditCatImageUrl(parentNode.imageUrl ?? null);
+      setEditCatParentId(undefined);
+    } else if (level === 'sub') {
+      const subNode = node as SubcategoryNode;
+      setEditCatParentId(subNode.parentId);
+      setEditCatImage(subNode.image ?? null);
+      setEditCatImageUrl(subNode.imageUrl ?? null);
+      setEditCatMobileIcon(null);
+      setEditCatMobileIconUrl(null);
+      setEditCatIcon('');
+      setEditCatSortOrder(0);
+    } else {
+      const childNode = node as ChildCategoryNode;
+      setEditCatParentId(childNode.parentId);
+      setEditCatImage(childNode.image ?? null);
+      setEditCatImageUrl(childNode.imageUrl ?? null);
+      setEditCatMobileIcon(null);
+      setEditCatMobileIconUrl(null);
+      setEditCatIcon('');
+      setEditCatSortOrder(0);
+    }
+    setShowEditCategoryModal(true);
+  };
+
+  // Save Edit Category Node
+  const handleEditCategoryNode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setValidationError('');
+    if (!editCatEn.trim() || !editCatAr.trim()) {
+      setValidationError(language === 'en' ? 'Category names in Arabic and English are required.' : 'يرجى إدخال اسم القسم بالعربية والإنجليزية.');
+      return;
+    }
+
+    try {
+      await LaravelAPI.updateCategory(editCatLevel, editCatId, {
+        name_en: editCatEn,
+        name_ar: editCatAr,
+        slug: editCatSlug,
+        parent_id: editCatParentId,
+        sort_order: editCatLevel === 'parent' ? editCatSortOrder : undefined,
+        mobile_icon: editCatLevel === 'parent' ? editCatMobileIcon : undefined,
+        image: editCatImage,
+        icon: editCatLevel === 'parent' ? editCatIcon : undefined,
+        status: editCatStatus
+      });
+
+      await loadCategoryTree();
+      setShowEditCategoryModal(false);
+      showSuccess(language === 'en' ? 'Category updated successfully!' : 'تم تحديث التصنيف بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      setValidationError(err?.message || 'Failed to update category');
+    }
+  };
+
+  // Status toggle handler
+  const handleToggleCategoryStatus = async (catId: number, level: 'parent' | 'sub' | 'child', currentStatus: 'active' | 'inactive') => {
+    if (!hasPermission) return;
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+
+    // Optimistic UI update
+    setCategories(prev => prev.map(c => {
+      if (level === 'parent' && c.id === catId) {
+        return { ...c, status: newStatus };
+      }
+      if (level === 'sub' && c.subcategories) {
+        return {
+          ...c,
+          subcategories: c.subcategories.map(s => s.id === catId ? { ...s, status: newStatus } : s)
+        };
+      }
+      if (level === 'child' && c.subcategories) {
+        return {
+          ...c,
+          subcategories: c.subcategories.map(s => ({
+            ...s,
+            childCategories: s.childCategories?.map(ch => ch.id === catId ? { ...ch, status: newStatus } : ch)
+          }))
+        };
+      }
+      return c;
+    }));
+
+    try {
+      await LaravelAPI.updateCategoryStatus(level, catId, newStatus);
+      showSuccess(language === 'en' ? `Category status updated to ${newStatus}!` : `تم تغيير حالة التصنيف إلى ${newStatus === 'active' ? 'نشط' : 'معطل'}!`);
+    } catch (err: any) {
+      console.error(err);
+      await loadCategoryTree();
+      setValidationError(err?.message || 'Failed to update category status');
+    }
+  };
+
+  // Reorder handler for main categories
+  const handleReorderCategory = async (index: number, direction: 'up' | 'down') => {
+    if (!hasPermission) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= categories.length) return;
+
+    const reordered = [...categories];
+    const temp = reordered[index];
+    reordered[index] = reordered[targetIndex];
+    reordered[targetIndex] = temp;
+
+    setCategories(reordered);
+
+    try {
+      const orderedIds = reordered.map(c => c.id);
+      await LaravelAPI.reorderCategories(orderedIds);
+      showSuccess(language === 'en' ? 'Category order updated!' : 'تم حفظ ترتيب التصنيفات!');
+    } catch (err: any) {
+      console.error(err);
+      await loadCategoryTree();
+      setValidationError(err?.message || 'Failed to reorder categories');
     }
   };
 
@@ -1340,67 +1562,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
             </form>
           )}
 
-          {/* Media Picker Modal */}
-          {showMediaPickerModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-              <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
-                <div className="flex items-center justify-between border-b pb-3">
-                  <div className="flex items-center gap-2">
-                    <ImageIcon className="h-5 w-5 text-indigo-600" />
-                    <h4 className="font-bold text-slate-800 text-sm">
-                      {language === 'en' ? 'Select Thumbnail from Media Vault' : 'اختيار صورة الغلاف من مكتبة الوسائط'}
-                    </h4>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowMediaPickerModal(false)}
-                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                  >
-                    ✕
-                  </button>
-                </div>
 
-                <div className="overflow-y-auto flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
-                  {mediaFiles.length === 0 ? (
-                    <div className="col-span-full py-8 text-center text-slate-400 text-xs">
-                      {language === 'en' ? 'No media assets found in library.' : 'لم يتم العثور على وسائط في المكتبة.'}
-                    </div>
-                  ) : (
-                    mediaFiles.map((asset) => (
-                      <div
-                        key={asset.id}
-                        onClick={() => {
-                          setFormImagePreview(asset.url);
-                          setFormSelectedMediaId(asset.id);
-                          setFormImageFile(null);
-                          setShowMediaPickerModal(false);
-                        }}
-                        className="group relative rounded-xl border border-slate-200 overflow-hidden cursor-pointer hover:border-indigo-600 hover:shadow-md transition bg-slate-50"
-                      >
-                        <img src={asset.url} alt={asset.name} className="w-full h-24 object-cover" />
-                        <div className="p-1.5 bg-white text-[9px] truncate font-medium text-slate-700">
-                          {asset.name}
-                        </div>
-                        <span className="absolute top-1 right-1 bg-black/60 text-white rounded px-1 text-[8px] font-mono">
-                          #{asset.id}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="border-t pt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowMediaPickerModal(false)}
-                    className="rounded-lg bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-                  >
-                    {t.cancel}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -1435,22 +1597,110 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
 
           {/* Interactive Nested List Canvas */}
           <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-xs space-y-6">
-            {categories.map((cat) => (
-              <div key={cat.id} className="border border-slate-100 rounded-xl p-4 bg-slate-50/50">
-                {/* Level 1: Category */}
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    <Folder className="h-4.5 w-4.5 text-indigo-500" />
-                    <span className="font-bold text-slate-800 text-xs">
-                      {language === 'en' ? cat.nameEn : cat.nameAr}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">/{cat.slug}</span>
-                    <span className="rounded bg-indigo-50 text-[9px] text-indigo-600 font-bold px-1.5">
-                      {cat.servicesCount} listings
-                    </span>
+            {categories.map((cat, index) => (
+              <div key={cat.id} className="border border-slate-200/80 rounded-2xl p-5 bg-white shadow-xs space-y-4">
+                {/* Level 1: Category Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-3">
+                    {/* Mobile App Icon / Thumbnail Preview */}
+                    <div className="relative group shrink-0">
+                      {cat.mobileIconUrl ? (
+                        <img
+                          src={cat.mobileIconUrl}
+                          alt={cat.nameEn}
+                          className="w-12 h-12 rounded-xl object-cover border border-indigo-200 shadow-xs"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500 font-bold text-xs">
+                          <Smartphone className="w-5 h-5 text-indigo-400" />
+                        </div>
+                      )}
+                      <span className="absolute -bottom-1 -right-1 bg-indigo-600 text-white text-[8px] font-bold px-1 rounded-sm shadow-xs">
+                        App
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800 text-sm">
+                          {language === 'en' ? cat.nameEn : cat.nameAr}
+                        </span>
+                        <span className="text-slate-400 text-xs">
+                          ({language === 'en' ? cat.nameAr : cat.nameEn})
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">/{cat.slug}</span>
+                      </div>
+
+                      {/* Badges row */}
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                        <span className="rounded-full bg-indigo-50 text-[10px] text-indigo-700 font-semibold px-2 py-0.5">
+                          {cat.servicesCount} listings
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono bg-slate-100 rounded px-1.5 py-0.5">
+                          Order: #{cat.sortOrder ?? 0}
+                        </span>
+                        {cat.icon && (
+                          <span className="inline-flex items-center gap-1 rounded bg-slate-100 text-[10px] text-slate-600 px-1.5 py-0.5 font-mono">
+                            <Tag className="w-3 h-3 text-slate-400" />
+                            {cat.icon}
+                          </span>
+                        )}
+                        {cat.imageUrl && (
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-50 text-[10px] text-emerald-700 font-semibold px-1.5 py-0.5">
+                            <Monitor className="w-3 h-3" />
+                            Web Banner
+                          </span>
+                        )}
+                        {/* Status Toggle Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCategoryStatus(cat.id, 'parent', cat.status)}
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold transition flex items-center gap-1 cursor-pointer ${
+                            cat.status === 'active'
+                              ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                              : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                          }`}
+                          title={language === 'en' ? 'Click to toggle status' : 'انقر لتغيير الحالة'}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${cat.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                          {cat.status === 'active' ? (language === 'en' ? 'Active' : 'نشط') : (language === 'en' ? 'Inactive' : 'معطل')}
+                        </button>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Actions: Reorder, Edit, Add Sub, Delete */}
                   {hasPermission && (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5 self-end sm:self-center">
+                      {/* Move Up */}
+                      <button
+                        onClick={() => handleReorderCategory(index, 'up')}
+                        disabled={index === 0}
+                        className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-25 rounded hover:bg-slate-100 transition"
+                        title={language === 'en' ? 'Move Up' : 'تحريك للأعلى'}
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      {/* Move Down */}
+                      <button
+                        onClick={() => handleReorderCategory(index, 'down')}
+                        disabled={index === categories.length - 1}
+                        className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-25 rounded hover:bg-slate-100 transition"
+                        title={language === 'en' ? 'Move Down' : 'تحريك للأسفل'}
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Edit Button */}
+                      <button
+                        onClick={() => openEditCategory(cat, 'parent')}
+                        className="text-xs bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1 text-indigo-700 font-semibold hover:bg-indigo-100 flex items-center gap-1 transition"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        <span>{language === 'en' ? 'Edit' : 'تعديل'}</span>
+                      </button>
+
+                      {/* Add Subcategory */}
                       <button
                         onClick={() => {
                           setSelectedParentCatId(cat.id);
@@ -1458,40 +1708,77 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                           setNewCatEn('');
                           setNewCatAr('');
                           setNewCatSlug('');
+                          setNewCatImage(null);
+                          setNewCatImageUrl(null);
                           setShowAddCategoryModal(true);
                         }}
-                        className="text-[10px] bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-600 font-bold hover:bg-slate-50"
+                        className="text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 font-semibold hover:bg-slate-50 flex items-center gap-1 transition"
                       >
-                        + Subcategory
+                        <Plus className="w-3 h-3 text-slate-400" />
+                        <span>+ Subcategory</span>
                       </button>
+
+                      {/* Delete */}
                       <button
                         onClick={() => handleDeleteCategoryNode(cat.id, 'parent')}
-                        className="p-1 text-rose-500 hover:bg-rose-50 rounded"
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                        title={language === 'en' ? 'Delete Category' : 'حذف القسم'}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   )}
                 </div>
 
                 {/* Level 2: Subcategory */}
-                <div className="space-y-4 pl-4 rtl:pl-0 rtl:pr-4 border-l border-dashed border-slate-200 rtl:border-l-0 rtl:border-r">
+                <div className="space-y-4 pl-4 rtl:pl-0 rtl:pr-4 border-l-2 border-dashed border-slate-200 rtl:border-l-0 rtl:border-r-2">
                   {cat.subcategories && cat.subcategories.length > 0 ? (
                     cat.subcategories.map((sub) => (
-                      <div key={sub.id} className="bg-white rounded-lg p-3 border border-slate-100">
+                      <div key={sub.id} className="bg-slate-50/70 rounded-xl p-3.5 border border-slate-100 space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                            {sub.imageUrl ? (
+                              <img src={sub.imageUrl} alt={sub.nameEn} className="w-6 h-6 rounded object-cover border border-slate-200" />
+                            ) : (
+                              <span className="h-2 w-2 rounded-full bg-slate-400" />
+                            )}
                             <span className="font-semibold text-slate-700 text-xs">
                               {language === 'en' ? sub.nameEn : sub.nameAr}
                             </span>
+                            <span className="text-slate-400 text-[11px]">
+                              ({language === 'en' ? sub.nameAr : sub.nameEn})
+                            </span>
                             <span className="text-[10px] text-slate-400 font-mono">/{sub.slug}</span>
-                            <span className="text-[10px] bg-slate-100 text-slate-500 px-1 rounded">
+                            <span className="text-[10px] bg-white border text-slate-500 px-1.5 py-0.5 rounded">
                               {sub.servicesCount} items
                             </span>
+
+                            {/* Subcategory Status Toggle */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCategoryStatus(sub.id, 'sub', sub.status)}
+                              className={`rounded-full px-2 py-0.5 text-[9px] font-bold transition flex items-center gap-1 cursor-pointer ${
+                                sub.status === 'active'
+                                  ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                  : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                              }`}
+                            >
+                              <span className={`w-1 h-1 rounded-full ${sub.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                              {sub.status === 'active' ? (language === 'en' ? 'Active' : 'نشط') : (language === 'en' ? 'Inactive' : 'معطل')}
+                            </button>
                           </div>
+
                           {hasPermission && (
                             <div className="flex items-center gap-1">
+                              {/* Edit Subcategory */}
+                              <button
+                                onClick={() => openEditCategory(sub, 'sub')}
+                                className="text-[10px] bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-600 font-semibold hover:bg-slate-100 flex items-center gap-1"
+                              >
+                                <Edit2 className="w-2.5 h-2.5" />
+                                <span>{language === 'en' ? 'Edit' : 'تعديل'}</span>
+                              </button>
+
                               <button
                                 onClick={() => {
                                   setSelectedParentSubId(sub.id);
@@ -1499,15 +1786,18 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                                   setNewCatEn('');
                                   setNewCatAr('');
                                   setNewCatSlug('');
+                                  setNewCatImage(null);
+                                  setNewCatImageUrl(null);
                                   setShowAddCategoryModal(true);
                                 }}
-                                className="text-[9px] bg-slate-50 border rounded px-1.5 py-0.5 font-bold hover:bg-slate-100"
+                                className="text-[10px] bg-indigo-50 border border-indigo-200 rounded px-2 py-0.5 font-bold text-indigo-700 hover:bg-indigo-100"
                               >
                                 + Child Category
                               </button>
                               <button
                                 onClick={() => handleDeleteCategoryNode(sub.id, 'sub')}
                                 className="p-1 text-rose-500 hover:bg-rose-50 rounded"
+                                title="Delete Subcategory"
                               >
                                 <Trash2 className="h-3 w-3" />
                               </button>
@@ -1517,22 +1807,41 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
 
                         {/* Level 3: Child category */}
                         {sub.childCategories && sub.childCategories.length > 0 && (
-                          <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pl-4 rtl:pl-0 rtl:pr-4 pt-2 border-t border-slate-50">
+                          <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pl-4 rtl:pl-0 rtl:pr-4 pt-2 border-t border-slate-100">
                             {sub.childCategories.map((child) => (
-                              <div key={child.id} className="flex items-center justify-between rounded bg-slate-50 px-2 py-1.5 border border-slate-100/50">
-                                <div className="min-w-0">
-                                  <p className="text-[10px] font-bold text-slate-600 truncate">
-                                    {language === 'en' ? child.nameEn : child.nameAr}
-                                  </p>
-                                  <p className="text-[8px] font-mono text-slate-400">/{child.slug}</p>
+                              <div key={child.id} className="flex items-center justify-between rounded-lg bg-white px-2.5 py-1.5 border border-slate-200/70 shadow-2xs">
+                                <div className="min-w-0 pr-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-[10px] font-bold text-slate-700 truncate">
+                                      {language === 'en' ? child.nameEn : child.nameAr}
+                                    </p>
+                                    {/* Child Status Toggle */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleCategoryStatus(child.id, 'child', child.status)}
+                                      className={`w-2 h-2 rounded-full transition shrink-0 ${child.status === 'active' ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                      title={child.status === 'active' ? 'Active' : 'Inactive'}
+                                    />
+                                  </div>
+                                  <p className="text-[8px] font-mono text-slate-400 truncate">/{child.slug}</p>
                                 </div>
                                 {hasPermission && (
-                                  <button
-                                    onClick={() => handleDeleteCategoryNode(child.id, 'child')}
-                                    className="text-rose-400 hover:text-rose-600"
-                                  >
-                                    ✕
-                                  </button>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      onClick={() => openEditCategory(child, 'child')}
+                                      className="text-slate-400 hover:text-indigo-600 p-0.5"
+                                      title="Edit"
+                                    >
+                                      <Edit2 className="w-2.5 h-2.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteCategoryNode(child.id, 'child')}
+                                      className="text-rose-400 hover:text-rose-600 p-0.5"
+                                      title="Delete"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                             ))}
@@ -1998,37 +2307,63 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
         </div>
       )}
 
+      {/* Hidden file input for category asset upload */}
+      <input
+        type="file"
+        ref={catUploadInputRef}
+        className="hidden"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            handleUploadCategoryAsset(file, catUploadTarget);
+          }
+          if (catUploadInputRef.current) {
+            catUploadInputRef.current.value = '';
+          }
+        }}
+      />
+
       {/* ======================= ADD CATALOG NODE MODAL ======================= */}
       {showAddCategoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <form onSubmit={handleAddCategoryNode} className="w-full max-w-md rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl animate-scale-in space-y-4">
-            <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-3">
-              {language === 'en' ? 'Append Catalog Node' : 'ربط تفرع جديد بالفهرس'}
-            </h3>
+          <form onSubmit={handleAddCategoryNode} className="w-full max-w-lg rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl animate-scale-in space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-800">
+                {language === 'en' ? 'Add Catalog Node' : 'إضافة تفريعة جديدة للفهرس'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddCategoryModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
 
             <div>
               <label className="text-[10px] font-bold uppercase text-slate-400">Node Level</label>
-              <div className="grid grid-cols-3 gap-1.5 mt-1 bg-slate-100 rounded p-1 text-xs font-semibold">
+              <div className="grid grid-cols-3 gap-1.5 mt-1 bg-slate-100 rounded-lg p-1 text-xs font-semibold">
                 <button
                   type="button"
                   onClick={() => setCatLevel('parent')}
-                  className={`rounded py-1 ${catLevel === 'parent' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}
+                  className={`rounded-md py-1.5 transition ${catLevel === 'parent' ? 'bg-white text-indigo-700 shadow-xs font-bold' : 'text-slate-500'}`}
                 >
-                  Category
+                  Main Category
                 </button>
                 <button
                   type="button"
                   onClick={() => setCatLevel('sub')}
-                  className={`rounded py-1 ${catLevel === 'sub' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}
+                  className={`rounded-md py-1.5 transition ${catLevel === 'sub' ? 'bg-white text-indigo-700 shadow-xs font-bold' : 'text-slate-500'}`}
                 >
                   Subcategory
                 </button>
                 <button
                   type="button"
                   onClick={() => setCatLevel('child')}
-                  className={`rounded py-1 ${catLevel === 'child' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}
+                  className={`rounded-md py-1.5 transition ${catLevel === 'child' ? 'bg-white text-indigo-700 shadow-xs font-bold' : 'text-slate-500'}`}
                 >
-                  Child Cat
+                  Child Category
                 </button>
               </div>
             </div>
@@ -2040,7 +2375,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                 <select
                   value={selectedParentCatId}
                   onChange={(e) => setSelectedParentCatId(parseInt(e.target.value))}
-                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white outline-hidden"
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white outline-hidden focus:border-indigo-500"
                 >
                   {categories.map(c => (
                     <option key={c.id} value={c.id}>{language === 'en' ? c.nameEn : c.nameAr}</option>
@@ -2056,7 +2391,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                 <select
                   value={selectedParentSubId}
                   onChange={(e) => setSelectedParentSubId(parseInt(e.target.value))}
-                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white outline-hidden"
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white outline-hidden focus:border-indigo-500"
                 >
                   {categories.flatMap(c => c.subcategories || []).map(sub => (
                     <option key={sub.id} value={sub.id}>{language === 'en' ? sub.nameEn : sub.nameAr}</option>
@@ -2074,7 +2409,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                   value={newCatEn}
                   onChange={(e) => setNewCatEn(e.target.value)}
                   className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500"
-                  placeholder="e.g., Yacht Cruises"
+                  placeholder="e.g. Home Cleaning"
                 />
               </div>
               <div>
@@ -2085,7 +2420,7 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                   value={newCatAr}
                   onChange={(e) => setNewCatAr(e.target.value)}
                   className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500 text-right"
-                  placeholder="مثال: رحلات اليخوت"
+                  placeholder="مثال: تنظيف المنازل"
                 />
               </div>
             </div>
@@ -2097,10 +2432,238 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
                 required
                 value={newCatSlug}
                 onChange={(e) => setNewCatSlug(e.target.value)}
-                className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500"
-                placeholder="yacht-cruises"
+                className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500 font-mono"
+                placeholder="home-cleaning"
               />
             </div>
+
+            {/* Parent Level Specific Fields */}
+            {catLevel === 'parent' && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-slate-400">Sort Order</label>
+                    <input
+                      type="number"
+                      value={newCatSortOrder}
+                      onChange={(e) => setNewCatSortOrder(parseInt(e.target.value) || 0)}
+                      className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500 font-mono"
+                      placeholder="0"
+                    />
+                    <p className="text-[9px] text-slate-400 mt-0.5">Lower numbers display first</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-slate-400">Status</label>
+                    <select
+                      value={newCatStatus}
+                      onChange={(e) => setNewCatStatus(e.target.value as 'active' | 'inactive')}
+                      className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white outline-hidden focus:border-indigo-500"
+                    >
+                      <option value="active">Active (Visible)</option>
+                      <option value="inactive">Inactive (Hidden)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Mobile Icon Asset */}
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-between">
+                    <span>{language === 'en' ? 'Mobile App Icon (Thumbnail)' : 'أيقونة تطبيق الجوال'}</span>
+                    <span className="text-[9px] font-mono text-indigo-600">categories.mobile_icon</span>
+                  </label>
+                  <div className="mt-1 flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                    <div className="w-12 h-12 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                      {newCatMobileIconUrl ? (
+                        <img src={newCatMobileIconUrl} alt="Mobile preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Smartphone className="w-5 h-5 text-slate-300" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMediaPickerTarget('new_cat_mobile');
+                            setShowMediaPickerModal(true);
+                          }}
+                          className="text-[10px] font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-md hover:bg-indigo-100 flex items-center gap-1"
+                        >
+                          <ImageIcon className="w-3 h-3" />
+                          <span>{language === 'en' ? 'Media Vault' : 'خزينة الوسائط'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCatUploadTarget('new_cat_mobile');
+                            catUploadInputRef.current?.click();
+                          }}
+                          className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-md hover:bg-slate-100 flex items-center gap-1"
+                        >
+                          <Upload className="w-3 h-3 text-slate-500" />
+                          <span>{language === 'en' ? 'Upload' : 'رفع ملف'}</span>
+                        </button>
+                        {newCatMobileIcon && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewCatMobileIcon(null);
+                              setNewCatMobileIconUrl(null);
+                            }}
+                            className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold px-1"
+                          >
+                            {language === 'en' ? 'Remove' : 'إزالة'}
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-slate-400 mt-1">
+                        {language === 'en' ? 'Rendered dynamically on Flutter mobile buyer home & category list.' : 'تظهر ديناميكياً على تطبيق المشتري في الرئيسية وشاشة التصنيفات.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Web Image Asset */}
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-between">
+                    <span>{language === 'en' ? 'Web Category Image (Banner)' : 'صورة الويب (بانر القسم)'}</span>
+                    <span className="text-[9px] font-mono text-emerald-600">categories.image</span>
+                  </label>
+                  <div className="mt-1 flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                    <div className="w-12 h-12 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                      {newCatImageUrl ? (
+                        <img src={newCatImageUrl} alt="Web preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Monitor className="w-5 h-5 text-slate-300" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMediaPickerTarget('new_cat_image');
+                            setShowMediaPickerModal(true);
+                          }}
+                          className="text-[10px] font-semibold bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-md hover:bg-emerald-100 flex items-center gap-1"
+                        >
+                          <ImageIcon className="w-3 h-3" />
+                          <span>{language === 'en' ? 'Media Vault' : 'خزينة الوسائط'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCatUploadTarget('new_cat_image');
+                            catUploadInputRef.current?.click();
+                          }}
+                          className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-md hover:bg-slate-100 flex items-center gap-1"
+                        >
+                          <Upload className="w-3 h-3 text-slate-500" />
+                          <span>{language === 'en' ? 'Upload' : 'رفع ملف'}</span>
+                        </button>
+                        {newCatImage && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewCatImage(null);
+                              setNewCatImageUrl(null);
+                            }}
+                            className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold px-1"
+                          >
+                            {language === 'en' ? 'Remove' : 'إزالة'}
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-slate-400 mt-1">
+                        {language === 'en' ? 'Used for public marketplace web view & landing pages.' : 'تستخدم لصفحات الويب والتسوق في الموقع الإلكتروني.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CSS Icon */}
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-between">
+                    <span>{language === 'en' ? 'CSS Icon Class' : 'فئة أيقونة CSS'}</span>
+                    <span className="text-[9px] font-mono text-slate-400">categories.icon</span>
+                  </label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newCatIcon}
+                      onChange={(e) => setNewCatIcon(e.target.value)}
+                      className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500 font-mono"
+                      placeholder="e.g. las la-tools, las la-broom, las la-cut"
+                    />
+                    {newCatIcon && (
+                      <div className="px-2.5 py-1.5 rounded-lg bg-slate-100 border text-slate-700 text-xs font-mono shrink-0 flex items-center gap-1">
+                        <Tag className="w-3 h-3" />
+                        <span className="truncate max-w-[100px]">{newCatIcon}</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-slate-400 mt-1">
+                    {language === 'en' ? 'LineAwesome or FontAwesome icon class.' : 'فئة أيقونات LineAwesome أو FontAwesome.'}
+                  </p>
+                </div>
+              </>
+            )}
+
+            {/* Sub/Child Level Image */}
+            {catLevel !== 'parent' && (
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400">
+                  {language === 'en' ? 'Subcategory Image (Optional)' : 'صورة القسم الفرعي (اختياري)'}
+                </label>
+                <div className="mt-1 flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                  <div className="w-12 h-12 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                    {newCatImageUrl ? (
+                      <img src={newCatImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon className="w-5 h-5 text-slate-300" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMediaPickerTarget('new_cat_image');
+                          setShowMediaPickerModal(true);
+                        }}
+                        className="text-[10px] font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-md hover:bg-indigo-100 flex items-center gap-1"
+                      >
+                        <ImageIcon className="w-3 h-3" />
+                        <span>{language === 'en' ? 'Media Vault' : 'خزينة الوسائط'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCatUploadTarget('new_cat_image');
+                          catUploadInputRef.current?.click();
+                        }}
+                        className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-md hover:bg-slate-100 flex items-center gap-1"
+                      >
+                        <Upload className="w-3 h-3 text-slate-500" />
+                        <span>{language === 'en' ? 'Upload' : 'رفع ملف'}</span>
+                      </button>
+                      {newCatImage && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewCatImage(null);
+                            setNewCatImageUrl(null);
+                          }}
+                          className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold px-1"
+                        >
+                          {language === 'en' ? 'Remove' : 'إزالة'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="mt-6 flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
               <button
@@ -2118,6 +2681,421 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ======================= EDIT CATALOG NODE MODAL ======================= */}
+      {showEditCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <form onSubmit={handleEditCategoryNode} className="w-full max-w-lg rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl animate-scale-in space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-sm font-bold text-slate-800">
+                  {language === 'en' ? 'Edit Category Node' : 'تعديل التصنيف'} #{editCatId}
+                </h3>
+                <span className="text-[9px] font-bold uppercase rounded bg-indigo-50 text-indigo-700 px-1.5 py-0.5">
+                  {editCatLevel}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEditCategoryModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* If Subcategory editing: parent selector */}
+            {editCatLevel === 'sub' && (
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400">Parent Category</label>
+                <select
+                  value={editCatParentId}
+                  onChange={(e) => setEditCatParentId(parseInt(e.target.value))}
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white outline-hidden focus:border-indigo-500"
+                >
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{language === 'en' ? c.nameEn : c.nameAr}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* If Child Category editing: parent selector */}
+            {editCatLevel === 'child' && (
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400">Parent Subcategory</label>
+                <select
+                  value={editCatParentId}
+                  onChange={(e) => setEditCatParentId(parseInt(e.target.value))}
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white outline-hidden focus:border-indigo-500"
+                >
+                  {categories.flatMap(c => c.subcategories || []).map(sub => (
+                    <option key={sub.id} value={sub.id}>{language === 'en' ? sub.nameEn : sub.nameAr}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400">English Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editCatEn}
+                  onChange={(e) => setEditCatEn(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400">Arabic Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editCatAr}
+                  onChange={(e) => setEditCatAr(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500 text-right"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400">Url Slug</label>
+                <input
+                  type="text"
+                  required
+                  value={editCatSlug}
+                  onChange={(e) => setEditCatSlug(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500 font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400">Status</label>
+                <select
+                  value={editCatStatus}
+                  onChange={(e) => setEditCatStatus(e.target.value as 'active' | 'inactive')}
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white outline-hidden focus:border-indigo-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Parent Level Specific Edit Fields */}
+            {editCatLevel === 'parent' && (
+              <>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400">Sort Order</label>
+                  <input
+                    type="number"
+                    value={editCatSortOrder}
+                    onChange={(e) => setEditCatSortOrder(parseInt(e.target.value) || 0)}
+                    className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500 font-mono"
+                  />
+                  <p className="text-[9px] text-slate-400 mt-0.5">Lower numbers display first</p>
+                </div>
+
+                {/* Mobile Icon Asset */}
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-between">
+                    <span>{language === 'en' ? 'Mobile App Icon (Thumbnail)' : 'أيقونة تطبيق الجوال'}</span>
+                    <span className="text-[9px] font-mono text-indigo-600">categories.mobile_icon</span>
+                  </label>
+                  <div className="mt-1 flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                    <div className="w-12 h-12 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                      {editCatMobileIconUrl ? (
+                        <img src={editCatMobileIconUrl} alt="Mobile preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Smartphone className="w-5 h-5 text-slate-300" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMediaPickerTarget('edit_cat_mobile');
+                            setShowMediaPickerModal(true);
+                          }}
+                          className="text-[10px] font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-md hover:bg-indigo-100 flex items-center gap-1"
+                        >
+                          <ImageIcon className="w-3 h-3" />
+                          <span>{language === 'en' ? 'Media Vault' : 'خزينة الوسائط'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCatUploadTarget('edit_cat_mobile');
+                            catUploadInputRef.current?.click();
+                          }}
+                          className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-md hover:bg-slate-100 flex items-center gap-1"
+                        >
+                          <Upload className="w-3 h-3 text-slate-500" />
+                          <span>{language === 'en' ? 'Upload' : 'رفع ملف'}</span>
+                        </button>
+                        {editCatMobileIcon && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditCatMobileIcon(null);
+                              setEditCatMobileIconUrl(null);
+                            }}
+                            className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold px-1"
+                          >
+                            {language === 'en' ? 'Remove' : 'إزالة'}
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-slate-400 mt-1">
+                        {language === 'en' ? 'Rendered dynamically on Flutter mobile buyer home & category list.' : 'تظهر ديناميكياً على تطبيق المشتري في الرئيسية وشاشة التصنيفات.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Web Image Asset */}
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-between">
+                    <span>{language === 'en' ? 'Web Category Image (Banner)' : 'صورة الويب (بانر القسم)'}</span>
+                    <span className="text-[9px] font-mono text-emerald-600">categories.image</span>
+                  </label>
+                  <div className="mt-1 flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                    <div className="w-12 h-12 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                      {editCatImageUrl ? (
+                        <img src={editCatImageUrl} alt="Web preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Monitor className="w-5 h-5 text-slate-300" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMediaPickerTarget('edit_cat_image');
+                            setShowMediaPickerModal(true);
+                          }}
+                          className="text-[10px] font-semibold bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-md hover:bg-emerald-100 flex items-center gap-1"
+                        >
+                          <ImageIcon className="w-3 h-3" />
+                          <span>{language === 'en' ? 'Media Vault' : 'خزينة الوسائط'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCatUploadTarget('edit_cat_image');
+                            catUploadInputRef.current?.click();
+                          }}
+                          className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-md hover:bg-slate-100 flex items-center gap-1"
+                        >
+                          <Upload className="w-3 h-3 text-slate-500" />
+                          <span>{language === 'en' ? 'Upload' : 'رفع ملف'}</span>
+                        </button>
+                        {editCatImage && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditCatImage(null);
+                              setEditCatImageUrl(null);
+                            }}
+                            className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold px-1"
+                          >
+                            {language === 'en' ? 'Remove' : 'إزالة'}
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-slate-400 mt-1">
+                        {language === 'en' ? 'Used for public marketplace web view & landing pages.' : 'تستخدم لصفحات الويب والتسوق في الموقع الإلكتروني.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CSS Icon */}
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-between">
+                    <span>{language === 'en' ? 'CSS Icon Class' : 'فئة أيقونة CSS'}</span>
+                    <span className="text-[9px] font-mono text-slate-400">categories.icon</span>
+                  </label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editCatIcon}
+                      onChange={(e) => setEditCatIcon(e.target.value)}
+                      className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-indigo-500 font-mono"
+                      placeholder="e.g. las la-tools, las la-broom, las la-cut"
+                    />
+                    {editCatIcon && (
+                      <div className="px-2.5 py-1.5 rounded-lg bg-slate-100 border text-slate-700 text-xs font-mono shrink-0 flex items-center gap-1">
+                        <Tag className="w-3 h-3" />
+                        <span className="truncate max-w-[100px]">{editCatIcon}</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-slate-400 mt-1">
+                    {language === 'en' ? 'LineAwesome or FontAwesome icon class.' : 'فئة أيقونات LineAwesome أو FontAwesome.'}
+                  </p>
+                </div>
+              </>
+            )}
+
+            {/* Sub/Child Level Image in Edit */}
+            {editCatLevel !== 'parent' && (
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400">
+                  {language === 'en' ? 'Image (Optional)' : 'صورة (اختياري)'}
+                </label>
+                <div className="mt-1 flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                  <div className="w-12 h-12 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                    {editCatImageUrl ? (
+                      <img src={editCatImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon className="w-5 h-5 text-slate-300" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMediaPickerTarget('edit_cat_image');
+                          setShowMediaPickerModal(true);
+                        }}
+                        className="text-[10px] font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-md hover:bg-indigo-100 flex items-center gap-1"
+                      >
+                        <ImageIcon className="w-3 h-3" />
+                        <span>{language === 'en' ? 'Media Vault' : 'خزينة الوسائط'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCatUploadTarget('edit_cat_image');
+                          catUploadInputRef.current?.click();
+                        }}
+                        className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-md hover:bg-slate-100 flex items-center gap-1"
+                      >
+                        <Upload className="w-3 h-3 text-slate-500" />
+                        <span>{language === 'en' ? 'Upload' : 'رفع ملف'}</span>
+                      </button>
+                      {editCatImage && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditCatImage(null);
+                            setEditCatImageUrl(null);
+                          }}
+                          className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold px-1"
+                        >
+                          {language === 'en' ? 'Remove' : 'إزالة'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={() => setShowEditCategoryModal(false)}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+              >
+                {t.save}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ======================= GLOBAL MEDIA PICKER MODAL ======================= */}
+      {showMediaPickerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col animate-scale-in">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="h-5 w-5 text-indigo-600" />
+                <h4 className="font-bold text-slate-800 text-sm">
+                  {mediaPickerTarget === 'service'
+                    ? (language === 'en' ? 'Select Thumbnail from Media Vault' : 'اختيار صورة الغلاف من مكتبة الوسائط')
+                    : mediaPickerTarget.includes('mobile')
+                    ? (language === 'en' ? 'Select Mobile App Thumbnail' : 'اختيار أيقونة تطبيق الجوال')
+                    : (language === 'en' ? 'Select Web Banner / Image' : 'اختيار صورة الويب')}
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMediaPickerModal(false)}
+                className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
+              {mediaFiles.length === 0 ? (
+                <div className="col-span-full py-8 text-center text-slate-400 text-xs">
+                  {language === 'en' ? 'No media assets found in library.' : 'لم يتم العثور على وسائط في المكتبة.'}
+                </div>
+              ) : (
+                mediaFiles.map((asset) => (
+                  <div
+                    key={asset.id}
+                    onClick={() => {
+                      if (mediaPickerTarget === 'service') {
+                        setFormImagePreview(asset.url);
+                        setFormSelectedMediaId(asset.id);
+                        setFormImageFile(null);
+                      } else if (mediaPickerTarget === 'new_cat_mobile') {
+                        setNewCatMobileIcon(asset.id);
+                        setNewCatMobileIconUrl(asset.url);
+                      } else if (mediaPickerTarget === 'new_cat_image') {
+                        setNewCatImage(asset.id);
+                        setNewCatImageUrl(asset.url);
+                      } else if (mediaPickerTarget === 'edit_cat_mobile') {
+                        setEditCatMobileIcon(asset.id);
+                        setEditCatMobileIconUrl(asset.url);
+                      } else if (mediaPickerTarget === 'edit_cat_image') {
+                        setEditCatImage(asset.id);
+                        setEditCatImageUrl(asset.url);
+                      }
+                      setShowMediaPickerModal(false);
+                    }}
+                    className="group relative rounded-xl border border-slate-200 overflow-hidden cursor-pointer hover:border-indigo-600 hover:shadow-md transition bg-slate-50"
+                  >
+                    <img src={asset.url} alt={asset.name} className="w-full h-24 object-cover" />
+                    <div className="p-1.5 bg-white text-[9px] truncate font-medium text-slate-700">
+                      {asset.name}
+                    </div>
+                    <span className="absolute top-1 right-1 bg-black/60 text-white rounded px-1 text-[8px] font-mono">
+                      #{asset.id}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="border-t pt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowMediaPickerModal(false)}
+                className="rounded-lg bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              >
+                {t.cancel}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
