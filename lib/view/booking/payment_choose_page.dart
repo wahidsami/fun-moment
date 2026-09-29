@@ -40,6 +40,10 @@ class _PaymentChoosePageState extends State<PaymentChoosePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<PaymentGatewayListService>(context, listen: false)
+          .fetchGatewayList(context);
+    });
   }
 
   int selectedMethod = 0;
@@ -49,10 +53,6 @@ class _PaymentChoosePageState extends State<PaymentChoosePage> {
   @override
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
-
-    //fetch payment gateway list
-    Provider.of<PaymentGatewayListService>(context, listen: false)
-        .fetchGatewayList(context);
 
     return Scaffold(
         backgroundColor: cc.bgColor,
@@ -302,10 +302,75 @@ class _PaymentChoosePageState extends State<PaymentChoosePage> {
                               sizedBoxCustom(30)
                             ]),
                       )
-                    : Container(
-                        margin: const EdgeInsets.only(top: 60),
-                        child: OthersHelper().showLoading(cc.primaryColor),
-                      );
+                    : pgProvider.isloading
+                        ? Container(
+                            margin: const EdgeInsets.only(top: 60),
+                            child: OthersHelper().showLoading(cc.primaryColor),
+                          )
+                        : pgProvider.hasError
+                            ? Container(
+                                margin: const EdgeInsets.only(top: 60),
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.error_outline,
+                                        size: 54, color: cc.warningColor),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      asProvider.getString(pgProvider.errorMessage ??
+                                          'Failed to load payment methods'),
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          color: cc.greyParagraph,
+                                          fontSize: 15,
+                                          height: 1.4),
+                                    ),
+                                    const SizedBox(height: 24),
+                                    CommonHelper().buttonOrange(
+                                        asProvider.getString('Retry'), () {
+                                      pgProvider.fetchGatewayList(context,
+                                          forceRefresh: true);
+                                    }),
+                                  ],
+                                ),
+                              )
+                            : Container(
+                                margin: const EdgeInsets.only(top: 60),
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.payment_outlined,
+                                        size: 54, color: cc.greyFour),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      asProvider.getString(
+                                          'No payment methods available'),
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: cc.greyParagraph,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      asProvider.getString(
+                                          'Please check back later or contact customer support.'),
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          color: cc.greyParagraph, fontSize: 13),
+                                    ),
+                                    const SizedBox(height: 24),
+                                    CommonHelper().buttonOrange(
+                                        asProvider.getString('Retry'), () {
+                                      pgProvider.fetchGatewayList(context,
+                                          forceRefresh: true);
+                                    }),
+                                  ],
+                                ),
+                              );
               }),
             ),
           ),

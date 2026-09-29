@@ -380,9 +380,9 @@ class PaymentGatewayController extends Controller
                 'gateway_list'=> $list,
             ]);
         }
-        return response()->error([
+        return response()->json([
             'gateway_list'=> [],
-        ]);
+        ], 200);
     }
 
     

@@ -1,5 +1,6 @@
 // ignore_for_file: prefer_typing_uninitialized_variables, avoid_print
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -25,6 +26,9 @@ class PaymentGatewayListService with ChangeNotifier {
   var zitopayUserName;
 
   bool isloading = false;
+  bool isLoaded = false;
+  bool hasError = false;
+  String? errorMessage;
 
   setSelectedMethodName(newName) {
     selectedMethodName = newName;
@@ -41,56 +45,90 @@ class PaymentGatewayListService with ChangeNotifier {
     notifyListeners();
   }
 
-  Future fetchGatewayList(BuildContext context) async {
-//TODO if no payment gateway is selected by user.
-//set default public and secret key
-
-    //if payment list already loaded, then don't load again
-    if (paymentList.isNotEmpty) {
+  Future fetchGatewayList(BuildContext context, {bool forceRefresh = false}) async {
+    // If payment list already loaded and not force-refreshing, don't reload
+    if (!forceRefresh && isLoaded && paymentList.isNotEmpty) {
       return;
     }
 
     var connection = await checkConnection();
-    if (connection) {
-      setLoadingTrue();
+    if (!connection) {
+      hasError = true;
+      errorMessage = 'No internet connection. Please check your network and try again.';
+      isloading = false;
+      notifyListeners();
+      return false;
+    }
 
+    setLoadingTrue();
+    hasError = false;
+    errorMessage = null;
+
+    try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       var token = prefs.getString('token');
 
       var header = {
-        //if header type is application/json then the data should be in jsonEncode method
         "Accept": "application/json",
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",
       };
 
-      var response = await http.post(
-          Uri.parse('$baseApi/user/payment-gateway-list'),
-          headers: header);
-      print(response.body);
+      var response = await http
+          .post(Uri.parse('$baseApi/user/payment-gateway-list'), headers: header)
+          .timeout(const Duration(seconds: 15));
+
+      debugPrint('Payment gateway response [${response.statusCode}]: ${response.body}');
       setLoadingFalse();
+      isLoaded = true;
 
-      if (response.statusCode == 201) {
-        paymentList = jsonDecode(response.body)['gateway_list'];
-
-        // add wallet payment
-        paymentList.add({
-          "name": "wallet",
-          "logo_link": "https://i.postimg.cc/y8pMmqF4/wallet.png"
-        });
-        try {
-          setSelectedMethodName(paymentList.first?['name']);
-          setKey(paymentList.first?['name'], 0);
-          Provider.of<BookService>(context, listen: false)
-              .setSelectedPayment(paymentList.first?['name']);
-        } catch (e) {}
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        var decoded = jsonDecode(response.body);
+        var rawList = decoded['gateway_list'];
+        if (rawList is List && rawList.isNotEmpty) {
+          paymentList = List.from(rawList);
+          // add wallet payment
+          paymentList.add({
+            "name": "wallet",
+            "logo_link": "https://i.postimg.cc/y8pMmqF4/wallet.png"
+          });
+          try {
+            setSelectedMethodName(paymentList.first?['name']);
+            setKey(paymentList.first?['name'], 0);
+            Provider.of<BookService>(context, listen: false)
+                .setSelectedPayment(paymentList.first?['name']);
+          } catch (e) {
+            debugPrint('Error selecting initial payment method: $e');
+          }
+        } else {
+          paymentList = [];
+        }
+        hasError = false;
+        notifyListeners();
+        return true;
       } else {
-        //something went wrong
-        debugPrint("Payment gateway list".toString());
-        print(response.body);
+        hasError = true;
+        errorMessage = 'Failed to load payment gateways (${response.statusCode})';
+        paymentList = [];
+        notifyListeners();
+        return false;
       }
-    } else {
-      //internet off
+    } on TimeoutException {
+      setLoadingFalse();
+      isLoaded = true;
+      hasError = true;
+      errorMessage = 'Network timeout while loading payment gateways. Please try again.';
+      paymentList = [];
+      notifyListeners();
+      return false;
+    } catch (e) {
+      setLoadingFalse();
+      isLoaded = true;
+      hasError = true;
+      errorMessage = 'Unable to load payment gateways. Please check connection.';
+      paymentList = [];
+      debugPrint('fetchGatewayList error: $e');
+      notifyListeners();
       return false;
     }
   }
