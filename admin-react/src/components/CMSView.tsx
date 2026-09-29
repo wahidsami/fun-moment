@@ -2095,7 +2095,7 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                 {/* Media Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {mediaGallery
-                    .filter(m => m.name.toLowerCase().includes(searchMedia.toLowerCase()))
+                    .filter(m => String(m.name ?? '').toLowerCase().includes(searchMedia.toLowerCase()))
                     .map(item => (
                       <div
                         key={item.id}

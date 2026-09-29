@@ -646,11 +646,13 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
         }
         setMediaFiles(prev => [{
           id: item.id,
-          name: item.title,
+          // API returns title_en / slug, not title — normalise consistently with loadMedia()
+          name: item.slug || item.title_en || `asset-${item.id}`,
           size: item.size || 'Unknown',
           type: 'image',
-          url: item.url,
-          uploadedAt: 'Just now'
+          url: item.image || item.url || '',
+          uploadedAt: 'Just now',
+          dimensions: item.dimensions || ''
         }, ...prev]);
         showSuccess(language === 'en' ? 'Asset uploaded and assigned!' : 'تم رفع الملف وربطه بالتصنيف بنجاح!');
       }
@@ -951,7 +953,8 @@ export default function ServicesView({ language, activeRole }: ServicesViewProps
   });
 
   const filteredMedia = mediaFiles.filter(file => {
-    const matchesSearch = file.name.toLowerCase().includes(mediaSearch.toLowerCase());
+    // Guard against name being undefined/null (e.g. if a just-uploaded asset has no title)
+    const matchesSearch = String(file.name ?? '').toLowerCase().includes(mediaSearch.toLowerCase());
     const matchesType = mediaTypeFilter === 'all' || file.type === mediaTypeFilter;
     return matchesSearch && matchesType;
   });
