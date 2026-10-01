@@ -37,19 +37,40 @@ class PaymentChoosePage extends StatefulWidget {
 }
 
 class _PaymentChoosePageState extends State<PaymentChoosePage> {
+  int selectedMethod = 0;
+  bool termsAgree = false;
+  bool firstTime = true;
+  bool _isSubmitting = false;
+  PlaceOrderService? _placeOrderService;
+
   @override
   void initState() {
     super.initState();
+    _placeOrderService = Provider.of<PlaceOrderService>(context, listen: false);
+    _placeOrderService?.addListener(_onPlaceOrderServiceChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<PaymentGatewayListService>(context, listen: false)
-          .fetchGatewayList(context);
+          .fetchGatewayList(context,
+              forceRefresh: true,
+              isFromDepositeToWallet: widget.isFromDepositeToWallet);
     });
   }
 
-  int selectedMethod = 0;
-  bool termsAgree = false;
+  void _onPlaceOrderServiceChanged() {
+    if (_isSubmitting && !(_placeOrderService?.isloading ?? true)) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
 
-  bool firstTime = true;
+  @override
+  void dispose() {
+    _placeOrderService?.removeListener(_onPlaceOrderServiceChanged);
+    super.dispose();
+  }
   @override
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
@@ -254,13 +275,10 @@ class _PaymentChoosePageState extends State<PaymentChoosePage> {
                               CommonHelper().buttonOrange(
                                   asProvider.getString('Pay & Confirm'),
                                   () async {
-                                var w = await Provider.of<WalletService>(
-                                        context,
-                                        listen: false)
-                                    .validate(
-                                        context, widget.isFromDepositeToWallet);
-
-                                if (w == false) return;
+                                // 1. Synchronously reject rapid second tap
+                                if (_isSubmitting || provider.isloading) {
+                                  return;
+                                }
 
                                 if (termsAgree == false) {
                                   OthersHelper().showToast(
@@ -269,14 +287,36 @@ class _PaymentChoosePageState extends State<PaymentChoosePage> {
                                       Colors.black);
                                   return;
                                 }
-                                if (provider.isloading == true) {
-                                  return;
-                                } else {
-                                  // if deposite from current balance is selected
+
+                                // 2. Synchronous submission latch set BEFORE any await
+                                _isSubmitting = true;
+                                setState(() {});
+
+                                try {
+                                  var w = await Provider.of<WalletService>(
+                                          context,
+                                          listen: false)
+                                      .validate(
+                                          context, widget.isFromDepositeToWallet);
+
+                                  if (w == false) {
+                                    if (mounted) {
+                                      setState(() {
+                                        _isSubmitting = false;
+                                      });
+                                    }
+                                    return;
+                                  }
+
+                                  final selectedMethodName =
+                                      pgProvider.paymentList[selectedMethod]
+                                          ['name'];
+                                  Provider.of<BookService>(context,
+                                          listen: false)
+                                      .setSelectedPayment(selectedMethodName);
 
                                   payAction(
-                                      pgProvider.paymentList[selectedMethod]
-                                          ['name'],
+                                      selectedMethodName,
                                       context,
                                       //if user selected bank transfer
                                       pgProvider.paymentList[selectedMethod]
@@ -293,11 +333,15 @@ class _PaymentChoosePageState extends State<PaymentChoosePage> {
                                           widget.isFromDepositeToWallet,
                                       payAgain: widget.payAgain,
                                       isFromHireJob: widget.isFromHireJob);
+                                } catch (e) {
+                                  if (mounted) {
+                                    setState(() {
+                                      _isSubmitting = false;
+                                    });
+                                  }
                                 }
                               },
-                                  isloading: provider.isloading == false
-                                      ? false
-                                      : true),
+                                  isloading: _isSubmitting || provider.isloading),
 
                               sizedBoxCustom(30)
                             ]),

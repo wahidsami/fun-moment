@@ -24,6 +24,7 @@ import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 import '../../view/utils/common_helper.dart';
 import '../common_service.dart';
 
@@ -35,6 +36,7 @@ class PlaceOrderService with ChangeNotifier {
   var cancelUrl;
 
   var paytmHtmlForm;
+  String? idempotencyKey;
 
   setOrderId(v) {
     orderId = v;
@@ -51,9 +53,33 @@ class PlaceOrderService with ChangeNotifier {
     notifyListeners();
   }
 
+  void resetIdempotencyKey() {
+    idempotencyKey = null;
+    notifyListeners();
+  }
+
+  void resetState() {
+    isloading = false;
+    orderId = null;
+    successUrl = null;
+    cancelUrl = null;
+    paytmHtmlForm = null;
+    idempotencyKey = null;
+    notifyListeners();
+  }
+
   Future<bool> placeOrder(BuildContext context, String? imagePath,
-      {bool isManualOrCod = false, bool paytmPaymentSelected = false}) async {
+      {bool isManualOrCod = false,
+      bool paytmPaymentSelected = false,
+      String? customIdempotencyKey}) async {
+    if (isloading) return false;
     setLoadingTrue();
+
+    if (customIdempotencyKey != null && customIdempotencyKey.isNotEmpty) {
+      idempotencyKey = customIdempotencyKey;
+    } else if (idempotencyKey == null || idempotencyKey!.isEmpty) {
+      idempotencyKey = const Uuid().v4();
+    }
     SharedPreferences prefs = await SharedPreferences.getInstance();
     var token = prefs.getString('token');
 
@@ -132,6 +158,11 @@ class PlaceOrderService with ChangeNotifier {
     dio.options.headers['Content-Type'] = 'multipart/form-data';
     dio.options.headers['Accept'] = 'application/json';
     dio.options.headers['Authorization'] = "Bearer $token";
+    if (idempotencyKey != null) {
+      dio.options.headers['X-Idempotency-Key'] = idempotencyKey;
+    }
+
+    var orderNote = bProvider.orderNote ?? '';
 
     if (isOnline == 0) {
       print('not online service');
@@ -157,6 +188,8 @@ class PlaceOrderService with ChangeNotifier {
               jsonEncode({"additional_services": extrasList}),
           'coupon_code': coupon.toString(),
           'selected_payment_gateway': selectedPaymentGateway.toString(),
+          'order_note': orderNote,
+          'idempotency_key': idempotencyKey,
           'manual_payment_image': await MultipartFile.fromFile(imagePath,
               filename: 'bankTransfer$name$address$imagePath.jpg'),
           'is_service_online': 0,
@@ -182,6 +215,8 @@ class PlaceOrderService with ChangeNotifier {
               jsonEncode({"additional_services": extrasList}),
           'coupon_code': coupon.toString(),
           'selected_payment_gateway': selectedPaymentGateway.toString(),
+          'order_note': orderNote,
+          'idempotency_key': idempotencyKey,
           'is_service_online': 0,
         });
       }
@@ -202,6 +237,8 @@ class PlaceOrderService with ChangeNotifier {
               jsonEncode({"additional_services": extrasList}),
           'coupon_code': coupon.toString(),
           'selected_payment_gateway': selectedPaymentGateway.toString(),
+          'order_note': orderNote,
+          'idempotency_key': idempotencyKey,
           'manual_payment_image': await MultipartFile.fromFile(imagePath,
               filename: 'bankTransfer$name$address$imagePath.jpg'),
           'is_service_online': '1',
@@ -219,6 +256,8 @@ class PlaceOrderService with ChangeNotifier {
               jsonEncode({"additional_services": extrasList}),
           'coupon_code': coupon.toString(),
           'selected_payment_gateway': selectedPaymentGateway.toString(),
+          'order_note': orderNote,
+          'idempotency_key': idempotencyKey,
           'is_service_online': '1',
         });
       }
@@ -244,6 +283,7 @@ class PlaceOrderService with ChangeNotifier {
       'additional_services': jsonEncode({"additional_services": extrasList}),
       'coupon_code': coupon.toString(),
       'selected_payment_gateway': selectedPaymentGateway.toString(),
+      'idempotency_key': idempotencyKey,
       'is_service_online': 0,
       'paytm': true
     });
@@ -256,45 +296,59 @@ class PlaceOrderService with ChangeNotifier {
       "Authorization": "Bearer $token",
     };
 
-    var response = await dio.post('$baseApi/service/order', data: formData,
-        options: Options(
-      validateStatus: (status) {
-        return true;
-      },
-    ));
+    try {
+      var response = await dio.post('$baseApi/service/order', data: formData,
+          options: Options(
+        validateStatus: (status) {
+          return true;
+        },
+      ));
 
-    //if paytm payment selected
-    // =================>
+      //if paytm payment selected
+      // =================>
 
-    if (paytmPaymentSelected == true) {
-      var paytmRes = await http.post(Uri.parse('$baseApi/service/order-paytm'),
-          headers: header, body: data);
+      if (paytmPaymentSelected == true) {
+        var paytmRes = await http.post(Uri.parse('$baseApi/service/order-paytm'),
+            headers: header, body: data);
 
-      paytmHtmlForm = paytmRes.body;
-      notifyListeners();
-    }
-
-    if (response.statusCode == 201) {
-      print(response.data);
-
-      orderId = response.data['order_id'];
-      successUrl = response.data['success_url'];
-      cancelUrl = response.data['cancel_url'];
-
-      print('order id is $orderId');
-
-      notifyListeners();
-
-      if (isManualOrCod == true) {
-        //if user placed order in manual transfer or cash on delivery then no need to hit the api- make payment success
-        //because in this case payment needs to stay pending anyway.
-        doNext(context, 'Pending');
-        setLoadingFalse();
+        paytmHtmlForm = paytmRes.body;
+        notifyListeners();
       }
-      return true;
-    } else {
+
+      if (response.statusCode == 201) {
+        debugPrint('Order created: ${response.data}');
+
+        var resData = response.data;
+        if (resData is String) {
+          try {
+            resData = jsonDecode(resData);
+          } catch (_) {}
+        }
+
+        orderId = resData is Map ? resData['order_id'] : response.data['order_id'];
+        successUrl = resData is Map ? resData['success_url'] : null;
+        cancelUrl = resData is Map ? resData['cancel_url'] : null;
+
+        debugPrint('Parsed order id is $orderId');
+
+        notifyListeners();
+
+        if (isManualOrCod == true) {
+          //if user placed order in manual transfer or cash on delivery then no need to hit the api- make payment success
+          //because in this case payment needs to stay pending anyway.
+          doNext(context, 'Pending');
+          setLoadingFalse();
+        }
+        return true;
+      } else {
+        setLoadingFalse();
+        print(response.data);
+        OthersHelper().showToast('Something went wrong', Colors.black);
+        return false;
+      }
+    } catch (e) {
       setLoadingFalse();
-      print(response.data);
+      debugPrint('placeOrder network/unexpected error: $e');
       OthersHelper().showToast('Something went wrong', Colors.black);
       return false;
     }
@@ -351,7 +405,7 @@ class PlaceOrderService with ChangeNotifier {
               context: context,
               builder: (ctx) {
                 return AlertDialog(
-                  title: Text(lnProvider.getString('')),
+                  title: Text(lnProvider.getString('Payment failed!')),
                   content: SizedBox(
                     height: 136,
                     child: Column(
@@ -380,38 +434,47 @@ class PlaceOrderService with ChangeNotifier {
               MaterialPageRoute(builder: (context) => const LandingPage()),
               (Route<dynamic> route) => false));
       setLoadingFalse();
-    } else {
-      await Provider.of<ProfileService>(context, listen: false)
-          .getProfileDetails(isFromProfileupdatePage: true);
-
-      Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LandingPage()),
-          (Route<dynamic> route) => false);
-
-      Navigator.push(
-        context,
-        MaterialPageRoute<void>(
-          builder: (BuildContext context) => PaymentSuccessPage(
-            paymentStatus: paymentStatus,
-          ),
-        ),
-      );
+      return;
     }
+
+    await Provider.of<ProfileService>(context, listen: false)
+        .getProfileDetails(isFromProfileupdatePage: true);
+
+    Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LandingPage()),
+        (Route<dynamic> route) => false);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => PaymentSuccessPage(
+          paymentStatus: paymentStatus,
+        ),
+      ),
+    );
 
     //reset steps
     Provider.of<BookStepsService>(context, listen: false).setStepsToDefault();
+    idempotencyKey = null;
 
-    //Send notification to seller
-    var sellerId = Provider.of<BookService>(context, listen: false).sellerId;
-    var username = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            .userDetails
-            .name ??
-        '';
-    PushNotificationService().sendNotificationToSeller(context,
-        sellerId: sellerId,
-        title: lnProvider.getString("You have received an order from") +
-            " $username",
-        body: lnProvider.getString('Order id') + ': $orderId');
+    // Provider notification is authoritative on the backend.
+    // Client must never trigger seller notification when payment is still pending.
+    if (paymentStatus == 'Complete') {
+      try {
+        var sellerId = Provider.of<BookService>(context, listen: false).sellerId;
+        var username = Provider.of<ProfileService>(context, listen: false)
+                .profileDetails
+                ?.userDetails
+                ?.name ??
+            '';
+        PushNotificationService().sendNotificationToSeller(context,
+            sellerId: sellerId,
+            title: lnProvider.getString("You have received an order from") +
+                " $username",
+            body: lnProvider.getString('Order id') + ': $orderId');
+      } catch (e) {
+        debugPrint('Seller push notification error non-fatal: $e');
+      }
+    }
   }
 }

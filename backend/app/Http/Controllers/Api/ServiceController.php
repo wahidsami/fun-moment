@@ -933,7 +933,7 @@ class ServiceController extends Controller
     public function order(Request $request)
     {
         $is_service_online_bool = $request->is_service_online === '1';
-        if($is_service_online_bool){
+        if ($is_service_online_bool) {
             $request->validate([
                 'name' => 'required|max:191',
                 'email' => 'required|max:191',
@@ -953,18 +953,38 @@ class ServiceController extends Controller
 
         $commission = AdminCommission::first();
 
-        if($request->selected_payment_gateway=='cash_on_delivery' || $request->selected_payment_gateway == 'manual_payment'){
-            $payment_status='pending';
-        }else{
-            $payment_status='pending';
-        }
+        $payment_status = 'pending';
 
-
-        if (empty($request->seller_id)){
+        if (empty($request->seller_id)) {
             return response()->error([
-                'message'=>__('Seller Id missing, please try another seller services'),
+                'message' => __('Seller Id missing, please try another seller services'),
             ]);
         }
+
+        if ($request->selected_payment_gateway === 'manual_payment') {
+            $this->validate($request, [
+                'manual_payment_image' => 'required|mimes:jpg,jpeg,png,pdf'
+            ]);
+        }
+
+        $idempotencyKey = $request->input('idempotency_key') ?: $request->header('X-Idempotency-Key');
+        if ($idempotencyKey !== null) {
+            $idempotencyKey = trim((string) $idempotencyKey);
+            if (strlen($idempotencyKey) === 0) {
+                $idempotencyKey = null;
+            } elseif (strlen($idempotencyKey) > 64 || !preg_match('/^[a-zA-Z0-9_\-\.]+$/', $idempotencyKey)) {
+                return response()->json([
+                    'error' => true,
+                    'message' => __('Invalid or oversized idempotency key'),
+                ], 422);
+            }
+        }
+
+        $buyer_id = Auth::guard('sanctum')->check() ? Auth::guard('sanctum')->user()->id : ($request->buyer_id ? (int)$request->buyer_id : null);
+
+        $reqDateYmd = null;
+        $reqSlot = null;
+        $parseSlotSec = null;
 
         if (!$is_service_online_bool && !empty($request->date) && !empty($request->schedule)) {
             try {
@@ -986,325 +1006,461 @@ class ServiceController extends Controller
             };
 
             $reqSlot = $parseSlotSec($request->schedule);
+        }
 
-            // Provider Cross-Service Conflict Detection:
-            // Query all active bookings for this provider (seller_id) across ALL services
-            $existingOrders = Order::where('seller_id', $request->seller_id)
-                ->whereIn('status', [0, 1, 2])
-                ->get();
-
-            foreach ($existingOrders as $ord) {
-                if (empty($ord->date)) continue;
-                $ordDateYmd = null;
-                try {
-                    $ordDateYmd = \Carbon\Carbon::parse($ord->date)->format('Y-m-d');
-                } catch (\Exception $e) {
-                    $ordDateYmd = null;
+        return DB::transaction(function () use (
+            $request,
+            $is_service_online_bool,
+            $commission,
+            $payment_status,
+            $buyer_id,
+            $idempotencyKey,
+            $reqDateYmd,
+            $reqSlot,
+            $parseSlotSec
+        ) {
+            // 1. CONCURRENCY SERIALIZATION VIA POSTGRESQL TRANSACTION ADVISORY LOCKS
+            if (DB::getDriverName() === 'pgsql') {
+                if ($idempotencyKey) {
+                    // Serialize rapid duplicate submissions using the exact submission idempotency key
+                    DB::statement('SELECT pg_advisory_xact_lock(hashtext(?))', ["idempotency:{$idempotencyKey}"]);
+                } elseif ($buyer_id) {
+                    // Fallback serialization for legacy clients without an idempotency key
+                    DB::statement('SELECT pg_advisory_xact_lock(hashtext(?))', ["buyer_order:{$buyer_id}:{$request->service_id}"]);
                 }
+                if (!$is_service_online_bool && !empty($request->date) && !empty($request->schedule) && $reqDateYmd) {
+                    // Serialize concurrent attempts for the EXACT SAME booking slot & provider
+                    DB::statement('SELECT pg_advisory_xact_lock(hashtext(?))', ["slot_booking:{$request->seller_id}:{$reqDateYmd}:{$request->schedule}"]);
+                }
+            }
 
-                if ($reqDateYmd && $ordDateYmd && $reqDateYmd === $ordDateYmd) {
-                    $ordSlot = $parseSlotSec($ord->schedule);
-                    $hasOverlap = false;
+            // 2. TRUE SUBMISSION IDEMPOTENCY / RETRY PROTECTION
+            $existingBuyerOrder = null;
+            if ($idempotencyKey) {
+                $existingBuyerOrder = Order::where('idempotency_key', $idempotencyKey)->first();
+            }
 
-                    if ($reqSlot && $ordSlot) {
-                        // Check if time windows overlap: startA < endB && endA > startB
-                        if ($reqSlot['start'] < $ordSlot['end'] && $reqSlot['end'] > $ordSlot['start']) {
-                            $hasOverlap = true;
-                        }
-                    } elseif (trim($ord->schedule) === trim($request->schedule)) {
-                        $hasOverlap = true;
+            if ($existingBuyerOrder) {
+                $service_sold_count = Service::select('sold_count')->where('id', $existingBuyerOrder->service_id)->first();
+                $random_order_id_1 = Str::random(30);
+                $random_order_id_2 = Str::random(30);
+                $new_order_id = $random_order_id_1 . $existingBuyerOrder->id . $random_order_id_2;
+
+                return response()->success([
+                    'order_id' => $existingBuyerOrder->id,
+                    'shortage_balance' => 0,
+                    'wallet_balance_status' => '',
+                    'service_sold_count' => $service_sold_count,
+                    'package_fee' => float_amount_with_currency_symbol($existingBuyerOrder->package_fee),
+                    'extra_service' => float_amount_with_currency_symbol($existingBuyerOrder->extra_service),
+                    'sub_total' => float_amount_with_currency_symbol($existingBuyerOrder->sub_total),
+                    'tax_amount' => float_amount_with_currency_symbol($existingBuyerOrder->tax),
+                    'total' => float_amount_with_currency_symbol($existingBuyerOrder->total),
+                    'coupon_code' => $existingBuyerOrder->coupon_code,
+                    'coupon_type' => $existingBuyerOrder->coupon_type,
+                    'coupon_amount' => float_amount_with_currency_symbol($existingBuyerOrder->coupon_amount),
+                    'commission_amount' => float_amount_with_currency_symbol($existingBuyerOrder->commission_amount),
+                    'success_url' => route('frontend.order.payment.success', $new_order_id),
+                    'cancel_url' => route('frontend.order.payment.cancel.static', $existingBuyerOrder->id),
+                    'paytm_details' => null
+                ]);
+            }
+
+            // 3. AUTHORITATIVE CONFLICT CHECK INSIDE TRANSACTION & LOCK BOUNDARY
+            if (!$is_service_online_bool && !empty($request->date) && !empty($request->schedule)) {
+                $existingOrders = Order::where('seller_id', $request->seller_id)
+                    ->where('status', '!=', 4) // exclude cancelled orders
+                    ->where(function ($q) {
+                        // Confirmed/completed/delivered OR paid orders
+                        $q->whereIn('status', [1, 2, 3])
+                          ->orWhere('payment_status', 'complete')
+                          // Offline orders pending confirmation (COD, manual payment)
+                          ->orWhere(function ($q2) {
+                              $q2->where('status', 0)
+                                 ->whereIn('payment_gateway', ['cash_on_delivery', 'manual_payment'])
+                                 ->whereNotIn('payment_status', ['failed', 'canceled']);
+                          })
+                          // Online orders currently holding the slot while payment is pending (20-minute reservation window)
+                          ->orWhere(function ($q3) {
+                              $q3->where('status', 0)
+                                 ->whereNotIn('payment_gateway', ['cash_on_delivery', 'manual_payment'])
+                                 ->where('payment_status', 'pending')
+                                 ->where('created_at', '>=', now()->subMinutes(20));
+                          });
+                    })
+                    ->get();
+
+                foreach ($existingOrders as $ord) {
+                    if (empty($ord->date)) continue;
+                    $ordDateYmd = null;
+                    try {
+                        $ordDateYmd = \Carbon\Carbon::parse($ord->date)->format('Y-m-d');
+                    } catch (\Exception $e) {
+                        $ordDateYmd = null;
                     }
 
-                    if ($hasOverlap) {
+                    if ($reqDateYmd && $ordDateYmd && $reqDateYmd === $ordDateYmd) {
+                        $ordSlot = $parseSlotSec ? $parseSlotSec($ord->schedule) : null;
+                        $hasOverlap = false;
+
+                        if ($reqSlot && $ordSlot) {
+                            if ($reqSlot['start'] < $ordSlot['end'] && $reqSlot['end'] > $ordSlot['start']) {
+                                $hasOverlap = true;
+                            }
+                        } elseif (trim($ord->schedule) === trim($request->schedule)) {
+                            $hasOverlap = true;
+                        }
+
+                        if ($hasOverlap) {
+                            return response()->json([
+                                'error' => true,
+                                'message' => __('This time slot conflicts with an existing booking for this provider. Please choose another time slot.'),
+                            ], 422);
+                        }
+                    }
+                }
+            }
+
+            // 4. SERVICE DETAILS & PRICING CALCULATIONS
+            $service_details = Service::where('id', $request->service_id)->first();
+            if (!$service_details) {
+                return response()->error(['message' => __('Service not found')]);
+            }
+
+            $package_fee = $is_service_online_bool ? $service_details->price : 0;
+            $includedServicesData = [];
+            if (isset($request->include_services)) {
+                $included_services = !empty($request->include_services) ? json_decode($request->include_services, true) : [];
+                $items = is_array($included_services) ? current($included_services) : [];
+                if (is_array($items)) {
+                    foreach ($items as $requested_service) {
+                        $package_fee += $requested_service['quantity'] * $requested_service['price'];
+                        $includedServicesData[] = [
+                            'title' => $requested_service['title'],
+                            'price' => $requested_service['price'],
+                            'quantity' => $requested_service['quantity'],
+                        ];
+                    }
+                }
+            } elseif ($request->is_service_online === 0 && count($request->include_services) < 1) {
+                return response()->error([
+                    'message' => __('Include service required'),
+                ]);
+            }
+
+            $extra_service = 0;
+            $additionalServicesData = [];
+            if (!empty($request->additional_services)) {
+                $additional_services = !empty($request->additional_services) ? json_decode($request->additional_services, true) : [];
+                $addItems = is_array($additional_services) ? current($additional_services) : [];
+                if (is_array($addItems)) {
+                    foreach ($addItems as $requested_additional) {
+                        $extra_service += $requested_additional['quantity'] * $requested_additional['additional_service_price'];
+                        $additionalServicesData[] = [
+                            'title' => $requested_additional['additional_service_title'],
+                            'price' => $requested_additional['additional_service_price'],
+                            'quantity' => $requested_additional['quantity'],
+                        ];
+                    }
+                }
+            }
+
+            $tax_amount = 0;
+            $service_details_for_book = Service::select('id', 'service_city_id')->where('id', $request->service_id)->first();
+            $service_country = optional(optional($service_details_for_book->serviceCity)->countryy)->id;
+            $country_tax = Tax::select('id', 'tax')->where('country_id', $service_country)->first();
+            $sub_total = $package_fee + $extra_service;
+            if (!is_null($country_tax)) {
+                $tax_amount = ($sub_total * $country_tax->tax) / 100;
+            }
+            $total = $sub_total + $tax_amount;
+
+            // Calculate coupon amount
+            $coupon_code = '';
+            $coupon_type = '';
+            $coupon_amount = 0;
+
+            if (!empty($request->coupon_code)) {
+                $coupon_obj = ServiceCoupon::where('code', $request->coupon_code)->first();
+                $current_date = date('Y-m-d');
+                if (!empty($coupon_obj)) {
+                    $isAdminCoupon = ($coupon_obj->user_type === 'admin' || is_null($coupon_obj->seller_id));
+                    $isSellerMatch = $isAdminCoupon || ((int)$coupon_obj->seller_id === (int)$request->seller_id);
+                    $isActive = ((int)$coupon_obj->status === 1);
+                    $isValidDate = ($coupon_obj->expire_date >= $current_date);
+
+                    if ($isActive && $isSellerMatch && $isValidDate) {
+                        if ($coupon_obj->discount_type == 'percentage') {
+                            $coupon_amount = ($total * $coupon_obj->discount) / 100;
+                            $total = $total - $coupon_amount;
+                            $coupon_code = $request->coupon_code;
+                            $coupon_type = 'percentage';
+                        } else {
+                            $coupon_amount = $coupon_obj->discount;
+                            $total = $total - $coupon_amount;
+                            $coupon_code = $request->coupon_code;
+                            $coupon_type = 'amount';
+                        }
+                    } else {
+                        $coupon_code = '';
+                    }
+                }
+            }
+
+            $total = round($total, 2);
+
+            // Commission amount
+            $commission_amount = 0;
+            if ($commission && $commission->commission_charge_type == 'percentage') {
+                $commission_amount = ($sub_total * $commission->commission_charge) / 100;
+            } elseif ($commission) {
+                $commission_amount = $commission->commission_charge;
+            }
+
+            // 5. WALLET ATOMIC SAFETY & ROW LOCKING
+            $shortage_balance = 0;
+            $wallet_balance_status = '';
+            $walletRow = null;
+
+            if ($request->selected_payment_gateway === 'wallet') {
+                if (!$buyer_id) {
+                    return response()->json([
+                        'error' => true,
+                        'message' => __('Authentication required for wallet payment'),
+                    ], 401);
+                }
+
+                if (moduleExists('Wallet')) {
+                    // Exclusive row lock on buyer's wallet row before reading balance
+                    $walletRow = Wallet::where(function ($q) use ($buyer_id) {
+                        $q->where('buyer_id', $buyer_id)->orWhere('user_id', $buyer_id);
+                    })->lockForUpdate()->first();
+
+                    $currentBalance = $walletRow ? (float) $walletRow->balance : 0.0;
+
+                    if (!$walletRow || $currentBalance < (float) $total) {
+                        // Insufficient funds: abort transaction without leaving partially created or paid order
+                        $shortage = float_amount_with_currency_symbol($total - $currentBalance);
                         return response()->json([
                             'error' => true,
-                            'message' => __('This time slot conflicts with an existing booking for this provider. Please choose another time slot.'),
+                            'message' => __('Wallet balance not available'),
+                            'wallet_balance_status' => __('Wallet balance not available'),
+                            'shortage_balance' => $shortage,
                         ], 422);
                     }
                 }
             }
-        }
 
-        if($request->selected_payment_gateway === 'manual_payment') {
-            $this->validate($request,[
-                'manual_payment_image' => 'required|mimes:jpg,jpeg,png,pdf'
+            // 6. CREATE ORDER ATOMICALLY WITH EXACT STATUS
+            $initialOrderStatus = ($request->selected_payment_gateway === 'wallet') ? 1 : 0;
+            $initialPaymentStatus = ($request->selected_payment_gateway === 'wallet') ? 'complete' : $payment_status;
+
+            $order = Order::create([
+                'service_id' => $request->service_id,
+                'seller_id' => $request->seller_id,
+                'buyer_id' => $buyer_id,
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'post_code' => $request->post_code ?: '00000',
+                'address' => $request->address ?: 'N/A',
+                'city' => (int) ($request->choose_service_city ?: ($request->city ?: 1)),
+                'area' => (int) ($request->choose_service_area ?: ($request->area ?: 1)),
+                'country' => (int) ($request->choose_service_country ?: ($request->country ?: 1)),
+                'date' => !$is_service_online_bool ? $request->date : '00.00.00',
+                'schedule' => !$is_service_online_bool ? $request->schedule : '00.00.00',
+                'package_fee' => $package_fee,
+                'is_order_online' => $is_service_online_bool ? 1 : '0',
+                'extra_service' => $extra_service,
+                'sub_total' => $sub_total,
+                'tax' => $tax_amount,
+                'total' => $total,
+                'commission_type' => $commission ? $commission->commission_charge_type : 'percentage',
+                'commission_charge' => $commission ? $commission->commission_charge : 0,
+                'commission_amount' => $commission_amount,
+                'status' => $initialOrderStatus,
+                'order_note' => $request->order_note,
+                'payment_gateway' => $request->selected_payment_gateway,
+                'payment_status' => $initialPaymentStatus,
+                'coupon_code' => $coupon_code,
+                'coupon_type' => $coupon_type,
+                'coupon_amount' => $coupon_amount,
+                'idempotency_key' => $idempotencyKey,
             ]);
-        }
 
-        Order::create([
-            'service_id' => $request->service_id,
-            'seller_id' => $request->seller_id,
-            'buyer_id' => Auth::guard('sanctum')->check() ? Auth::guard('sanctum')->user()->id : NULL,
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'post_code' => $request->post_code ?: '00000',
-            'address' => $request->address ?: 'N/A',
-            'city' => (int) ($request->choose_service_city ?: ($request->city ?: 1)),
-            'area' => (int) ($request->choose_service_area ?: ($request->area ?: 1)),
-            'country' => (int) ($request->choose_service_country ?: ($request->country ?: 1)),
-            'date' => !$is_service_online_bool ? $request->date : '00.00.00',
-            'schedule' => !$is_service_online_bool ? $request->schedule : '00.00.00',
-            'package_fee' => 0,
-            'is_order_online' => $is_service_online_bool ? 1 : '0',
-            'extra_service' => 0,
-            'sub_total' => 0,
-            'tax' => 0,
-            'total' => 0,
-            'commission_type' => $commission->commission_charge_type,
-            'commission_charge' => $commission->commission_charge,
-            'status' => 0,
-            'order_note' => $request->order_note,
-            'payment_gateway' => $request->selected_payment_gateway,
-            'payment_status' => $payment_status,
-        ]);
+            $last_order_id = $order->id;
 
-        $last_order_id = DB::getPdo()->lastInsertId();
-        $service_details = Service::where('id',$request->service_id)->first();
-        $service_sold_count = Service::select('sold_count')->where('id',$request->service_id)->first();
-        
-        Service::where('id',$request->service_id)->update(['sold_count'=> $service_sold_count->sold_count+1]);
-
-        $package_fee = $is_service_online_bool ? $service_details->price : 0;
-        
-        if(isset($request->include_services)){
-            $included_services = !empty($request->include_services) ? json_decode($request->include_services,true) : (object) [];
-            foreach (current($included_services) as $requested_service) {
-                $package_fee += $requested_service['quantity'] * $requested_service['price'];
+            // Create includes and additional records
+            foreach ($includedServicesData as $inc) {
                 OrderInclude::create([
                     'order_id' => $last_order_id,
-                    'title' => $requested_service['title'],
-                    'price' => $requested_service['price'],
-                    'quantity' => $requested_service['quantity'],
+                    'title' => $inc['title'],
+                    'price' => $inc['price'],
+                    'quantity' => $inc['quantity'],
                 ]);
             }
-        }elseif($request->is_service_online === 0 && count($request->include_services) < 1){
-            return response()->error([
-                'message'=> __('Include service required'),
-            ]);
-        }
 
-        $extra_service = 0;
-        if(!empty($request->additional_services)){
-            $additional_services = !empty($request->additional_services) ? json_decode($request->additional_services,true) : (object) [];
-            foreach (current($additional_services) as $requested_additional) {
-                $extra_service += $requested_additional['quantity'] * $requested_additional['additional_service_price'];
-
+            foreach ($additionalServicesData as $add) {
                 OrderAdditional::create([
                     'order_id' => $last_order_id,
-                    'title' => $requested_additional['additional_service_title'],
-                    'price' => $requested_additional['additional_service_price'],
-                    'quantity' => $requested_additional['quantity'],
+                    'title' => $add['title'],
+                    'price' => $add['price'],
+                    'quantity' => $add['quantity'],
                 ]);
             }
-        }
 
-        $tax_amount = 0;
-        $tax = Service::select('tax')->where('id', $request->service_id)->first();
-        $service_details_for_book = Service::select('id','service_city_id')->where('id',$request->service_id)->first();
-        $service_country =  optional(optional($service_details_for_book->serviceCity)->countryy)->id;
-        $country_tax =  Tax::select('id','tax')->where('country_id',$service_country)->first();
-        $sub_total = $package_fee + $extra_service;
-        if(!is_null($country_tax )){
-            $tax_amount = ($sub_total * $country_tax->tax) / 100;
-        }
-        $total = $sub_total + $tax_amount;
+            // Increment sold count
+            $service_sold_count = Service::select('sold_count')->where('id', $request->service_id)->first();
+            Service::where('id', $request->service_id)->update(['sold_count' => ($service_sold_count->sold_count ?? 0) + 1]);
 
-        //calculate coupon amount
-        $coupon_code = '';
-        $coupon_type = '';
-        $coupon_amount = 0;
+            // Save manual payment image if uploaded
+            if ($request->selected_payment_gateway === 'manual_payment') {
+                if ($image = $request->file('manual_payment_image')) {
+                    $imageName = 'manual_attachment_' . time() . '-' . uniqid() . '.' . $image->getClientOriginalExtension();
 
-        if(!empty($request->coupon_code)){
-            $coupon_code = ServiceCoupon::where('code',$request->coupon_code)->first();
-            $current_date = date('Y-m-d');
-            if(!empty($coupon_code)){
-                $isAdminCoupon = ($coupon_code->user_type === 'admin' || is_null($coupon_code->seller_id));
-                $isSellerMatch = $isAdminCoupon || ((int)$coupon_code->seller_id === (int)$request->seller_id);
-                $isActive = ((int)$coupon_code->status === 1);
-                $isValidDate = ($coupon_code->expire_date >= $current_date);
+                    $uploaded_file = $request->manual_payment_image;
+                    $file_extension = $uploaded_file->getClientOriginalExtension();
+                    if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+                        $processed_image = Image::make($uploaded_file);
+                        $image_default_width = $processed_image->width();
+                        $image_default_height = $processed_image->height();
 
-                if($isActive && $isSellerMatch && $isValidDate){
-                    if($coupon_code->discount_type == 'percentage'){
-                        $coupon_amount = ($total * $coupon_code->discount)/100;
-                        $total = $total-$coupon_amount;
-                        $coupon_code = $request->coupon_code;
-                        $coupon_type = 'percentage';
-                    }else{
-                        $coupon_amount = $coupon_code->discount;
-                        $total = $total-$coupon_amount;
-                        $coupon_code = $request->coupon_code;
-                        $coupon_type = 'amount';
+                        $processed_image->resize($image_default_width, $image_default_height, function ($constraint) {
+                            $constraint->aspectRatio();
+                        });
+                        $processed_image->save('assets/uploads/manual-payment/' . $imageName);
+                    } else {
+                        $image->move('assets/uploads/manual-payment/', $imageName);
                     }
-                }else{
-                    $coupon_code = '';
+
+                    Order::where('id', $last_order_id)->update([
+                        'manual_payment_image' => $imageName
+                    ]);
                 }
             }
-        }
 
-
-        //commission amount
-        $commission_amount = 0;
-        if($commission->commission_charge_type=='percentage'){
-            $commission_amount = ($sub_total*$commission->commission_charge)/100;
-        }else{
-            $commission_amount = $commission->commission_charge;
-        }
-
-        if($request->selected_payment_gateway === 'manual_payment') {
-            if ($image = $request->file('manual_payment_image')) {
-                $imageName = 'manual_attachment_'.time().'-'.uniqid().'.'.$image->getClientOriginalExtension();
-
-                // file scan start
-                $uploaded_file = $request->manual_payment_image;
-                $file_extension = $uploaded_file->getClientOriginalExtension();
-                if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
-                    $processed_image = Image::make($uploaded_file);
-                    $image_default_width = $processed_image->width();
-                    $image_default_height = $processed_image->height();
-
-                    $processed_image->resize($image_default_width, $image_default_height, function ($constraint) {
-                        $constraint->aspectRatio();
-                    });
-                    $processed_image->save('assets/uploads/manual-payment/' . $imageName);
-                }else{
-                    $image->move('assets/uploads/manual-payment/', $imageName);
-                } // file scan end
-
-                Order::where('id',$last_order_id)->update([
-                    'manual_payment_image'=>$imageName
+            // Atomically deduct wallet balance and log history
+            if ($request->selected_payment_gateway === 'wallet' && $walletRow) {
+                $newBalance = round($currentBalance - $total, 2);
+                $walletRow->update([
+                    'balance' => $newBalance,
+                    'total_spent' => round((float) ($walletRow->total_spent ?? 0) + $total, 2),
                 ]);
-            }
-        }
 
-        Order::where('id', $last_order_id)->update([
-            'package_fee' => $package_fee,
-            'extra_service' => $extra_service,
-            'sub_total' => $sub_total,
-            'tax' => $tax_amount,
-            'total' => $total,
-            'coupon_code' => $coupon_code,
-            'coupon_type' => $coupon_type,
-            'coupon_amount' => $coupon_amount,
-            'commission_amount' => $commission_amount,
-        ]);
-
-        $order_details = Order::find($last_order_id);
-
-        //todo: check payment gateway is wallet or not
-        $shortage_balance = 0;
-        $wallet_balance_status = '';
-        if(moduleExists('Wallet')){
-            if ($request->selected_payment_gateway === 'wallet') {
-                $buyer_id = Auth::guard('sanctum')->user()->id;
-                $wallet_balance = Wallet::where('buyer_id',$buyer_id)->first();
-                if(!empty($wallet_balance)){
-                    if($wallet_balance->balance >= $order_details->total){
-                        Order::where('id', $last_order_id)->update([
-                            'payment_status' => 'complete',
+                if (class_exists('Modules\Wallet\Entities\WalletHistory')) {
+                    try {
+                        $txnId = 'WTX-' . date('Ymd') . '-' . strtoupper(Str::random(10));
+                        \Modules\Wallet\Entities\WalletHistory::create([
+                            'wallet_id' => $walletRow->id,
+                            'user_id' => $buyer_id,
+                            'buyer_id' => $buyer_id,
+                            'entry_type' => 'debit',
+                            'amount' => $total,
+                            'balance_before' => $currentBalance,
+                            'balance_after' => $newBalance,
                             'payment_gateway' => 'wallet',
+                            'payment_status' => 'complete',
                             'status' => 1,
+                            'reference_type' => 'service_booking',
+                            'reference_id' => (string) $last_order_id,
+                            'transaction_id' => $txnId,
+                            'description_en' => "Payment for booking #{$last_order_id}",
+                            'description_ar' => "دفع قيمة الحجز #{$last_order_id}",
                         ]);
-                        Wallet::where('buyer_id',$buyer_id)->update([
-                            'balance' => $wallet_balance->balance-$order_details->total,
-                        ]);
-                        $shortage_balance =  float_amount_with_currency_symbol($order_details->total - $wallet_balance->balance);
-                        $order_details = Order::find($last_order_id);
-                    }else{
-                        $wallet_balance_status = __('Wallet balance not available');
-                        $shortage_balance =  float_amount_with_currency_symbol($order_details->total - $wallet_balance->balance);
+                    } catch (\Exception $e) {
+                        \Log::error('[WalletHistory Error] ' . $e->getMessage());
                     }
                 }
             }
-        }
 
-        // Only send order notifications and confirmation emails for immediately actionable bookings (COD)
-        // or successfully completed wallet payments. Online gateways (PayTabs, Stripe, PayPal, etc.) and
-        // pending manual bank transfers must NOT notify the provider until payment is verified.
-        $isImmediateOrActionablePayment = ($request->selected_payment_gateway === 'cash_on_delivery')
-            || ($request->selected_payment_gateway === 'wallet' && $order_details->payment_status === 'complete');
+            // 7. PROVIDER NOTIFICATIONS (ONLY FOR NEW ORDERS THAT ARE IMMEDIATELY ACTIONABLE)
+            $order_details = Order::find($last_order_id);
 
-        if ($isImmediateOrActionablePayment) {
-            $seller = User::where('id',$request->seller_id)->first();
-            $order_message = __('You have a new order');
-            if ($seller) {
+            $isImmediateOrActionablePayment = ($request->selected_payment_gateway === 'cash_on_delivery')
+                || ($request->selected_payment_gateway === 'wallet' && $order_details->payment_status === 'complete');
+
+            if ($isImmediateOrActionablePayment) {
+                $seller = User::where('id', $request->seller_id)->first();
+                $order_message = __('You have a new order');
+                if ($seller) {
+                    try {
+                        $seller->notify(new OrderNotification(
+                            $last_order_id,
+                            $request->service_id,
+                            $request->seller_id,
+                            $request->buyer_id,
+                            $order_message,
+                            'new_booking',
+                            $order_details->status,
+                            'seller'
+                        ));
+                    } catch (\Exception $e) {
+                        \Log::error('[Order Notification Error] ' . $e->getMessage());
+                    }
+                }
+
                 try {
-                    $seller->notify(new OrderNotification(
-                        $last_order_id,
-                        $request->service_id,
-                        $request->seller_id,
-                        $request->buyer_id,
-                        $order_message,
-                        'new_booking',
-                        $order_details->status,
-                        'seller'
-                    ));
+                    $mail_subject = get_static_option('new_order_email_subject') ?? __('New Order #');
+                    $message_for_buyer = get_static_option('new_order_buyer_message') ?? __('You have successfully placed an order #');
+                    $message_for_seller_admin = get_static_option('new_order_admin_seller_message') ?? __('You have a new order #');
+                    if (!empty($order_details->email)) {
+                        Mail::to($order_details->email)->send(new OrderMail($mail_subject, $order_details, $message_for_buyer));
+                    }
+                    if ($seller && !empty($seller->email)) {
+                        Mail::to($seller->email)->send(new OrderMail($mail_subject, $order_details, $message_for_seller_admin));
+                    }
+                    if (get_static_option('site_global_email')) {
+                        Mail::to(get_static_option('site_global_email'))->send(new OrderMail($mail_subject, $order_details, $message_for_seller_admin));
+                    }
                 } catch (\Exception $e) {
-                    \Log::error('[Order Notification Error] ' . $e->getMessage());
+                    \Log::error('[Order Mail Error] ' . $e->getMessage());
                 }
             }
 
-            try {
-                $mail_subject = get_static_option('new_order_email_subject') ?? __('New Order #');
-                $message_for_buyer = get_static_option('new_order_buyer_message') ?? __('You have successfully placed an order #');
-                $message_for_seller_admin = get_static_option('new_order_admin_seller_message') ?? __('You have a new order #');
-                if (!empty($order_details->email)) {
-                    Mail::to($order_details->email)->send(new OrderMail($mail_subject,$order_details,$message_for_buyer));
-                }
-                if ($seller && !empty($seller->email)) {
-                    Mail::to($seller->email)->send(new OrderMail($mail_subject,$order_details, $message_for_seller_admin));
-                }
-                if (get_static_option('site_global_email')) {
-                    Mail::to(get_static_option('site_global_email'))->send(new OrderMail($mail_subject,$order_details, $message_for_seller_admin));
-                }
-            } catch (\Exception $e) {
-                \Log::error('[Order Mail Error] ' . $e->getMessage());
-            }
-        }
-        //todo send success/cancel url
-        //todo is it has paytm parameter then return paytm object instance
-        $random_order_id_1 = Str::random(30);
-        $random_order_id_2 = Str::random(30);
-        $new_order_id = $random_order_id_1.$last_order_id.$random_order_id_2;
-        $paytm_details = null;
+            // 8. RESPONSE URLS & PAYTM CHARGE
+            $random_order_id_1 = Str::random(30);
+            $random_order_id_2 = Str::random(30);
+            $new_order_id = $random_order_id_1 . $last_order_id . $random_order_id_2;
+            $paytm_details = null;
 
-        if ($request->has('paytm') && !empty($request->has('paytm'))){
-            $user_info = Auth::guard('sanctum')->user();
-            $title = Str::limit(strip_tags($service_details->title),20);
-            $description = sprintf(__('Order id #%1$d Email: %2$s, Name: %3$s'),$last_order_id,$user_info->email,$user_info->name);
-            $paytm_details = XgPaymentGateway::paytm()->charge_customer([
-                'amount' => $total,
-                'title' => $title,
-                'description' => $description,
-                'ipn_url' => route('frontend.paytm.ipn'),
+            if ($request->has('paytm') && !empty($request->has('paytm'))) {
+                $user_info = Auth::guard('sanctum')->user();
+                $title = Str::limit(strip_tags($service_details->title), 20);
+                $description = sprintf(__('Order id #%1$d Email: %2$s, Name: %3$s'), $last_order_id, $user_info->email, $user_info->name);
+                $paytm_details = XgPaymentGateway::paytm()->charge_customer([
+                    'amount' => $total,
+                    'title' => $title,
+                    'description' => $description,
+                    'ipn_url' => route('frontend.paytm.ipn'),
+                    'order_id' => $last_order_id,
+                    'track' => \Str::random(36),
+                    'success_url' => route('frontend.order.payment.success', $new_order_id),
+                    'cancel_url' => route('frontend.order.payment.cancel.static', $last_order_id),
+                    'email' => $user_info->email,
+                    'name' => $user_info->name,
+                    'payment_type' => 'order',
+                ]);
+            }
+
+            return response()->success([
                 'order_id' => $last_order_id,
-                'track' => \Str::random(36),
-                'success_url' => route('frontend.order.payment.success',$new_order_id),
-                'cancel_url' => route('frontend.order.payment.cancel.static',$last_order_id),
-                'email' => $user_info->email,
-                'name' => $user_info->name,
-                'payment_type' => 'order',
+                'shortage_balance' => $shortage_balance,
+                'wallet_balance_status' => $wallet_balance_status,
+                'service_sold_count' => $service_sold_count,
+                'package_fee' => float_amount_with_currency_symbol($package_fee),
+                'extra_service' => float_amount_with_currency_symbol($extra_service),
+                'sub_total' => float_amount_with_currency_symbol($sub_total),
+                'tax_amount' => float_amount_with_currency_symbol($tax_amount),
+                'total' => float_amount_with_currency_symbol($total),
+                'coupon_code' => $coupon_code,
+                'coupon_type' => $coupon_type,
+                'coupon_amount' => float_amount_with_currency_symbol($coupon_amount),
+                'commission_amount' => float_amount_with_currency_symbol($commission_amount),
+                'success_url' => route('frontend.order.payment.success', $new_order_id),
+                'cancel_url' => route('frontend.order.payment.cancel.static', $last_order_id),
+                'paytm_details' => $paytm_details
             ]);
-        }
-
-        return response()->success([
-            'order_id'=> $last_order_id,
-            'shortage_balance'=> $shortage_balance,
-            'wallet_balance_status'=> $wallet_balance_status,
-            'service_sold_count'=> $service_sold_count,
-            'package_fee'=> float_amount_with_currency_symbol($package_fee),
-            'extra_service'=>float_amount_with_currency_symbol($extra_service),
-            'sub_total'=>float_amount_with_currency_symbol($sub_total),
-            'tax_amount'=>float_amount_with_currency_symbol($tax_amount),
-            'total'=>float_amount_with_currency_symbol($total),
-            'coupon_code'=>$coupon_code,
-            'coupon_type'=>$coupon_type,
-            'coupon_amount'=>float_amount_with_currency_symbol($coupon_amount),
-            'commission_amount'=>float_amount_with_currency_symbol($commission_amount),
-            'success_url' => route('frontend.order.payment.success',$new_order_id),
-            'cancel_url' => route('frontend.order.payment.cancel.static',$last_order_id),
-            'paytm_details' => $paytm_details
-        ]);
+        });
     }
 
     public function imageUpload(Request $request){
