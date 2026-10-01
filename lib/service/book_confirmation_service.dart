@@ -133,4 +133,15 @@ class BookConfirmationService with ChangeNotifier {
         totalPriceOnlineServiceAfterAllCalculation - parsedDiscount;
     notifyListeners();
   }
+
+  void resetState() {
+    isPanelOpened = false;
+    totalPriceAfterAllcalculation = 0.0;
+    subTotalAfterAllCalculation = 0.0;
+    totalPriceOnlineServiceAfterAllCalculation = 0.0;
+    subTotalOnlineServiceAfterAllCalculation = 0.0;
+    taxPrice = null;
+    taxPriceOnline = null;
+    notifyListeners();
+  }
 }

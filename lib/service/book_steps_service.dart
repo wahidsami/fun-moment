@@ -13,6 +13,12 @@ class BookStepsService with ChangeNotifier {
 
   setStepsToDefault() {
     currentStep = 1;
+    notifyListeners();
+  }
+
+  void resetState() {
+    currentStep = 1;
+    notifyListeners();
   }
 
   // setCurrentStepOne() {

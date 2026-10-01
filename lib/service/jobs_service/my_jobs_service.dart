@@ -24,6 +24,14 @@ class MyJobsService with ChangeNotifier {
     notifyListeners();
   }
 
+  void resetState() {
+    myJobsListMap = [];
+    imageList = [];
+    isLoading = true;
+    currentPage = 1;
+    notifyListeners();
+  }
+
   setCurrentPage(newValue) {
     currentPage = newValue;
     notifyListeners();

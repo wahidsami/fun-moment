@@ -101,6 +101,16 @@ class ProviderServiceManagementService with ChangeNotifier {
     notifyListeners();
   }
 
+  void resetState() {
+    services = [];
+    isLoading = false;
+    isCreating = false;
+    isUpdating = false;
+    isToggling = false;
+    dashboardData = null;
+    notifyListeners();
+  }
+
   Future<String?> _getToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.getString('token');

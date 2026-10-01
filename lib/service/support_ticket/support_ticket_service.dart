@@ -22,6 +22,12 @@ class SupportTicketService with ChangeNotifier {
     notifyListeners();
   }
 
+  void resetState() {
+    ticketList = [];
+    currentPage = 1;
+    notifyListeners();
+  }
+
   setTotalPage(newPageNumber) {
     totalPages = newPageNumber;
     notifyListeners();

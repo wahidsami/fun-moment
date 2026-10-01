@@ -95,6 +95,26 @@ class FilterServicesService with ChangeNotifier {
     fetchServices();
   }
 
+  void resetState() {
+    searchText = "";
+    searchUrl = "";
+    minPrice = "";
+    maxPrice = "";
+    selectedSorting = null;
+    rating = null;
+    distance = 50;
+    prediction = null;
+    serviceType = "All";
+    selectedCategory = null;
+    selectedSubcategory = null;
+    selectedChildCategory = null;
+    _serviceSearchModel = null;
+    serviceMap = [];
+    markerKeys = [];
+    searchLoading = false;
+    notifyListeners();
+  }
+
   get _searchUrl {
     var url = "$baseApi/service/search?search_text=$searchText";
     url += "&cat=${selectedCategory?.id ?? ""}";

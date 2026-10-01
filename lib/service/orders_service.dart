@@ -20,6 +20,11 @@ class OrdersService with ChangeNotifier {
     notifyListeners();
   }
 
+  void resetState() {
+    markLoading = false;
+    notifyListeners();
+  }
+
 //==========>
 //=======>
   completeOrder(BuildContext context, {required orderId}) async {
@@ -248,6 +253,11 @@ class OrdersService with ChangeNotifier {
 
     setAcceptLoadingStatus(true);
 
+    debugPrint('[MY ORDERS REQUEST]');
+    debugPrint('caller=OrdersService.changeOrderStatus');
+    debugPrint('user_type=0');
+    debugPrint('endpoint=$baseApi/seller/my-orders/order/change-status');
+
     try {
       var response = await http.post(
           Uri.parse('$baseApi/seller/my-orders/order/change-status'),
@@ -293,22 +303,47 @@ class OrdersService with ChangeNotifier {
     var token = prefs.getString('token');
 
     var header = {
-      //if header type is application/json then the data should be in jsonEncode method
       "Accept": "application/json",
       "Content-Type": "application/json",
       "Authorization": "Bearer $token",
     };
 
-    var data = jsonEncode({"id": orderId, "status": 4});
-
     var connection = await checkConnection();
     if (!connection) return;
 
+    bool isSeller = false;
+    try {
+      isSeller = Provider.of<ProfileService>(context, listen: false).isSeller;
+    } catch (_) {}
+    if (prefs.containsKey('userType')) {
+      final rawUserType = prefs.get('userType');
+      if (rawUserType is int) {
+        isSeller = rawUserType == 0;
+      } else if (rawUserType is num) {
+        isSeller = rawUserType.toInt() == 0;
+      } else if (rawUserType is String) {
+        isSeller = int.tryParse(rawUserType) == 0;
+      }
+    }
+
+    final endpoint = isSeller
+        ? '$baseApi/seller/my-orders/order/change-status'
+        : '$baseApi/user/my-orders/order/cancel';
+
+    final data = isSeller
+        ? jsonEncode({"id": orderId, "status": 4})
+        : jsonEncode({"id": orderId});
+
     setCancelLoadingStatus(true);
+
+    debugPrint('[MY ORDERS REQUEST]');
+    debugPrint('caller=OrdersService.cancelOrder');
+    debugPrint('user_type=${isSeller ? 0 : 1}');
+    debugPrint('endpoint=$endpoint');
 
     try {
       var response = await http.post(
-          Uri.parse('$baseApi/seller/my-orders/order/change-status'),
+          Uri.parse(endpoint),
           headers: header,
           body: data);
 
@@ -325,8 +360,14 @@ class OrdersService with ChangeNotifier {
           Provider.of<MyOrdersService>(context, listen: false).fetchMyOrders();
         } catch (_) {}
       } else {
-        OthersHelper()
-            .showSnackBar(context, 'Something went wrong', Colors.black);
+        String errorMsg = 'Something went wrong';
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            errorMsg = decoded['message'] ?? decoded['msg'] ?? errorMsg;
+          }
+        } catch (_) {}
+        OthersHelper().showSnackBar(context, errorMsg, Colors.black);
       }
     } catch (e) {
       setCancelLoadingStatus(false);

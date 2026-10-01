@@ -809,13 +809,14 @@ class UserController extends Controller
         ]);
     }
 
-    public function singleOrder(Request $request){
-        if(empty($request->id)){
+    public function singleOrder(Request $request, $id = null){
+        $order_id = $id ?? $request->id;
+        if(empty($order_id)){
             return response()->error(['message' => __('no order found')]);
         }
 
         $buyer_id = auth('sanctum')->id();
-        $orderInfo = Order::where('id',$request->id)->where('buyer_id', $buyer_id)->first();
+        $orderInfo = Order::where('id', $order_id)->where('buyer_id', $buyer_id)->first();
         if(is_null($orderInfo)){
             return response()->error([
                 'message'=>__('Order Not Found')
@@ -828,26 +829,115 @@ class UserController extends Controller
         $orderInfo->sub_total = amount_with_currency_symbol($orderInfo->sub_total);
         $orderInfo->extra_service = amount_with_currency_symbol($orderInfo->extra_service);
         $orderInfo->package_fee = amount_with_currency_symbol($orderInfo->package_fee);
-        $orderInfo->date = $orderInfo->date !== "No Date Created" ? \Carbon\Carbon::parse($orderInfo->date) : null;
-
-        $orderInfo->date = null;
-        if($orderInfo->date !== "No Date Created"){
-            try{
+        
+        if (!empty($orderInfo->date) && $orderInfo->date !== "No Date Created") {
+            try {
                 $orderInfo->date = \Carbon\Carbon::parse($orderInfo->date);
-            }
-            catch(\Exception $e){
-                
+            } catch (\Exception $e) {
             }
         }
 
         //append seller infomation
         $orderInfo->seller_details = $orderInfo->seller ?? null;
-        $is_report_exist = Report::where(['order_id'=> $request->order_id , 'report_from'=>'buyer'])->first();
+        $report_order_id = $order_id ?? $request->order_id;
+        $is_report_exist = Report::where(['order_id'=> $report_order_id , 'report_from'=>'buyer'])->first();
 
         $orderInfo->has_report = is_null($is_report_exist) ? 1 : 0;
 
         return response()->success([
             'orderInfo'=> $orderInfo
+        ]);
+    }
+
+    /**
+     * Customer cancel pending order.
+     * Dedicated endpoint for buyer role (user_type = 1).
+     */
+    public function cancelOrder(Request $request)
+    {
+        $request->validate([
+            'id' => 'nullable|integer',
+            'order_id' => 'nullable|integer',
+        ]);
+
+        $user = auth('sanctum')->user();
+        if (!$user || $user->user_type !== 1) {
+            return response()->error([
+                'message' => __('Only customers can cancel bookings through this action.'),
+            ]);
+        }
+
+        $orderId = $request->id ?? $request->order_id;
+        if (empty($orderId)) {
+            return response()->error([
+                'message' => __('Order ID is required.'),
+            ]);
+        }
+
+        // Must locate using buyer_id = authenticated user
+        $order = Order::where('id', $orderId)->where('buyer_id', $user->id)->first();
+        if (!$order) {
+            return response()->error([
+                'message' => __('Order not found or unauthorized.'),
+            ]);
+        }
+
+        // Allowed only for pending orders (status == 0)
+        if ($order->status == 4) {
+            return response()->error([
+                'message' => __('This order is already cancelled.'),
+            ]);
+        }
+        if ($order->status == 2 || $order->status == 3) {
+            return response()->error([
+                'message' => __('Completed orders cannot be cancelled.'),
+            ]);
+        }
+        if ($order->status == 1) {
+            return response()->error([
+                'message' => __('Active orders in progress cannot be cancelled directly. Please contact support.'),
+            ]);
+        }
+        if ($order->status != 0) {
+            return response()->error([
+                'message' => __('Only pending bookings can be cancelled.'),
+            ]);
+        }
+
+        // Financial safety check: cannot cancel paid orders without refund processing
+        if ($order->payment_status === 'complete') {
+            return response()->error([
+                'message' => __('Paid orders cannot be cancelled directly. Please contact support or submit a report for refund.'),
+            ]);
+        }
+
+        // Authoritatively transition order to cancelled (status = 4)
+        $order->status = 4;
+        $order->save();
+
+        // Notify provider that buyer cancelled the pending booking
+        try {
+            $seller = User::find($order->seller_id);
+            if ($seller) {
+                $seller->notify(new \App\Notifications\OrderNotification(
+                    $order->id,
+                    $order->service_id,
+                    $order->seller_id,
+                    $order->buyer_id,
+                    __('Booking #') . $order->id . __(' was cancelled by the customer.'),
+                    'booking_cancelled',
+                    4,
+                    'seller'
+                ));
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('[CancelOrder Notification Error] ' . $e->getMessage());
+        }
+
+        return response()->success([
+            'message' => __('Booking cancelled successfully.'),
+            'order_id' => $order->id,
+            'status' => 4,
         ]);
     }
 
@@ -1010,8 +1100,15 @@ class UserController extends Controller
     public function orderCompleteRequestApprove(Request $request)
     {
         $buyer_id = auth('sanctum')->id();
-        $find_order = Order::where('id', $request->order_id)->where('buyer_id', $buyer_id)->first();
+        $order_id = $request->order_id ?? $request->id;
+        $find_order = Order::where('id', $order_id)->where('buyer_id', $buyer_id)->first();
         if(!empty($find_order)){
+            if ($find_order->status == 4) {
+                return response()->error(['msg' => __('Cancelled orders cannot be completed.')]);
+            }
+            if ($find_order->status == 2) {
+                return response()->success(['msg' => __('Order is already completed.')]);
+            }
             $find_order->update(['order_complete_request'=>2,'status'=>2]);
             return response()->success([
                 'msg'=>__('Order complete request successfully approved.'),
@@ -1036,14 +1133,15 @@ class UserController extends Controller
         ]);
 
         $buyer_id = auth('sanctum')->id();
-        $find_order = Order::where('id', $request->order_id)->where('buyer_id', $buyer_id)->first();
+        $order_id = $request->order_id ?? $request->id;
+        $find_order = Order::where('id', $order_id)->where('buyer_id', $buyer_id)->first();
         if(empty($find_order)){
             return response()->error([
                 'msg'=>__('Order id does not exist or unauthorized.'),
             ]);
         }
 
-        OrderCompleteDecline::where('order_id',$request->order_id)->update([
+        OrderCompleteDecline::where('order_id',$order_id)->update([
             'decline_reason'=>$request->decline_reason,
         ]);
         $find_order->update(['order_complete_request'=>3]);

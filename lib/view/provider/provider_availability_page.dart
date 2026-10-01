@@ -29,10 +29,14 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
   }
 
   void _showAddSlotDialog(BuildContext context, ProviderWorkingDay day) {
+    final lnProvider = Provider.of<AppStringService>(context, listen: false);
+    if (day.id <= 0) {
+      OthersHelper().showToast(lnProvider.getString('Please enable this day first'), Colors.black);
+      return;
+    }
     TimeOfDay startTime = const TimeOfDay(hour: 9, minute: 0);
     TimeOfDay endTime = const TimeOfDay(hour: 10, minute: 0);
     bool applyToAllDays = false;
-    final lnProvider = Provider.of<AppStringService>(context, listen: false);
 
     showDialog(
       context: context,
@@ -280,8 +284,47 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
       ),
       body: Consumer<ProviderAvailabilityService>(
         builder: (context, availService, child) {
-          if (availService.isLoading && availService.days.isEmpty) {
+          if (!availService.isInitialized || (availService.isLoading && availService.days.isEmpty)) {
             return const Center(child: CircularProgressIndicator(color: FMColors.magenta));
+          }
+
+          if (availService.errorMessage != null && availService.days.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      lnProvider.getString('Could not load availability'),
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      availService.errorMessage ?? '',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: FMColors.textMuted, fontSize: 13),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: FMColors.magenta,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                      onPressed: () => availService.fetchDaysAndSchedules(serviceId: widget.serviceId),
+                      icon: const Icon(Icons.refresh_rounded, size: 18, color: Colors.white),
+                      label: Text(
+                        lnProvider.getString('Retry'),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           // Build complete 7-day display
@@ -362,7 +405,7 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
                   );
 
                   final isConfigured = existing.id > 0;
-                  final isEnabled = existing.isEnabled;
+                  final isEnabled = isConfigured && existing.isEnabled;
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -420,15 +463,17 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
                       trailing: Switch(
                         value: isEnabled,
                         activeColor: FMColors.magenta,
-                        onChanged: (bool newVal) async {
-                          if (!isConfigured) {
-                            // Day doesn't exist yet in DB: create it
-                            await availService.createWorkingDay(shortName, serviceId: widget.serviceId);
-                          } else {
-                            // Toggle existing day
-                            await availService.toggleWorkingDay(existing.id, serviceId: widget.serviceId);
-                          }
-                        },
+                        onChanged: (availService.isSaving || availService.isLoading)
+                            ? null
+                            : (bool newVal) async {
+                                if (!isConfigured) {
+                                  // Day doesn't exist yet in DB: create it
+                                  await availService.createWorkingDay(shortName, serviceId: widget.serviceId);
+                                } else {
+                                  // Toggle existing day
+                                  await availService.toggleWorkingDay(existing.id, serviceId: widget.serviceId);
+                                }
+                              },
                       ),
                       children: [
                         if (isEnabled) ...[
@@ -476,9 +521,11 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
                                             ),
                                             const SizedBox(width: 8),
                                             InkWell(
-                                              onTap: () async {
-                                                await availService.deleteTimeSlot(slot.id, serviceId: widget.serviceId);
-                                              },
+                                              onTap: (availService.isSaving || availService.isLoading)
+                                                  ? null
+                                                  : () async {
+                                                      await availService.deleteTimeSlot(slot.id, serviceId: widget.serviceId);
+                                                    },
                                               child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 16),
                                             ),
                                           ],
@@ -496,7 +543,9 @@ class _ProviderAvailabilityPageState extends State<ProviderAvailabilityPage> {
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       padding: const EdgeInsets.symmetric(vertical: 10),
                                     ),
-                                    onPressed: () => _showAddSlotDialog(context, existing),
+                                    onPressed: (availService.isSaving || availService.isLoading || !isConfigured)
+                                        ? null
+                                        : () => _showAddSlotDialog(context, existing),
                                     icon: const Icon(Icons.add_rounded, size: 18),
                                     label: Text(
                                       lnProvider.getString('Add Time Slot'),

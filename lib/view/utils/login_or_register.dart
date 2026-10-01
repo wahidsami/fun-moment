@@ -5,7 +5,6 @@ import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
 import '../auth/login/login.dart';
-import '../utils/custom_button.dart';
 import 'common_helper.dart';
 import 'language_selector_sheet.dart';
 
@@ -59,13 +58,20 @@ class LoginOrRegister extends StatelessWidget {
                   fontsize: 16,
                   textAlign: TextAlign.center)),
           const SizedBox(height: 20),
-          CustomButton(
-              btText: lnProvider.getString('Sign-In/Sign-Up'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: FMPrimaryButton(
+              label: lnProvider.getString('Sign-In/Sign-Up'),
+              height: 54,
+              fontSize: 16,
               onPressed: () {
-                context.toPage(const LoginPage(hasBackButton: true));
+                context.toPage(const LoginPage(
+                  hasBackButton: true,
+                  returnToPrevious: true,
+                ));
               },
-              isLoading: false,
-              width: context.width / 2),
+            ),
+          ),
           const SizedBox(height: 20),
           const LanguageSwitchPill(),
         ],

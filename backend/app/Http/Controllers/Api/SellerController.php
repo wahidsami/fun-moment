@@ -252,9 +252,9 @@ class SellerController extends Controller
             //0=pending, 1=complete
             $my_orders->where("payment_status", request()->payment_status === "0" ? "pending" : "complete");
         }
-        if (isset(request()->status) && in_array(request()->payment_status, [0, 1, 2, 3, 4])) {
+        if (request()->filled('status') && in_array((string) request()->status, ["0", "1", "2", "3", "4"])) {
             //0=pending, 1=active, 2=completed, 3=delivered, 4=cancelled
-            $my_orders->where("status", request()->status);
+            $my_orders->where("status", (int) request()->status);
         }
 
         $my_orders = $my_orders->where('seller_id', $uesr_info)
@@ -268,13 +268,12 @@ class SellerController extends Controller
             ->paginate(10)
             ->through(function ($item) {
                 $item->payment_status = !empty($item->payment_status) ? $item->payment_status : 'pending';
-                $item->date = null;
 
-                if ($item->date !== "No Date Created") {
+                if (!empty($item->date) && $item->date !== "No Date Created") {
                     try {
-                        $item->date = \Carbon\Carbon::parse($item->date);
+                        $item->date = \Carbon\Carbon::parse($item->date)->toIso8601String();
                     } catch (\Exception $e) {
-                        // Handle exception if necessary
+                        // Keep raw date string if not parseable
                     }
                 }
 
@@ -288,14 +287,14 @@ class SellerController extends Controller
         ]);
     }
 
-    public function singleOrder(Request $request)
+    public function singleOrder(Request $request, $id = null)
     {
-
-        if (empty($request->id)) {
+        $order_id = $id ?? $request->id;
+        if (empty($order_id)) {
             return response()->error(['message' => __('no order found')]);
         }
 
-        $orderInfo = Order::with('service')->where('id', $request->id)->where('seller_id', auth('sanctum')->id())->first();
+        $orderInfo = Order::with('service')->where('id', $order_id)->where('seller_id', auth('sanctum')->id())->first();
         if ($orderInfo != null) {
             $orderInfo->payment_status = !empty($orderInfo->payment_status) ? $orderInfo->payment_status : 'pending';
             $orderInfo->total = amount_with_currency_symbol($orderInfo->total);
@@ -304,9 +303,7 @@ class SellerController extends Controller
             $orderInfo->extra_service = amount_with_currency_symbol($orderInfo->extra_service);
             $orderInfo->package_fee = amount_with_currency_symbol($orderInfo->package_fee);
 
-            $orderInfo->date = null;
-            if ($orderInfo->date !== "No Date Created") {
-
+            if (!empty($orderInfo->date) && $orderInfo->date !== "No Date Created") {
                 try {
                     $orderInfo->date = \Carbon\Carbon::parse($orderInfo->date);
                 } catch (\Exception $e) {
@@ -316,20 +313,12 @@ class SellerController extends Controller
             $orderInfo->buyer_details = $orderInfo->buyer ?? null;
             $showresult = StaticOption::where('option_name', "result")->select("option_value")->first();
 
-
-
-            if ($showresult->option_value == "Checkbox is not checked." && $orderInfo->buyer_details) {
+            if ($showresult && $showresult->option_value == "Checkbox is not checked." && $orderInfo->buyer_details) {
                 $orderInfo->email = null;
                 $orderInfo->phone = null;
-            }
-
-            if ($showresult->option_value == "Checkbox is not checked." && $orderInfo->buyer_details) {
                 $orderInfo->buyer_details->email = null;
                 $orderInfo->buyer_details->phone = null;
             }
-
-
-
 
             if (is_null($orderInfo)) {
                 return response()->success([
@@ -1171,16 +1160,86 @@ class SellerController extends Controller
 
     public function OrderStatusChange(Request $request)
     {
-        $orderInfo = Order::where('id', $request->id)->where('seller_id', auth('sanctum')->id())->first();
-        if (is_null($orderInfo)) {
+        $sellerId = auth('sanctum')->id();
+        if (empty($sellerId)) {
             return response(['msg' => __("order not found or unauthorized")], 422);
         }
 
-        // Support explicit status: 1=active/accepted, 2=completed, 3=delivered, 4=cancelled/declined
-        // Defaults to 4 (cancelled) if not provided for backward compatibility
+        $orderId = $request->id;
         $new_status = $request->has('status') ? (int) $request->status : 4;
-        $orderInfo->status = $new_status;
-        $orderInfo->save();
+
+        try {
+            $transactionResult = DB::transaction(function () use ($orderId, $sellerId, $new_status) {
+                $orderInfo = Order::where('id', $orderId)
+                    ->where('seller_id', $sellerId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (is_null($orderInfo)) {
+                    return ['error' => true, 'status' => 422, 'msg' => __("order not found or unauthorized")];
+                }
+
+                if ($new_status == 4) {
+                    if ((int) $orderInfo->status === 2) {
+                        return ['error' => true, 'status' => 422, 'msg' => __("Completed orders cannot be cancelled.")];
+                    }
+                    if ((int) $orderInfo->status === 4) {
+                        return ['error' => true, 'status' => 422, 'msg' => __("This order is already cancelled.")];
+                    }
+
+                    if ($orderInfo->payment_status === 'complete') {
+                        $paidAmount = (float) $orderInfo->total;
+                        $alreadyRefunded = ((int) $orderInfo->cancel_order_money_return === 1) ||
+                            (class_exists(\Modules\Wallet\Entities\WalletHistory::class) &&
+                             \Modules\Wallet\Entities\WalletHistory::where('reference_type', 'order_refund')
+                                 ->where('reference_id', (string) $orderInfo->id)
+                                 ->lockForUpdate()
+                                 ->exists());
+
+                        if (!$alreadyRefunded && $paidAmount > 0) {
+                            if (class_exists(\Modules\Wallet\Services\WalletService::class)) {
+                                $gateway = !empty($orderInfo->payment_gateway) ? $orderInfo->payment_gateway : 'wallet';
+                                $walletService = app(\Modules\Wallet\Services\WalletService::class);
+                                $walletService->credit(
+                                    $orderInfo->buyer_id,
+                                    $paidAmount,
+                                    $gateway,
+                                    'order_refund',
+                                    (string) $orderInfo->id,
+                                    "Refund for declined booking #{$orderInfo->id}",
+                                    "استرداد مبلغ الحجز المرفوض رقم {$orderInfo->id}",
+                                    [
+                                        'order_id' => $orderInfo->id,
+                                        'original_gateway' => $orderInfo->payment_gateway,
+                                        'transaction_id' => $orderInfo->transaction_id,
+                                        'decline_by' => 'provider',
+                                        'seller_id' => $orderInfo->seller_id,
+                                    ]
+                                );
+                                $orderInfo->cancel_order_money_return = 1;
+                                \Log::info("[Provider Decline Refund] Successfully refunded {$paidAmount} SAR to buyer #{$orderInfo->buyer_id} wallet for order #{$orderInfo->id}.");
+                            } else {
+                                \Log::warning("[Provider Decline Alert] WalletService not found for refunding order #{$orderInfo->id}.");
+                            }
+                        }
+                    }
+                }
+
+                $orderInfo->status = $new_status;
+                $orderInfo->save();
+
+                return ['error' => false, 'order' => $orderInfo];
+            });
+        } catch (\Throwable $e) {
+            \Log::error("[OrderStatusChange Transaction Error] Order #{$orderId}: " . $e->getMessage());
+            return response(['msg' => __("something went wrong, try after sometime")], 500);
+        }
+
+        if (!empty($transactionResult['error'])) {
+            return response(['msg' => $transactionResult['msg']], $transactionResult['status'] ?? 422);
+        }
+
+        $orderInfo = $transactionResult['order'];
 
         // Customer status notifications:
         // provider accepts -> notify customer (booking_accepted)

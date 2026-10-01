@@ -30,7 +30,8 @@ class PushNotificationService with ChangeNotifier {
   factory PushNotificationService() => _instance;
   PushNotificationService._internal();
 
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
+  FirebaseMessaging? _fcmInstance;
+  FirebaseMessaging get _fcm => _fcmInstance ??= FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
@@ -43,6 +44,15 @@ class PushNotificationService with ChangeNotifier {
   bool isLoading = false;
   int currentPage = 1;
   bool hasMore = true;
+
+  void resetState() {
+    notifications = [];
+    unreadCount = 0;
+    isLoading = false;
+    currentPage = 1;
+    hasMore = true;
+    notifyListeners();
+  }
 
   // Backward compatibility fields for legacy Pusher references
   bool pusherCredentialLoaded = false;

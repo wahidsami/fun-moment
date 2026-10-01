@@ -296,6 +296,8 @@ class _LoginPageState extends State<LoginPage> {
                                   FMPrimaryButton(
                                 label: asProvider.getString('Login'),
                                 isLoading: provider.isloading,
+                                height: 54,
+                                fontSize: 16,
                                 onPressed: () {
                                   if (provider.isloading == false &&
                                       _formKey.currentState!.validate()) {
@@ -308,11 +310,11 @@ class _LoginPageState extends State<LoginPage> {
                                     )
                                         .then((value) {
                                       if (value == true) {
-                                        HomepageHelper.tabIndex.value = 0;
                                         if (widget.returnToPrevious &&
                                             Navigator.canPop(context)) {
                                           context.popTrue;
                                         } else {
+                                          HomepageHelper.tabIndex.value = 0;
                                           context.toUntilPage(const LandingPage());
                                         }
                                       }

@@ -32,6 +32,10 @@ class ReportService with ChangeNotifier {
     notifyListeners();
   }
 
+  void resetState() {
+    setReportListDefault();
+  }
+
   addNewDataReportList(subject, id, priority, status) {
     reportList.add(
         {'subject': subject, 'id': id, 'priority': priority, 'status': status});

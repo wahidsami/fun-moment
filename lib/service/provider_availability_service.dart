@@ -97,11 +97,24 @@ class ProviderWorkingDay {
 
 class ProviderAvailabilityService with ChangeNotifier {
   List<ProviderWorkingDay> days = [];
+  bool isInitialized = false;
   bool isLoading = false;
   bool isSaving = false;
+  String? errorMessage;
+
+  bool get hasError => errorMessage != null;
 
   void setLoading(bool val) {
     isLoading = val;
+    notifyListeners();
+  }
+
+  void resetState() {
+    days = [];
+    isInitialized = false;
+    isLoading = false;
+    isSaving = false;
+    errorMessage = null;
     notifyListeners();
   }
 
@@ -117,12 +130,28 @@ class ProviderAvailabilityService with ChangeNotifier {
   /// Pass [serviceId] to retrieve availability scoped to a specific service.
   Future<void> fetchDaysAndSchedules({bool showLoader = true, int? serviceId}) async {
     final connected = await checkConnection();
-    if (!connected) return;
+    if (!connected) {
+      errorMessage = 'No internet connection';
+      isInitialized = true;
+      if (showLoader) isLoading = false;
+      notifyListeners();
+      return;
+    }
 
     final token = await _getToken();
-    if (token == null) return;
+    if (token == null) {
+      errorMessage = 'User not authenticated';
+      isInitialized = true;
+      if (showLoader) isLoading = false;
+      notifyListeners();
+      return;
+    }
 
-    if (showLoader) setLoading(true);
+    if (showLoader) {
+      isLoading = true;
+      errorMessage = null;
+      notifyListeners();
+    }
 
     try {
       String urlStr = '$baseApi/seller/schedule-days-list';
@@ -144,18 +173,34 @@ class ProviderAvailabilityService with ChangeNotifier {
           final order = {'Sun': 1, 'Mon': 2, 'Tue': 3, 'Wed': 4, 'Thu': 5, 'Fri': 6, 'Sat': 7};
           loaded.sort((a, b) => (order[a.shortName] ?? 99).compareTo(order[b.shortName] ?? 99));
           days = loaded;
+          errorMessage = null;
+        } else {
+          if (days.isEmpty) {
+            errorMessage = 'Unexpected response format';
+          }
+        }
+      } else {
+        if (days.isEmpty) {
+          errorMessage = 'Failed to load availability (${res.statusCode})';
         }
       }
     } catch (e) {
       debugPrint('fetchDaysAndSchedules error: $e');
+      if (days.isEmpty) {
+        errorMessage = 'Failed to load availability: $e';
+      }
     } finally {
-      if (showLoader) setLoading(false);
+      isInitialized = true;
+      if (showLoader) isLoading = false;
+      notifyListeners();
     }
   }
 
   /// Create (or reactivate) a working day.
   /// Pass [serviceId] to scope the day to a specific service.
   Future<bool> createWorkingDay(String dayName, {int? serviceId}) async {
+    if (isSaving || isLoading) return false;
+
     final token = await _getToken();
     if (token == null) return false;
 
@@ -181,6 +226,7 @@ class ProviderAvailabilityService with ChangeNotifier {
         await fetchDaysAndSchedules(showLoader: false, serviceId: serviceId);
         return true;
       }
+      notifyListeners();
       return false;
     } catch (e) {
       isSaving = false;
@@ -192,8 +238,21 @@ class ProviderAvailabilityService with ChangeNotifier {
   /// Toggle a working day on/off.
   /// Pass [serviceId] so the backend scopes the lookup correctly.
   Future<bool> toggleWorkingDay(int dayId, {int? serviceId}) async {
+    if (isSaving || isLoading) return false;
+    if (dayId <= 0) return false;
+
     final token = await _getToken();
     if (token == null) return false;
+
+    isSaving = true;
+    final idx = days.indexWhere((d) => d.id == dayId);
+    final prevStatus = idx != -1 ? days[idx].status : null;
+
+    // Optimistic toggle
+    if (idx != -1) {
+      days[idx].status = days[idx].status == 1 ? 0 : 1;
+      notifyListeners();
+    }
 
     try {
       final url = Uri.parse('$baseApi/seller/toggle-day');
@@ -209,18 +268,37 @@ class ProviderAvailabilityService with ChangeNotifier {
         body: bodyMap,
       );
 
+      isSaving = false;
       if (res.statusCode == 200 || res.statusCode == 201) {
-        // Toggle locally for instant UI feedback
-        final idx = days.indexWhere((d) => d.id == dayId);
-        if (idx != -1) {
-          days[idx].status = days[idx].status == 1 ? 0 : 1;
-          notifyListeners();
-        }
+        // Backend returned authoritative state
+        try {
+          final data = jsonDecode(res.body);
+          if (data is Map && data['day'] != null && data['day']['status'] != null) {
+            final backendStatus = int.tryParse(data['day']['status'].toString()) ?? days[idx].status;
+            if (idx != -1) {
+              days[idx].status = backendStatus;
+            }
+          }
+        } catch (_) {}
+        notifyListeners();
         return true;
       }
+
+      // Rollback on failure
+      if (idx != -1 && prevStatus != null) {
+        days[idx].status = prevStatus;
+      }
+      notifyListeners();
+      OthersHelper().showToast('Could not update working day', Colors.black);
       return false;
     } catch (e) {
       debugPrint('toggleWorkingDay error: $e');
+      if (idx != -1 && prevStatus != null) {
+        days[idx].status = prevStatus;
+      }
+      isSaving = false;
+      notifyListeners();
+      OthersHelper().showToast('Error updating working day', Colors.black);
       return false;
     }
   }
@@ -233,6 +311,12 @@ class ProviderAvailabilityService with ChangeNotifier {
     bool allDays = false,
     int? serviceId,
   }) async {
+    if (isSaving || isLoading) return false;
+    if (dayId <= 0 && !allDays) {
+      OthersHelper().showToast('Please activate this day first', Colors.black);
+      return false;
+    }
+
     final token = await _getToken();
     if (token == null) return false;
 
@@ -283,8 +367,12 @@ class ProviderAvailabilityService with ChangeNotifier {
 
   /// Delete a time slot by its ID.
   Future<bool> deleteTimeSlot(int slotId, {int? serviceId}) async {
+    if (isSaving || isLoading) return false;
     final token = await _getToken();
     if (token == null) return false;
+
+    isSaving = true;
+    notifyListeners();
 
     try {
       final url = Uri.parse('$baseApi/seller/schedule/delete');
@@ -297,6 +385,7 @@ class ProviderAvailabilityService with ChangeNotifier {
         body: {'id': slotId.toString()},
       );
 
+      isSaving = false;
       if (res.statusCode == 200 || res.statusCode == 201) {
         // Remove locally
         for (var day in days) {
@@ -306,10 +395,13 @@ class ProviderAvailabilityService with ChangeNotifier {
         OthersHelper().showToast('Time slot deleted', Colors.green);
         return true;
       } else {
+        notifyListeners();
         OthersHelper().showToast('Could not delete time slot', Colors.black);
         return false;
       }
     } catch (e) {
+      isSaving = false;
+      notifyListeners();
       OthersHelper().showToast('Error deleting time slot', Colors.black);
       return false;
     }

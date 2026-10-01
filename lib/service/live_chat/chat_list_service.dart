@@ -19,6 +19,15 @@ class ChatListService with ChangeNotifier {
     notifyListeners();
   }
 
+  void resetState() {
+    chatList = [];
+    chatListImage = [];
+    storeChatList = [];
+    storeChatListImage = [];
+    isLoading = false;
+    notifyListeners();
+  }
+
   setLoadedChatList() {
     chatList = storeChatList;
     chatListImage = storeChatListImage;

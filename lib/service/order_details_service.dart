@@ -33,6 +33,14 @@ class OrderDetailsService with ChangeNotifier {
     notifyListeners();
   }
 
+  void resetState() {
+    orderDetails = null;
+    orderStatus = null;
+    orderExtra = [];
+    isLoading = true;
+    notifyListeners();
+  }
+
   Future<bool> fetchOrderDetails(orderId, BuildContext context,
       {bool isFromOrderComplete = false}) async {
     //get user id
@@ -47,52 +55,96 @@ class OrderDetailsService with ChangeNotifier {
     };
 
     var connection = await checkConnection();
-    if (!connection) return false;
-    //if connection is ok
+    if (!connection) {
+      orderDetails = 'error';
+      setLoadingStatus(false);
+      return false;
+    }
 
     if (!isFromOrderComplete) {
-      //if it is from order complete accept, then no need to show loading
-      //because it is causing some issue
-
       setLoadingStatus(true);
     }
 
-    bool isSeller = false;
     try {
-      isSeller = Provider.of<ProfileService>(context, listen: false).isSeller;
-    } catch (_) {}
-    if (prefs.containsKey('userType')) {
-      isSeller = prefs.getInt('userType') == 0;
-    }
+      bool isSeller = false;
+      try {
+        isSeller = Provider.of<ProfileService>(context, listen: false).isSeller;
+      } catch (_) {}
+      if (prefs.containsKey('userType')) {
+        final rawUserType = prefs.get('userType');
+        if (rawUserType is int) {
+          isSeller = rawUserType == 0;
+        } else if (rawUserType is num) {
+          isSeller = rawUserType.toInt() == 0;
+        } else if (rawUserType is String) {
+          isSeller = int.tryParse(rawUserType) == 0;
+        }
+      }
 
-    final endpoint = isSeller
-        ? '$baseApi/seller/my-orders/$orderId'
-        : '$baseApi/user/my-orders/$orderId';
+      final endpoint = isSeller
+          ? '$baseApi/seller/my-orders/$orderId'
+          : '$baseApi/user/my-orders/$orderId';
 
-    var response = await http.post(Uri.parse(endpoint), headers: header);
+      debugPrint('[MY ORDERS REQUEST]');
+      debugPrint('caller=OrderDetailsService.fetchOrderDetails');
+      debugPrint('user_type=${isSeller ? 0 : 1}');
+      debugPrint('endpoint=$endpoint');
+      if (endpoint.contains('/user/my-orders')) {
+        debugPrint('[MY ORDERS REQUEST] StackTrace for /user/my-orders:');
+        debugPrint(StackTrace.current.toString());
+      }
 
-    print('order details response ${response.body}');
+      var response = await http
+          .post(Uri.parse(endpoint), headers: header)
+          .timeout(const Duration(seconds: 20));
 
-    if (response.statusCode == 201) {
-      var data = OrderDetailsModel.fromJson(jsonDecode(response.body));
+      print('order details response ${response.body}');
 
-      orderDetails = data.orderInfo;
+      if (response.statusCode == 201) {
+        final decoded = jsonDecode(response.body);
+        if (decoded != null &&
+            decoded is Map<String, dynamic> &&
+            decoded.containsKey('orderInfo') &&
+            decoded['orderInfo'] != null) {
+          var data = OrderDetailsModel.fromJson(decoded);
 
-      var status = data.orderInfo.status;
+          orderDetails = data.orderInfo;
 
-      orderStatus = getOrderStatus(status ?? -1);
+          var status = data.orderInfo.status;
 
-      await fetchOrderExtraList(orderId);
+          orderStatus = getOrderStatus(status ?? -1);
 
-      Provider.of<OrdersService>(context, listen: false)
-          .fetchDeclineHistory(context, orderId: orderId);
+          try {
+            await fetchOrderExtraList(orderId);
+          } catch (e) {
+            debugPrint('fetchOrderExtraList error: $e');
+          }
 
-      notifyListeners();
-      return true;
-    } else {
-      //Something went wrong
+          try {
+            Provider.of<OrdersService>(context, listen: false)
+                .fetchDeclineHistory(context, orderId: orderId);
+          } catch (e) {
+            debugPrint('fetchDeclineHistory error: $e');
+          }
+
+          setLoadingStatus(false);
+          return true;
+        } else {
+          // Unexpected or empty response shape
+          orderDetails = 'error';
+          setLoadingStatus(false);
+          return false;
+        }
+      } else {
+        // Non-201 response (4xx, 5xx)
+        orderDetails = 'error';
+        setLoadingStatus(false);
+        return false;
+      }
+    } catch (e) {
+      debugPrint('fetchOrderDetails exception: $e');
       orderDetails = 'error';
-      notifyListeners();
+      setLoadingStatus(false);
       return false;
     }
   }

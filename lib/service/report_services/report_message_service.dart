@@ -20,6 +20,13 @@ class ReportMessagesService with ChangeNotifier {
     notifyListeners();
   }
 
+  void resetState() {
+    messagesList = [];
+    isloading = false;
+    sendLoading = false;
+    notifyListeners();
+  }
+
   setLoadingFalse() {
     isloading = false;
     notifyListeners();

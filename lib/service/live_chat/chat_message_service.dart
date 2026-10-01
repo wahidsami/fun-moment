@@ -40,6 +40,11 @@ class ChatMessagesService with ChangeNotifier {
     currentPage = 1;
   }
 
+  void resetState() {
+    setMessageListDefault();
+    notifyListeners();
+  }
+
   setLoadingTrue() {
     isloading = true;
     notifyListeners();

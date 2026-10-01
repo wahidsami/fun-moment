@@ -77,25 +77,48 @@ class FMPrimaryButton extends StatelessWidget {
     required this.onPressed,
     this.isLoading = false,
     this.icon,
+    this.height,
+    this.fontSize,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
   final Widget? icon;
+  final double? height;
+  final double? fontSize;
 
   @override
   Widget build(BuildContext context) {
+    final double btnHeight = height ?? 54.0;
+    final double btnFontSize = fontSize ?? 15.0;
+
+    final isArabic = Directionality.maybeOf(context) == TextDirection.rtl ||
+        Localizations.maybeLocaleOf(context)?.languageCode == 'ar' ||
+        RegExp(r'[\u0600-\u06FF]').hasMatch(label);
+
+    final buttonTextStyle = TextStyle(
+      fontSize: btnFontSize,
+      fontWeight: FontWeight.w700,
+      fontFamily: isArabic ? 'Cairo' : null,
+    );
+
     return SizedBox(
       width: double.infinity,
+      height: btnHeight,
       child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          minimumSize: Size(double.infinity, btnHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+          textStyle: buttonTextStyle,
+        ),
         onPressed: isLoading ? null : onPressed,
         child: isLoading
             ? const SizedBox(
-                height: 18,
-                width: 18,
+                height: 22,
+                width: 22,
                 child: CircularProgressIndicator(
-                  strokeWidth: 2.3,
+                  strokeWidth: 2.5,
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
@@ -107,7 +130,10 @@ class FMPrimaryButton extends StatelessWidget {
                     icon!,
                     const SizedBox(width: 10),
                   ],
-                  Text(label),
+                  Text(
+                    label,
+                    style: buttonTextStyle,
+                  ),
                 ],
               ),
       ),
