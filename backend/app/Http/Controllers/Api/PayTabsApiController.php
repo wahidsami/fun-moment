@@ -8,6 +8,7 @@ use App\Services\Payment\PayTabsPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PayTabsApiController extends Controller
@@ -134,6 +135,102 @@ class PayTabsApiController extends Controller
             'already_completed' => $applyResult['already_completed'],
             'message' => __('Payment successfully verified.')
         ]);
+    }
+
+    /**
+     * Cancel an unverified pending PayTabs order upon customer cancellation, failure, or WebView abandonment.
+     */
+    public function cancelPending(Request $request): JsonResponse
+    {
+        $request->validate([
+            'order_id' => 'nullable|integer',
+            'id' => 'nullable|integer',
+        ]);
+
+        $orderId = (int) ($request->order_id ?: $request->id);
+        if (!$orderId) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Order ID is required.')
+            ], 422);
+        }
+
+        $userId = Auth::guard('sanctum')->id();
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Unauthenticated.')
+            ], 401);
+        }
+
+        return DB::transaction(function () use ($orderId, $userId) {
+            $order = Order::where('id', $orderId)->lockForUpdate()->first();
+            if (!$order) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('Order not found.')
+                ], 404);
+            }
+
+            // Must belong to authenticated buyer
+            if ($order->buyer_id !== null && (int) $order->buyer_id !== (int) $userId) {
+                Log::warning('[PayTabs] Unauthorized pending cancellation attempt', [
+                    'auth_user_id' => $userId,
+                    'order_id' => $order->id,
+                    'order_buyer_id' => $order->buyer_id,
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => __('Unauthorized action for this order.')
+                ], 403);
+            }
+
+            // Idempotency: If already cancelled, return safe idempotent success
+            if ((int) $order->status === 4 && $order->payment_status === 'canceled') {
+                return response()->json([
+                    'success' => true,
+                    'message' => __('Order is already cancelled.'),
+                    'already_cancelled' => true,
+                    'order_id' => $order->id,
+                    'status' => 4,
+                    'payment_status' => 'canceled',
+                ], 200);
+            }
+
+            // Financial safety: If payment is already complete, reject cancellation
+            if ($order->payment_status === 'complete') {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('Paid orders cannot be cancelled through this endpoint.'),
+                    'already_paid' => true,
+                    'order_id' => $order->id,
+                ], 422);
+            }
+
+            // Eligibility: Only unverified pending PayTabs orders (payment_gateway == paytabs, status == 0, payment_status == pending)
+            if ($order->payment_gateway !== 'paytabs' || (int) $order->status !== 0 || $order->payment_status !== 'pending') {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('Only unverified pending PayTabs orders can be cancelled through this endpoint.'),
+                    'order_id' => $order->id,
+                ], 422);
+            }
+
+            // Authoritative state mutation: cancel order and mark payment as canceled
+            $order->status = 4;
+            $order->payment_status = 'canceled';
+            $order->save();
+
+            Log::info("[PayTabs] Pending order #{$order->id} successfully cancelled by buyer {$userId}.");
+
+            return response()->json([
+                'success' => true,
+                'message' => __('Pending order cancelled successfully.'),
+                'order_id' => $order->id,
+                'status' => 4,
+                'payment_status' => 'canceled',
+            ], 200);
+        });
     }
 
     /**

@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:http/http.dart' as http;
 
@@ -58,6 +59,16 @@ class _PayTabsPaymentState extends State<PayTabsPayment> {
     });
   }
 
+  bool _isReturnUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    final path = uri.path.toLowerCase();
+    return path.contains('/paytabs/return') ||
+        path.contains('paytabs-return') ||
+        path.contains('/api/v1/paytabs/return') ||
+        path.contains('returnpage');
+  }
+
   /// Request the backend to securely initiate a PayTabs session.
   /// Server-side credentials are used; secrets are never exposed on mobile.
   Future<void> _initiatePaymentSession() async {
@@ -70,6 +81,23 @@ class _PayTabsPaymentState extends State<PayTabsPayment> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token') ?? '';
 
+      if (token.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Please sign in to proceed with payment.';
+        });
+        return;
+      }
+
+      final parsedOrderId = int.tryParse(widget.orderId.toString()) ?? widget.orderId;
+      if (parsedOrderId == null || parsedOrderId == 0) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Invalid order ID. Please try placing your booking again.';
+        });
+        return;
+      }
+
       final initiateUrl = Uri.parse('$baseApi/user/paytabs/initiate');
       final headers = {
         'Accept': 'application/json',
@@ -77,7 +105,6 @@ class _PayTabsPaymentState extends State<PayTabsPayment> {
         'Authorization': 'Bearer $token',
       };
 
-      final parsedOrderId = int.tryParse(widget.orderId.toString()) ?? widget.orderId;
       final body = jsonEncode({
         'order_id': parsedOrderId,
       });
@@ -87,6 +114,7 @@ class _PayTabsPaymentState extends State<PayTabsPayment> {
           .post(initiateUrl, headers: headers, body: body)
           .timeout(const Duration(seconds: 30));
 
+      debugPrint('[PayTabs] Initiate response [${response.statusCode}]: ${response.body}');
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
@@ -105,16 +133,19 @@ class _PayTabsPaymentState extends State<PayTabsPayment> {
       }
 
       // If backend reports order is already paid, fast-path to success
-      if (data['already_paid'] == true) {
+      if (data is Map && data['already_paid'] == true) {
         debugPrint('[PayTabs] Order is already paid on server.');
         _handleSuccess();
         return;
       }
 
-      final errMsg = data['message'] ?? 'Failed to initialize secure payment session.';
+      final errMsg = data is Map ? data['message'] : null;
       setState(() {
         _isLoading = false;
-        _errorMessage = errMsg;
+        _errorMessage = errMsg ??
+            (response.statusCode == 422
+                ? 'PayTabs gateway is currently being configured. Please try again shortly.'
+                : 'Failed to initialize secure payment session (${response.statusCode}).');
       });
     } catch (e) {
       debugPrint('[PayTabs] Exception during session initiation: $e');
@@ -128,22 +159,46 @@ class _PayTabsPaymentState extends State<PayTabsPayment> {
   void _setupWebViewController(String initialUrl) {
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setUserAgent(
+          'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36')
       ..setNavigationDelegate(
         NavigationDelegate(
           onWebResourceError: (error) {
-            debugPrint('[PayTabs WebView] Resource error: ${error.description}');
+            debugPrint('[PayTabs WebView] Resource error: ${error.description}, code: ${error.errorCode}');
           },
           onPageStarted: (url) {
             debugPrint('[PayTabs WebView] Page started: $url');
-            _inspectNavigation(url);
+            if (_isReturnUrl(url)) {
+              _inspectNavigation(url);
+            }
           },
           onPageFinished: (url) {
             debugPrint('[PayTabs WebView] Page finished: $url');
-            _inspectNavigation(url);
+            if (_isReturnUrl(url)) {
+              _inspectNavigation(url);
+            }
           },
           onNavigationRequest: (navRequest) {
             debugPrint('[PayTabs WebView] Nav request: ${navRequest.url}');
-            _inspectNavigation(navRequest.url);
+            final url = navRequest.url;
+            final uri = Uri.tryParse(url);
+
+            // Handle non-http/https schemes (bank apps, STC Pay, tel, whatsapp, etc.)
+            if (uri != null && uri.scheme != 'http' && uri.scheme != 'https') {
+              try {
+                launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (e) {
+                debugPrint('[PayTabs WebView] External scheme launch error: $e');
+              }
+              return NavigationDecision.prevent;
+            }
+
+            // If the URL is our return callback, intercept and verify
+            if (_isReturnUrl(url)) {
+              _inspectNavigation(url);
+              return NavigationDecision.prevent;
+            }
+
             return NavigationDecision.navigate;
           },
         ),
@@ -154,33 +209,27 @@ class _PayTabsPaymentState extends State<PayTabsPayment> {
   /// Inspect the current URL for return redirect or transaction reference.
   void _inspectNavigation(String url) {
     if (_isProcessed || _isVerifying) return;
+    if (!_isReturnUrl(url)) return; // CRITICAL: NEVER intercept hosted checkout page!
 
     final uri = Uri.tryParse(url);
     if (uri == null) return;
 
-    final path = uri.path.toLowerCase();
-    final isReturnUrl = path.contains('/paytabs/return') || path.contains('paytabs-return');
-    final hasTranRef = uri.queryParameters.containsKey('tranRef') ||
-        uri.queryParameters.containsKey('tran_ref');
+    final tranRef = uri.queryParameters['tranRef'] ??
+        uri.queryParameters['tran_ref'] ??
+        _tranRef;
+    final respStatus = uri.queryParameters['respStatus'] ?? '';
+    final respMessage = uri.queryParameters['respMessage'];
 
-    if (isReturnUrl || hasTranRef) {
-      final tranRef = uri.queryParameters['tranRef'] ??
-          uri.queryParameters['tran_ref'] ??
-          _tranRef;
-      final respStatus = uri.queryParameters['respStatus'] ?? '';
-      final respMessage = uri.queryParameters['respMessage'];
+    debugPrint('[PayTabs] Detected return: tranRef=$tranRef, respStatus=$respStatus');
 
-      debugPrint('[PayTabs] Detected return: tranRef=$tranRef, respStatus=$respStatus');
+    // If explicitly declined or cancelled
+    if (respStatus == 'D' || respStatus == 'C') {
+      _handleFailure(message: respMessage ?? 'Payment was declined or cancelled.');
+      return;
+    }
 
-      // If explicitly declined or cancelled
-      if (respStatus == 'D' || respStatus == 'C') {
-        _handleFailure(message: respMessage ?? 'Payment was declined or cancelled.');
-        return;
-      }
-
-      if (tranRef != null && tranRef.isNotEmpty) {
-        _verifyWithBackend(tranRef);
-      }
+    if (tranRef != null && tranRef.isNotEmpty) {
+      _verifyWithBackend(tranRef);
     }
   }
 
@@ -264,13 +313,57 @@ class _PayTabsPaymentState extends State<PayTabsPayment> {
     }
   }
 
-  void _handleFailure({String? message}) {
+  /// Safely cancel unverified pending order on backend when payment is cancelled or failed.
+  /// Uses a short bounded timeout (5s) so mobile UI is never blocked indefinitely.
+  Future<void> _cancelPendingOrderOnBackend() async {
+    // Only applies to service orders placed by customer, not wallet/job/extra flows
+    if (widget.isFromOrderExtraAccept == true ||
+        widget.isFromWalletDeposite == true ||
+        widget.isFromHireJob == true) {
+      return;
+    }
+
+    final parsedOrderId = int.tryParse(widget.orderId.toString()) ?? widget.orderId;
+    if (parsedOrderId == null || parsedOrderId == 0) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token') ?? '';
+      if (token.isEmpty) return;
+
+      final cancelUrl = Uri.parse('$baseApi/service/order/cancel-pending');
+      final headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+      final body = jsonEncode({
+        'order_id': parsedOrderId,
+      });
+
+      debugPrint('[PayTabs] Requesting pending order cancellation for order $parsedOrderId');
+      final response = await http
+          .post(cancelUrl, headers: headers, body: body)
+          .timeout(const Duration(seconds: 5));
+
+      debugPrint('[PayTabs] Cancel response [${response.statusCode}]: ${response.body}');
+    } catch (e) {
+      debugPrint('[PayTabs] Non-fatal error during cancel-pending call: $e');
+    }
+  }
+
+  Future<void> _handleFailure({String? message}) async {
     if (_isProcessed) return;
     _isProcessed = true;
 
     if (message != null && message.isNotEmpty) {
       OthersHelper().showToast(message, Colors.redAccent);
     }
+
+    // Call server cleanup with short bounded timeout (5s)
+    await _cancelPendingOrderOnBackend();
+
+    if (!mounted) return;
 
     Provider.of<PlaceOrderService>(context, listen: false)
         .doNext(context, 'failed', paymentFailed: true);
@@ -318,7 +411,7 @@ class _PayTabsPaymentState extends State<PayTabsPayment> {
     );
 
     if (shouldLeave == true) {
-      _handleFailure(message: 'Payment cancelled.');
+      await _handleFailure(message: 'Payment cancelled.');
       return false;
     }
 

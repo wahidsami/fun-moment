@@ -125,6 +125,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         // PayTabs payment endpoints
         Route::post('paytabs/initiate', [PayTabsApiController::class, 'initiate']);
         Route::post('paytabs/verify-transaction', [PayTabsApiController::class, 'verify']);
+        Route::post('paytabs/cancel-pending', [PayTabsApiController::class, 'cancelPending']);
         
         //payment gateway list
         Route::post('payment-gateway-list',[PaymentGatewayController::class,'gatewayList']);
@@ -209,6 +210,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
     //verify 
     Route::group(['middleware' => 'auth:sanctum'],function (){
         Route::post('service/order', [ServiceController::class,'order']);
+        Route::post('service/order/cancel-pending', [PayTabsApiController::class, 'cancelPending']);
         Route::post('image/upload', [ServiceController::class,'imageUpload']);
         Route::post('payment-image/manual-payment', [ServiceController::class,'manualPaymentImage']);
         

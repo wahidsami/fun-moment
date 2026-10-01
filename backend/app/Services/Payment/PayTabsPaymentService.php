@@ -6,6 +6,7 @@ use App\Mail\OrderMail;
 use App\Notifications\OrderNotification;
 use App\Order;
 use App\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -311,66 +312,80 @@ class PayTabsPaymentService
      */
     public function applySuccessfulPayment(Order $order, string $tranRef, array $sanitizedDetails): array
     {
-        // 1. Idempotency Check: if already completed with this tranRef or verified
-        if ($order->payment_status === 'complete') {
-            Log::info("[PayTabs] Order #{$order->id} payment already completed. Skipping side effects.");
+        return DB::transaction(function () use ($order, $tranRef, $sanitizedDetails) {
+            $lockedOrder = Order::where('id', $order->id)->lockForUpdate()->first();
+            if (!$lockedOrder) {
+                return [
+                    'already_completed' => false,
+                    'order' => $order
+                ];
+            }
+
+            // 1. Idempotency Check: if already completed with this tranRef or verified
+            if ($lockedOrder->payment_status === 'complete') {
+                Log::info("[PayTabs] Order #{$lockedOrder->id} payment already completed. Skipping side effects.");
+                return [
+                    'already_completed' => true,
+                    'order' => $lockedOrder
+                ];
+            }
+
+            // 2. Authoritative Database State Mutation
+            $lockedOrder->payment_status = 'complete';
+            $lockedOrder->payment_gateway = 'paytabs';
+            $lockedOrder->transaction_id = $tranRef;
+            $lockedOrder->payment_verified_at = now();
+            $lockedOrder->payment_details = json_encode($sanitizedDetails);
+
+            // Phase 6 Invariant: If order was pending (0) or prematurely cancelled (4)
+            // due to client cancellation race while PayTabs authoritatively captured payment,
+            // real successful payment wins and transitions the order to active/in-progress (status = 1).
+            if ((int) $lockedOrder->status === 0 || (int) $lockedOrder->status === 4) {
+                $lockedOrder->status = 1; // 1 = Active / In Progress
+            }
+            $lockedOrder->save();
+
+            Log::info("[PayTabs] Order #{$lockedOrder->id} successfully verified and marked as complete with tran_ref: {$tranRef}");
+
+            // 3. Dispatch Notifications & Emails Safely
+            try {
+                $seller = User::find($lockedOrder->seller_id);
+                if ($seller) {
+                    $seller->notify(new OrderNotification(
+                        $lockedOrder->id,
+                        $lockedOrder->service_id,
+                        $lockedOrder->seller_id,
+                        $lockedOrder->buyer_id,
+                        __('New verified booking received for Order #') . $lockedOrder->id,
+                        'new_booking',
+                        $lockedOrder->status,
+                        'seller'
+                    ));
+                }
+            } catch (\Exception $e) {
+                Log::error('[PayTabs] Failed dispatching OrderNotification: ' . $e->getMessage());
+            }
+
+            try {
+                $mailSubject = get_static_option('new_order_email_subject') ?? __('Order Payment Confirmed #');
+                $buyerMsg = __('Your payment was successful for order #') . $lockedOrder->id;
+                $sellerMsg = __('Payment confirmed for new order #') . $lockedOrder->id;
+
+                if (!empty($lockedOrder->email)) {
+                    Mail::to($lockedOrder->email)->send(new OrderMail($mailSubject, $lockedOrder, $buyerMsg));
+                }
+                if ($seller && !empty($seller->email)) {
+                    Mail::to($seller->email)->send(new OrderMail($mailSubject, $lockedOrder, $sellerMsg));
+                }
+            } catch (\Exception $e) {
+                Log::error('[PayTabs] Failed sending order confirmation mail: ' . $e->getMessage());
+            }
+
             return [
-                'already_completed' => true,
-                'order' => $order
+                'already_completed' => false,
+                'order' => $lockedOrder
             ];
-        }
-
-        // 2. Authoritative Database State Mutation
-        $order->payment_status = 'complete';
-        $order->payment_gateway = 'paytabs';
-        $order->transaction_id = $tranRef;
-        $order->payment_verified_at = now();
-        $order->payment_details = json_encode($sanitizedDetails);
-        if ($order->status === 0) {
-            $order->status = 1; // 1 = Active / In Progress
-        }
-        $order->save();
-
-        Log::info("[PayTabs] Order #{$order->id} successfully verified and marked as complete with tran_ref: {$tranRef}");
-
-        // 3. Dispatch Notifications & Emails Safely
-        try {
-            $seller = User::find($order->seller_id);
-            if ($seller) {
-                $seller->notify(new OrderNotification(
-                    $order->id,
-                    $order->service_id,
-                    $order->seller_id,
-                    $order->buyer_id,
-                    __('New verified booking received for Order #') . $order->id,
-                    'new_booking',
-                    $order->status,
-                    'seller'
-                ));
-            }
-        } catch (\Exception $e) {
-            Log::error('[PayTabs] Failed dispatching OrderNotification: ' . $e->getMessage());
-        }
-
-        try {
-            $mailSubject = get_static_option('new_order_email_subject') ?? __('Order Payment Confirmed #');
-            $buyerMsg = __('Your payment was successful for order #') . $order->id;
-            $sellerMsg = __('Payment confirmed for new order #') . $order->id;
-
-            if (!empty($order->email)) {
-                Mail::to($order->email)->send(new OrderMail($mailSubject, $order, $buyerMsg));
-            }
-            if ($seller && !empty($seller->email)) {
-                Mail::to($seller->email)->send(new OrderMail($mailSubject, $order, $sellerMsg));
-            }
-        } catch (\Exception $e) {
-            Log::error('[PayTabs] Failed sending order confirmation mail: ' . $e->getMessage());
-        }
-
-        return [
-            'already_completed' => false,
-            'order' => $order
-        ];
+        });
     }
 
     /**
