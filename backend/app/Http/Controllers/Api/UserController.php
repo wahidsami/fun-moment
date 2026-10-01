@@ -660,32 +660,37 @@ class UserController extends Controller
         $my_orders = Order::query();
         
 
-        if(isset(request()->payment_status) && in_array(request()->payment_status,["0","1"])){
+        if (isset(request()->payment_status) && in_array((string) request()->payment_status, ["0", "1"])) {
             //0=pending, 1=complete
-            $my_orders->where("payment_status",request()->payment_status === "0" ? "pending" : "complete");
+            $my_orders->where("payment_status", (string) request()->payment_status === "0" ? "pending" : "complete");
         }
-        if(isset(request()->status) && in_array(request()->payment_status,[0,1,2,3,4])){
+        if (isset(request()->status) && in_array((string) request()->status, ["0", "1", "2", "3", "4"])) {
             //0=pending, 1=active, 2=completed, 3=delivered, 4=cancelled
-            $my_orders->where("status",request()->status);
+            $my_orders->where("status", (int) request()->status);
         }
-        
-        $my_orders_all = $my_orders->where('buyer_id',$uesr_info)
-        ->orderBy('id','desc')
-        ->paginate(20)
-        ->through(function($item){
-            $item->payment_status =  !empty($item->payment_status) ? $item->payment_status : 'pending';
-            $item->date = null;
-            if($item->date !== "No Date Created"){
-                
-                try{
-                    $item->date = \Carbon\Carbon::parse($item->date);
-                }
-                catch(\Exception $e){
-                    
-                };
-            }
-            return $item;
+
+        // Quarantine: Online orders must have complete payment; COD allowed pending delivery
+        $my_orders->where(function ($q) {
+            $q->where('payment_status', 'complete')
+              ->orWhere('payment_gateway', 'cash_on_delivery');
         });
+
+        $my_orders_all = $my_orders->where('buyer_id', $uesr_info)
+            ->orderBy('id', 'desc')
+            ->paginate(20)
+            ->through(function ($item) {
+                $item->payment_status = !empty($item->payment_status) ? $item->payment_status : 'pending';
+
+                if (!empty($item->date) && $item->date !== "No Date Created") {
+                    try {
+                        $item->date = \Carbon\Carbon::parse($item->date)->toIso8601String();
+                    } catch (\Exception $e) {
+                        // Keep raw date string if not parseable
+                    }
+                }
+
+                return $item;
+            });
 
         return response()->success([
             'my_orders' => $my_orders_all,

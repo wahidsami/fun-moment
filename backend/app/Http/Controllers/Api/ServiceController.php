@@ -1189,21 +1189,6 @@ class ServiceController extends Controller
             'commission_amount' => $commission_amount,
         ]);
 
-        //Send order notification to seller
-        $seller = User::where('id',$request->seller_id)->first();
-        $order_message = __('You have a new order');
-        if ($request->selected_payment_gateway !== 'paytabs' && $seller) {
-            $seller->notify(new OrderNotification(
-                $last_order_id,
-                $request->service_id,
-                $request->seller_id,
-                $request->buyer_id,
-                $order_message,
-                'new_booking',
-                0,
-                'seller'
-            ));
-        }
         $order_details = Order::find($last_order_id);
 
         //todo: check payment gateway is wallet or not
@@ -1211,7 +1196,6 @@ class ServiceController extends Controller
         $wallet_balance_status = '';
         if(moduleExists('Wallet')){
             if ($request->selected_payment_gateway === 'wallet') {
-                $order_details = Order::find($last_order_id);
                 $buyer_id = Auth::guard('sanctum')->user()->id;
                 $wallet_balance = Wallet::where('buyer_id',$buyer_id)->first();
                 if(!empty($wallet_balance)){
@@ -1219,11 +1203,13 @@ class ServiceController extends Controller
                         Order::where('id', $last_order_id)->update([
                             'payment_status' => 'complete',
                             'payment_gateway' => 'wallet',
+                            'status' => 1,
                         ]);
                         Wallet::where('buyer_id',$buyer_id)->update([
                             'balance' => $wallet_balance->balance-$order_details->total,
                         ]);
                         $shortage_balance =  float_amount_with_currency_symbol($order_details->total - $wallet_balance->balance);
+                        $order_details = Order::find($last_order_id);
                     }else{
                         $wallet_balance_status = __('Wallet balance not available');
                         $shortage_balance =  float_amount_with_currency_symbol($order_details->total - $wallet_balance->balance);
@@ -1232,16 +1218,48 @@ class ServiceController extends Controller
             }
         }
 
-        //Send order email to buyer for cash on delivery
-        try {
-            $mail_subject = get_static_option('new_order_email_subject') ?? __('New Order #');
-            $message_for_buyer = get_static_option('new_order_buyer_message') ?? __('You have successfully placed an order #');
-            $message_for_seller_admin = get_static_option('new_order_admin_seller_message') ?? __('You have a new order #');
-            Mail::to($order_details->email)->send(new OrderMail($mail_subject,$order_details,$message_for_buyer));
-            Mail::to($seller->email)->send(new OrderMail($mail_subject,$order_details, $message_for_seller_admin));
-            Mail::to(get_static_option('site_global_email'))->send(new OrderMail($mail_subject,$order_details, $message_for_seller_admin));
-        } catch (\Exception $e) {
-            //return response()->error($e->getMessage());
+        // Only send order notifications and confirmation emails for immediately actionable bookings (COD)
+        // or successfully completed wallet payments. Online gateways (PayTabs, Stripe, PayPal, etc.) and
+        // pending manual bank transfers must NOT notify the provider until payment is verified.
+        $isImmediateOrActionablePayment = ($request->selected_payment_gateway === 'cash_on_delivery')
+            || ($request->selected_payment_gateway === 'wallet' && $order_details->payment_status === 'complete');
+
+        if ($isImmediateOrActionablePayment) {
+            $seller = User::where('id',$request->seller_id)->first();
+            $order_message = __('You have a new order');
+            if ($seller) {
+                try {
+                    $seller->notify(new OrderNotification(
+                        $last_order_id,
+                        $request->service_id,
+                        $request->seller_id,
+                        $request->buyer_id,
+                        $order_message,
+                        'new_booking',
+                        $order_details->status,
+                        'seller'
+                    ));
+                } catch (\Exception $e) {
+                    \Log::error('[Order Notification Error] ' . $e->getMessage());
+                }
+            }
+
+            try {
+                $mail_subject = get_static_option('new_order_email_subject') ?? __('New Order #');
+                $message_for_buyer = get_static_option('new_order_buyer_message') ?? __('You have successfully placed an order #');
+                $message_for_seller_admin = get_static_option('new_order_admin_seller_message') ?? __('You have a new order #');
+                if (!empty($order_details->email)) {
+                    Mail::to($order_details->email)->send(new OrderMail($mail_subject,$order_details,$message_for_buyer));
+                }
+                if ($seller && !empty($seller->email)) {
+                    Mail::to($seller->email)->send(new OrderMail($mail_subject,$order_details, $message_for_seller_admin));
+                }
+                if (get_static_option('site_global_email')) {
+                    Mail::to(get_static_option('site_global_email'))->send(new OrderMail($mail_subject,$order_details, $message_for_seller_admin));
+                }
+            } catch (\Exception $e) {
+                \Log::error('[Order Mail Error] ' . $e->getMessage());
+            }
         }
         //todo send success/cancel url
         //todo is it has paytm parameter then return paytm object instance

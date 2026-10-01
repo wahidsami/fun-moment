@@ -258,11 +258,9 @@ class SellerController extends Controller
         }
 
         $my_orders = $my_orders->where('seller_id', $uesr_info)
-            ->when(get_static_option('service_order_completed_payment_status_settings') == 'enabled', function ($query) {
-                $query->where(function ($q) {
-                    $q->where('payment_status', 'complete')
-                        ->orWhere('payment_gateway', 'cash_on_delivery');
-                });
+            ->where(function ($q) {
+                $q->where('payment_status', 'complete')
+                    ->orWhere('payment_gateway', 'cash_on_delivery');
             })
             ->orderBy('id', 'desc')
             ->paginate(10)
@@ -1177,6 +1175,16 @@ class SellerController extends Controller
 
                 if (is_null($orderInfo)) {
                     return ['error' => true, 'status' => 422, 'msg' => __("order not found or unauthorized")];
+                }
+
+                if ($new_status == 1) {
+                    if ($orderInfo->payment_status !== 'complete' && $orderInfo->payment_gateway !== 'cash_on_delivery') {
+                        return [
+                            'error' => true,
+                            'status' => 422,
+                            'msg' => __("Unpaid online bookings cannot be accepted until payment is verified."),
+                        ];
+                    }
                 }
 
                 if ($new_status == 4) {
