@@ -17,6 +17,7 @@ import 'package:funmoments/service/auth_services/email_verify_service.dart';
 import 'package:funmoments/service/auth_services/google_sign_service.dart';
 import 'package:funmoments/service/auth_services/login_service.dart';
 import 'package:funmoments/service/auth_services/logout_service.dart';
+import 'package:funmoments/service/auth_services/provider_registration_service.dart';
 import 'package:funmoments/service/auth_services/reset_password_service.dart';
 import 'package:funmoments/service/book_confirmation_service.dart';
 import 'package:funmoments/service/book_steps_service.dart';
@@ -127,6 +128,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => CountryStatesService()),
         ChangeNotifierProvider(create: (_) => SignupService()),
+        ChangeNotifierProvider(create: (_) => ProviderRegistrationService()),
         ChangeNotifierProvider(create: (_) => BookConfirmationService()),
         ChangeNotifierProvider(create: (_) => BookStepsService()),
         ChangeNotifierProvider(create: (_) => AllServicesService()),

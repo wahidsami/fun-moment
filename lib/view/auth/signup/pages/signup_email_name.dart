@@ -5,6 +5,7 @@ import 'package:funmoments/service/auth_services/signup_service.dart';
 import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/auth/signup/components/email_name_fields.dart';
+import 'package:funmoments/view/auth/signup/provider/provider_registration_page.dart';
 import 'package:funmoments/view/auth/signup/signup_helper.dart';
 
 class SignupEmailName extends StatefulWidget {
@@ -139,11 +140,24 @@ class _SignupEmailNameState extends State<SignupEmailName> {
                 label: asProvider.getString("Continue"),
                 onPressed: () {
                   if (_formKey.currentState!.validate()) {
-                    provider.pagecontroller.animateToPage(
-                      provider.selectedPage + 1,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.ease,
-                    );
+                    if (provider.selectedUserType == 0) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProviderRegistrationPage(
+                            fullName: widget.fullNameController.text.trim(),
+                            userName: widget.userNameController.text.trim(),
+                            email: widget.emailController.text.trim(),
+                          ),
+                        ),
+                      );
+                    } else {
+                      provider.pagecontroller.animateToPage(
+                        provider.selectedPage + 1,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.ease,
+                      );
+                    }
                   }
                 },
               ),
