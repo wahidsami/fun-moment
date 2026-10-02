@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:funmoments/view/utils/saudi_phone_input.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/booking_services/book_service.dart';
 import 'package:funmoments/service/booking_services/personalization_service.dart';
+import 'package:funmoments/service/dropdowns_services/area_dropdown_service.dart';
+import 'package:funmoments/service/dropdowns_services/country_dropdown_service.dart';
+import 'package:funmoments/service/dropdowns_services/state_dropdown_services.dart';
 import 'package:funmoments/service/profile_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/view/auth/signup/signup_helper.dart';
@@ -34,6 +37,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   TextEditingController phoneController = TextEditingController();
   TextEditingController postCodeController = TextEditingController();
   TextEditingController addressController = TextEditingController();
+  TextEditingController buildingNumberController = TextEditingController();
   TextEditingController notesController = TextEditingController();
 
   String? countryCode;
@@ -42,48 +46,27 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   void initState() {
     super.initState();
 
-    countryCode = Provider.of<ProfileService>(context, listen: false)
-        .profileDetails
-        ?.userDetails
-        .countryCode;
+    final profile = Provider.of<ProfileService>(context, listen: false).profileDetails?.userDetails;
+    countryCode = profile?.countryCode ?? 'SA';
 
-    userNameController.text =
-        Provider.of<ProfileService>(context, listen: false)
-                .profileDetails
-                ?.userDetails
-                .name ??
-            '';
-    emailController.text = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            ?.userDetails
-            .email ??
-        '';
-
-    phoneController.text = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            ?.userDetails
-            .phone ??
-        '';
-    postCodeController.text =
-        Provider.of<ProfileService>(context, listen: false)
-                .profileDetails
-                ?.userDetails
-                .postCode ??
-            '';
-    addressController.text = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            ?.userDetails
-            .address ??
-        '';
-
-    addressController.text = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            ?.userDetails
-            .address ??
-        '';
+    userNameController.text = profile?.name ?? '';
+    emailController.text = profile?.email ?? '';
+    phoneController.text = normalizeToLocalSaudiPhone(profile?.phone);
+    postCodeController.text = profile?.postCode ?? '';
+    addressController.text = profile?.address ?? '';
   }
 
-  var phoneNumber;
+  @override
+  void dispose() {
+    emailController.dispose();
+    userNameController.dispose();
+    phoneController.dispose();
+    postCodeController.dispose();
+    addressController.dispose();
+    buildingNumberController.dispose();
+    notesController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,26 +84,44 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
           return Future.value(true);
         },
         child: Scaffold(
-          // resizeToAvoidBottomInset: false,
           backgroundColor: cc.bgColor,
           appBar: CommonHelper()
               .appbarForBookingPages(lnProvider.getString('Address'), context),
           body: Consumer<AppStringService>(
             builder: (context, asProvider, child) =>
                 Consumer<PersonalizationService>(
-              builder: (context, personalizatioProvider, child) => Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: physicsCommon,
-                      child: Container(
+              builder: (context, personalizatioProvider, child) {
+                // Resolve localized names for confirmed location display
+                final stateP = Provider.of<StateDropdownService>(context, listen: false);
+                final areaP = Provider.of<AreaDropdownService>(context, listen: false);
+                final countryP = Provider.of<CountryDropdownService>(context, listen: false);
+
+                String selectedCountry = countryP.selectedCountry;
+                if (selectedCountry.toLowerCase() == 'saudi arabia') {
+                  selectedCountry = asProvider.getString('Saudi Arabia');
+                }
+                String selectedCity = stateP.selectedState;
+                if (selectedCity.toLowerCase() == 'riyadh') {
+                  selectedCity = asProvider.getString('Riyadh');
+                }
+                String selectedArea = areaP.selectedArea;
+                if (selectedArea.toLowerCase() == 'olaya') {
+                  selectedArea = asProvider.getString('Olaya');
+                }
+
+                return Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: physicsCommon,
+                        child: Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: screenPadding,
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              //Circular Progress bar
+                              // Progress bar
                               personalizatioProvider.isOnline == 0
                                   ? Steps(cc: cc)
                                   : Container(),
@@ -128,25 +129,96 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                               CommonHelper().titleCommon(
                                   asProvider.getString('Booking Information')),
 
-                              const SizedBox(
-                                height: 22,
-                              ),
+                              const SizedBox(height: 16),
+
+                              // Confirmed Location Summary Card (Dark FUN MOMENT Theme)
+                              if (personalizatioProvider.isOnline == 0) ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 14),
+                                  decoration: BoxDecoration(
+                                    color: cc.white.withOpacity(0.04),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: cc.primaryColor.withOpacity(0.25),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: cc.primaryColor.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(Icons.location_on,
+                                            color: cc.primaryColor, size: 20),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              asProvider.getString('Selected Location'),
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: cc.greyFour,
+                                                fontFamily: 'Cairo',
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '$selectedCountry • $selectedCity • $selectedArea',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                fontFamily: 'Cairo',
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      InkWell(
+                                        onTap: () {
+                                          BookStepsService().decreaseStep(context);
+                                          Navigator.pop(context);
+                                        },
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          child: Icon(
+                                            Icons.edit_location_alt_outlined,
+                                            color: cc.primaryColor,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                              ],
 
                               Form(
                                 key: _formKey,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // name ============>
+                                    // Name ============>
                                     CommonHelper().labelCommon(
                                         asProvider.getString('Name')),
-
                                     CustomInput(
                                       controller: userNameController,
                                       validation: (value) {
-                                        if (value == null || value.isEmpty) {
+                                        if (value == null || value.trim().isEmpty) {
                                           return asProvider.getString(
-                                              'Please enter your name');
+                                              'Please enter your full name');
                                         }
                                         return null;
                                       },
@@ -155,20 +227,30 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                                       icon: 'assets/icons/user.png',
                                       textInputAction: TextInputAction.next,
                                     ),
-                                    const SizedBox(
-                                      height: 20,
-                                    ),
+                                    const SizedBox(height: 18),
 
-                                    //Email ============>
+                                    // Phone number field ============>
+                                    CommonHelper().labelCommon(
+                                        asProvider.getString('Phone')),
+                                    SaudiPhoneInput(
+                                      controller: phoneController,
+                                      asProvider: asProvider,
+                                    ),
+                                    const SizedBox(height: 18),
+
+                                    // Email ============>
                                     CommonHelper().labelCommon(
                                         asProvider.getString('Email')),
-
                                     CustomInput(
                                       controller: emailController,
                                       validation: (value) {
-                                        if (value == null || value.isEmpty) {
+                                        if (value == null || value.trim().isEmpty) {
                                           return asProvider.getString(
                                               'Please enter your email');
+                                        }
+                                        if (!value.contains('@')) {
+                                          return asProvider.getString(
+                                              'Please enter a valid email');
                                         }
                                         return null;
                                       },
@@ -177,126 +259,177 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                                       icon: 'assets/icons/email-grey.png',
                                       textInputAction: TextInputAction.next,
                                     ),
-                                    const SizedBox(
-                                      height: 20,
-                                    ),
+                                    const SizedBox(height: 18),
 
-                                    //Phone number field
-                                    CommonHelper().labelCommon(
-                                        asProvider.getString('Phone')),
-                                    Consumer<RtlService>(
-                                      builder: (context, rtlP, child) =>
-                                          IntlPhoneField(
-                                        controller: phoneController,
-                                        disableLengthCheck: true,
-                                        textAlign: rtlP.direction == 'ltr'
-                                            ? TextAlign.left
-                                            : TextAlign.right,
-                                        decoration: SignupHelper()
-                                            .phoneFieldDecoration(),
-                                        initialCountryCode: countryCode,
-                                        onChanged: (phone) {
-                                          print(phone.completeNumber);
-                                          // phoneController.text = phone.completeNumber;
+                                    // Physical Delivery Address Fields (Offline Service)
+                                    if (personalizatioProvider.isOnline == 0) ...[
+                                      // Street Address ============>
+                                      CommonHelper().labelCommon(
+                                          asProvider.getString('Street address')),
+                                      CustomInput(
+                                        controller: addressController,
+                                        validation: (value) {
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return asProvider.getString(
+                                                'Enter street address');
+                                          }
+                                          return null;
                                         },
+                                        hintText: asProvider.getString(
+                                            'Enter street address'),
+                                        icon: 'assets/icons/location.png',
+                                        textInputAction: TextInputAction.next,
                                       ),
-                                    ),
+                                      const SizedBox(height: 18),
 
-                                    sizedBoxCustom(20),
+                                      // Building Number & Postal Code Row ============>
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          // Building Number (Saudi National Address 4-digit standard)
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                CommonHelper().labelCommon(
+                                                    asProvider.getString(
+                                                        'Building number')),
+                                                CustomInput(
+                                                  controller:
+                                                      buildingNumberController,
+                                                  isNumberField: true,
+                                                  maxLength: 4,
+                                                  hintText: asProvider.getString(
+                                                      'Enter building number'),
+                                                  icon: 'assets/icons/location.png',
+                                                  textInputAction:
+                                                      TextInputAction.next,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 14),
 
-                                    personalizatioProvider.isOnline == 0
-                                        ? Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              CommonHelper().labelCommon(
-                                                  asProvider
-                                                      .getString('Post code')),
+                                          // Postal Code (5 digits)
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                CommonHelper().labelCommon(
+                                                    asProvider.getString(
+                                                        'Post code')),
+                                                CustomInput(
+                                                  controller:
+                                                      postCodeController,
+                                                  isNumberField: true,
+                                                  maxLength: 5,
+                                                  hintText: asProvider.getString(
+                                                      'Enter your post code'),
+                                                  icon: 'assets/icons/location.png',
+                                                  textInputAction:
+                                                      TextInputAction.next,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 18),
 
-                                              CustomInput(
-                                                controller: postCodeController,
-                                                validation: (value) {
-                                                  if (value == null ||
-                                                      value.isEmpty) {
-                                                    return asProvider.getString(
-                                                        'Please enter post code');
-                                                  }
-                                                  return null;
-                                                },
-                                                hintText: asProvider.getString(
-                                                    'Enter your post code'),
-                                                icon:
-                                                    'assets/icons/location.png',
-                                                textInputAction:
-                                                    TextInputAction.next,
-                                              ),
+                                      // Additional details / Notes ============>
+                                      CommonHelper().labelCommon(
+                                          asProvider.getString(
+                                              'Additional details / Notes')),
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: TextFormField(
+                                          controller: notesController,
+                                          maxLines: 3,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontFamily: 'Cairo',
+                                          ),
+                                          decoration: InputDecoration(
+                                            hintText: asProvider.getString(
+                                                'Enter additional details (e.g. apartment, floor, landmark)'),
+                                            hintStyle: TextStyle(
+                                              fontSize: 13,
+                                              color: cc.greyFour,
+                                              fontFamily: 'Cairo',
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderSide: BorderSide(
+                                                  color: cc.greyFive),
+                                              borderRadius:
+                                                  BorderRadius.circular(9),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderSide: BorderSide(
+                                                  color: cc.primaryColor),
+                                            ),
+                                            contentPadding: const EdgeInsets
+                                                .symmetric(
+                                                horizontal: 14, vertical: 14),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
 
-                                              //Address ============>
-
-                                              const SizedBox(
-                                                height: 20,
-                                              ),
-
-                                              CommonHelper().labelCommon(
-                                                  asProvider.getString(
-                                                      'Your address')),
-
-                                              CustomInput(
-                                                controller: addressController,
-                                                validation: (value) {
-                                                  if (value == null ||
-                                                      value.isEmpty) {
-                                                    return asProvider.getString(
-                                                        'Please enter your address');
-                                                  }
-                                                  return null;
-                                                },
-                                                hintText: asProvider.getString(
-                                                    'Enter your address'),
-                                                icon:
-                                                    'assets/icons/location.png',
-                                                textInputAction:
-                                                    TextInputAction.next,
-                                              ),
-                                            ],
-                                          )
-                                        : Container(),
-
-                                    const SizedBox(
-                                      height: 100,
-                                    ),
+                                    const SizedBox(height: 120),
                                   ],
                                 ),
                               ),
                             ],
-                          )),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
 
-                  ///Next button
-                  Container(
-                    height: 110,
-                    padding: EdgeInsets.only(
-                        left: screenPadding, top: 30, right: screenPadding),
-                    decoration: BookingHelper().bottomSheetDecoration(),
-                    child: Column(
+                    // Next Button Footer
+                    Container(
+                      height: 110,
+                      padding: EdgeInsets.only(
+                          left: screenPadding, top: 30, right: screenPadding),
+                      decoration: BookingHelper().bottomSheetDecoration(),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           CommonHelper()
                               .buttonOrange(asProvider.getString('Next'), () {
                             if (_formKey.currentState!.validate()) {
-                              //increase page steps by one
+                              // Build full address combining street and building number
+                              String street = addressController.text.trim();
+                              String building =
+                                  buildingNumberController.text.trim();
+                              String fullAddress = street;
+                              if (building.isNotEmpty) {
+                                fullAddress = '$street, مبنى $building';
+                              }
+
+                              // Advance steps
                               BookStepsService().onNext(context);
-                              //set delivery address informations so that we can use it later
+
+                              // Normalize phone for backend / PayTabs
+                              String normalizedPhone =
+                                  normalizeToBackendSaudiPhone(phoneController.text);
+
+                              // Save address information to BookService
                               Provider.of<BookService>(context, listen: false)
                                   .setAddress(
-                                      userNameController.text,
-                                      emailController.text,
-                                      phoneController.text,
-                                      // phoneNumber,
-                                      postCodeController.text,
-                                      addressController.text,
-                                      notesController.text);
+                                      userNameController.text.trim(),
+                                      emailController.text.trim(),
+                                      normalizedPhone,
+                                      postCodeController.text.trim(),
+                                      fullAddress,
+                                      notesController.text.trim());
+
                               Navigator.push(
                                   context,
                                   PageTransition(
@@ -304,10 +437,12 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                                       child: const BookConfirmationPage()));
                             }
                           }),
-                        ]),
-                  )
-                ],
-              ),
+                        ],
+                      ),
+                    )
+                  ],
+                );
+              },
             ),
           ),
         ),

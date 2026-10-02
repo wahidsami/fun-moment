@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:funmoments/view/utils/saudi_phone_input.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/dropdowns_services/area_dropdown_service.dart';
@@ -59,7 +59,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     fullNameController.text = userDetails.name ?? '';
     emailController.text = userDetails.email ?? '';
 
-    phoneController.text = userDetails?.phone ?? '';
+    phoneController.text = normalizeToLocalSaudiPhone(userDetails?.phone);
     postCodeController.text = userDetails?.postCode ?? '';
     addressController.text = userDetails?.address ?? '';
     aboutController.text = userDetails?.about ?? '';
@@ -242,23 +242,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         children: [
                           CommonHelper()
                               .labelCommon(asProvider.getString('Phone')),
-                          Consumer<RtlService>(
-                            builder: (context, rtlP, child) => IntlPhoneField(
-                              searchText:
-                                  asProvider.getString("Search country"),
-                              initialCountryCode: provider.countryCode,
-                              initialValue: phoneController.text,
-                              // controller: phoneController,
-                              decoration: SignupHelper().phoneFieldDecoration(),
-                              disableLengthCheck: true,
-                              textAlign: rtlP.direction == 'ltr'
-                                  ? TextAlign.left
-                                  : TextAlign.right,
-                              onChanged: (phone) {
-                                provider.setCountryCode(phone.countryISOCode);
-                                phoneController.text = phone.completeNumber;
-                              },
-                            ),
+                          SaudiPhoneInput(
+                            controller: phoneController,
+                            asProvider: asProvider,
                           ),
                           sizedBoxCustom(20),
                           CommonHelper()
@@ -345,9 +331,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                     .getString('Address field is required'),
                                 Colors.black);
                             return;
-                          } else if (phoneController.text.isEmpty) {
+                          } else if (validateSaudiPhone(phoneController.text, asProvider: asProvider) != null) {
                             OthersHelper().showToast(
-                                asProvider.getString('Phone field is required'),
+                                validateSaudiPhone(phoneController.text, asProvider: asProvider)!,
                                 Colors.black);
                             return;
                           }
@@ -368,7 +354,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           var result = await provider.updateProfile(
                             fullNameController.text,
                             emailController.text,
-                            phoneController.text,
+                            normalizeToBackendSaudiPhone(phoneController.text),
                             selectedStateId,
                             selectedAreaId,
                             Provider.of<CountryDropdownService>(context,

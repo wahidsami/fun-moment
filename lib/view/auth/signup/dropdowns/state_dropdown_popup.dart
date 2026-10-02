@@ -83,9 +83,10 @@ class StateDropdownPopup extends StatelessWidget {
                                       p.statesDropdownList[i])],
                             );
                             Navigator.pop(context);
-                            Provider.of<AreaDropdownService>(context,
-                                    listen: false)
-                                .setAreaDefault();
+                            final areaProv = Provider.of<AreaDropdownService>(context,
+                                    listen: false);
+                            areaProv.setAreaDefault();
+                            areaProv.fetchArea(context, isrefresh: true);
                             final sProvider = Provider.of<
                                     SearchBarWithDropdownService>(
                                 context,

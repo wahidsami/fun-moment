@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/book_steps_service.dart';
 import 'package:funmoments/service/dropdowns_services/area_dropdown_service.dart';
+import 'package:funmoments/service/dropdowns_services/country_dropdown_service.dart';
 import 'package:funmoments/service/dropdowns_services/state_dropdown_services.dart';
 import 'package:funmoments/view/auth/signup/components/country_states_dropdowns.dart';
 import 'package:funmoments/view/booking/delivery_address_page.dart.dart';
@@ -27,6 +28,17 @@ class _BookingLocationPageState extends State<BookingLocationPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final cp = Provider.of<CountryDropdownService>(context, listen: false);
+      cp.preselectSaudi();
+      final sp = Provider.of<StateDropdownService>(context, listen: false);
+      sp.fetchStates(context).then((_) {
+        if (mounted) {
+          final ap = Provider.of<AreaDropdownService>(context, listen: false);
+          ap.fetchArea(context);
+        }
+      });
+    });
   }
 
   @override
@@ -34,25 +46,21 @@ class _BookingLocationPageState extends State<BookingLocationPage> {
     ConstantColors cc = ConstantColors();
     return WillPopScope(
       onWillPop: () {
+        BookStepsService().decreaseStep(context);
         return Future.value(true);
       },
-      child: WillPopScope(
-        onWillPop: () {
-          BookStepsService().decreaseStep(context);
-          return Future.value(true);
-        },
-        child: Scaffold(
+      child: Consumer<AppStringService>(
+        builder: (context, asProvider, child) => Scaffold(
           appBar: CommonHelper().appbarForBookingPages(
-            "Location",
+            asProvider.getString("Location"),
             context,
           ),
           body: SingleChildScrollView(
             physics: physicsCommon,
-            child: Consumer<AppStringService>(
-              builder: (context, asProvider, child) => Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: screenPadding,
-                  ),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: screenPadding,
+              ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -67,7 +75,50 @@ class _BookingLocationPageState extends State<BookingLocationPage> {
                       ),
 
                       const CountryStatesDropdowns(),
-                      //Login button ==================>
+
+                      Consumer2<StateDropdownService, AreaDropdownService>(
+                        builder: (context, sp, ap, child) {
+                          if (sp.hasError || ap.hasError) {
+                            return Container(
+                              margin: const EdgeInsets.only(top: 16),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: cc.warningColor.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: cc.warningColor.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.info_outline, color: cc.warningColor, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      asProvider.getString('Could not load locations. Tap retry.'),
+                                      style: TextStyle(color: cc.greyFour, fontSize: 13),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      sp.fetchStates(context, isrefresh: true).then((_) {
+                                        if (mounted) {
+                                          ap.fetchArea(context, isrefresh: true);
+                                        }
+                                      });
+                                    },
+                                    child: Text(
+                                      asProvider.getString('Retry'),
+                                      style: TextStyle(color: cc.primaryColor, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+
+                      //Next button ==================>
                       const SizedBox(
                         height: 27,
                       ),
@@ -81,18 +132,20 @@ class _BookingLocationPageState extends State<BookingLocationPage> {
                                 context,
                                 listen: false)
                             .selectedAreaId;
-                        if (selectedStateId == '0' || selectedAreaId == '0') {
+                        if (selectedStateId == '0' ||
+                            selectedStateId == 0 ||
+                            selectedAreaId == '0' ||
+                            selectedAreaId == 0) {
                           OthersHelper().showSnackBar(
                               context,
                               asProvider.getString(
-                                  'You must select a state and area'),
+                                  'Please select a city and area'),
                               cc.warningColor);
                           return;
                         }
 
                         //increase page steps by one
                         BookStepsService().onNext(context);
-                        // setDefaultPrice ==> Before the user did any quantity increase decrease...etc
 
                         Navigator.push(
                             context,
@@ -105,11 +158,11 @@ class _BookingLocationPageState extends State<BookingLocationPage> {
                         height: 30,
                       ),
                     ],
-                  )),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
+        );
   }
 }

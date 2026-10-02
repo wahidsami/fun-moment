@@ -9,16 +9,20 @@ import 'package:funmoments/service/profile_service.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 
 class StateDropdownService with ChangeNotifier {
-  var statesDropdownList = [];
-  var statesDropdownIndexList = [];
+  var statesDropdownList = ['Riyadh'];
+  var statesDropdownIndexList = [2];
 
-  dynamic selectedState = 'Select City';
-  dynamic selectedStateId = defaultId;
+  final List<String> _allStates = ['Riyadh'];
+  final List<dynamic> _allStateIds = [2];
+
+  dynamic selectedState = 'Riyadh';
+  dynamic selectedStateId = 2;
 
   bool isLoading = false;
+  bool hasError = false;
+  String? errorMessage;
 
   late int totalPages;
-
   int currentPage = 1;
 
   setCurrentPage(newValue) {
@@ -32,29 +36,29 @@ class StateDropdownService with ChangeNotifier {
   }
 
   setStateDefault() {
-    statesDropdownList = [];
-    statesDropdownIndexList = [];
-    selectedState = 'Select City';
-    selectedStateId = defaultId;
-
+    statesDropdownList = ['Riyadh'];
+    statesDropdownIndexList = [2];
+    selectedState = 'Riyadh';
+    selectedStateId = 2;
+    hasError = false;
+    errorMessage = null;
     currentPage = 1;
     notifyListeners();
   }
 
   setStatesValue(value) {
     selectedState = value;
-    print('selected state $selectedState');
     notifyListeners();
   }
 
   setSelectedStatesId(value) {
     selectedStateId = value;
-    print('selected state id $value');
     notifyListeners();
   }
 
   setLoadingTrue() {
     isLoading = true;
+    hasError = false;
     notifyListeners();
   }
 
@@ -65,132 +69,196 @@ class StateDropdownService with ChangeNotifier {
 
   Future<bool> fetchStates(BuildContext context,
       {bool isrefresh = false}) async {
-    if (isrefresh) {
-      //making the list empty first to show loading bar (we are showing loading bar while the product list is empty)
-      //we are make the list empty when the sub category or brand is selected because then the refresh is true
-      setStateDefault();
+    if (statesDropdownList.length > 1 && !isrefresh) return false;
 
-      setCurrentPage(currentPage);
+    if (isrefresh) {
+      statesDropdownList = [];
+      statesDropdownIndexList = [];
+      currentPage = 1;
     }
+
+    setLoadingTrue();
 
     var selectedCountryId =
         Provider.of<CountryDropdownService>(context, listen: false)
             .selectedCountryId;
 
-    var response = await http.get(Uri.parse(
-        '$baseApi/country/service-city/$selectedCountryId?page=$currentPage'));
+    if (selectedCountryId == defaultId || selectedCountryId == '0' || selectedCountryId == null) {
+      selectedCountryId = saudiCountryId;
+    }
 
-    if ((response.statusCode == 200 || response.statusCode == 201) &&
-        jsonDecode(response.body)['service_cities']['data'].isNotEmpty) {
-      var data = StatesDropdownModel.fromJson(jsonDecode(response.body));
-      for (int i = 0; i < data.serviceCities.data.length; i++) {
-        statesDropdownList.add(data.serviceCities.data[i].serviceCity);
-        statesDropdownIndexList.add(data.serviceCities.data[i].id);
+    try {
+      final response = await http
+          .get(Uri.parse('$baseApi/country/service-city/$selectedCountryId?page=$currentPage'))
+          .timeout(const Duration(seconds: 8));
+
+      setLoadingFalse();
+
+      if ((response.statusCode == 200 || response.statusCode == 201)) {
+        final decoded = jsonDecode(response.body);
+        final citiesData = decoded['service_cities']?['data'];
+
+        if (citiesData is List && citiesData.isNotEmpty) {
+          var data = StatesDropdownModel.fromJson(decoded);
+
+          statesDropdownList.clear();
+          statesDropdownIndexList.clear();
+          _allStates.clear();
+          _allStateIds.clear();
+
+          for (int i = 0; i < data.serviceCities.data.length; i++) {
+            final cityName = data.serviceCities.data[i].serviceCity;
+            final cityId = data.serviceCities.data[i].id;
+            statesDropdownList.add(cityName);
+            statesDropdownIndexList.add(cityId);
+            _allStates.add(cityName);
+            _allStateIds.add(cityId);
+          }
+
+          set_State(context, data: data);
+          hasError = false;
+          notifyListeners();
+
+          currentPage++;
+          return true;
+        }
       }
 
-      set_State(context, data: data);
+      // Default fallback to Riyadh if country is Saudi Arabia
+      if (selectedCountryId == saudiCountryId || selectedCountryId == '2') {
+        selectedState = 'Riyadh';
+        selectedStateId = 2;
+        statesDropdownList = ['Riyadh'];
+        statesDropdownIndexList = [2];
+      }
       notifyListeners();
-
-      currentPage++;
-      setCurrentPage(currentPage);
-
       return true;
-    } else {
-      //error fetching data
-      statesDropdownList.add('Select City');
-      statesDropdownIndexList.add(defaultId);
-      selectedState = 'Select City';
-      selectedStateId = defaultId;
+    } catch (e) {
+      setLoadingFalse();
+      hasError = true;
+      errorMessage = 'Could not load cities. Using default.';
+      if (selectedCountryId == saudiCountryId || selectedCountryId == '2') {
+        selectedState = 'Riyadh';
+        selectedStateId = 2;
+        statesDropdownList = ['Riyadh'];
+        statesDropdownIndexList = [2];
+      }
       notifyListeners();
       return false;
     }
   }
 
-  //Set state based on user profile
-//==============================>
   setStateBasedOnUserProfile(BuildContext context) {
-    final profile = Provider.of<ProfileService>(context, listen: false).profileDetails;
-    if (profile == null) return;
-    selectedState = profile.userDetails.city?.serviceCity ?? 'Select City';
-    selectedStateId = profile.userDetails.city?.id ?? defaultId;
-    print(statesDropdownList);
-    print(statesDropdownIndexList);
-    print('selected state $selectedState');
-    print('selected state id $selectedStateId');
+    try {
+      final profile =
+          Provider.of<ProfileService>(context, listen: false).profileDetails;
+      if (profile != null &&
+          profile.userDetails.city != null &&
+          profile.userDetails.city.serviceCity != null) {
+        selectedState = profile.userDetails.city.serviceCity;
+        selectedStateId = profile.userDetails.city.id ?? 2;
+      } else {
+        selectedState = 'Riyadh';
+        selectedStateId = 2;
+      }
+    } catch (_) {
+      selectedState = 'Riyadh';
+      selectedStateId = 2;
+    }
   }
 
-  //==============>
   set_State(BuildContext context, {StatesDropdownModel? data}) {
     var profileData =
         Provider.of<ProfileService>(context, listen: false).profileDetails;
 
-    if (profileData != null) {
-      var userCountryId = Provider.of<ProfileService>(context, listen: false)
-          .profileDetails
-          .userDetails
-          .countryId;
-
-      var selectedCountryId =
-          Provider.of<CountryDropdownService>(context, listen: false)
-              .selectedCountryId;
-
-      if (userCountryId == selectedCountryId) {
-        //if user selected the country id which is save in his profile
-        //only then show state/area based on that
-
-        setStateBasedOnUserProfile(context);
-      } else {
-        if (data != null) {
+    if (profileData != null &&
+        profileData.userDetails.city != null &&
+        profileData.userDetails.city.serviceCity != null) {
+      setStateBasedOnUserProfile(context);
+    } else {
+      if (data != null && data.serviceCities.data.isNotEmpty) {
+        // Prioritize Riyadh if present or first
+        int riyadhIdx = data.serviceCities.data
+            .indexWhere((c) => c.id == 2 || c.serviceCity.toLowerCase().contains('riyadh'));
+        if (riyadhIdx >= 0) {
+          selectedState = data.serviceCities.data[riyadhIdx].serviceCity;
+          selectedStateId = data.serviceCities.data[riyadhIdx].id;
+        } else {
           selectedState = data.serviceCities.data[0].serviceCity;
           selectedStateId = data.serviceCities.data[0].id;
         }
-      }
-    } else {
-      if (data != null) {
-        selectedState = data.serviceCities.data[0].serviceCity;
-        selectedStateId = data.serviceCities.data[0].id;
+      } else {
+        selectedState = 'Riyadh';
+        selectedStateId = 2;
       }
     }
 
-    Future.delayed(const Duration(milliseconds: 500), () {
-      notifyListeners();
-    });
+    notifyListeners();
   }
 
   // ================>
-  // Search
+  // Bilingual Search State/City
   // ================>
-
-  Future<bool> searchState(BuildContext context, String searchText,
+  Future<bool> searchState(BuildContext? context, String searchText,
       {bool isrefresh = false, bool isSearching = false}) async {
-    if (isSearching) {
-      setStateDefault();
-    }
+    final query = searchText.trim().toLowerCase();
 
-    var response =
-        await http.get(Uri.parse('$baseApi/city-search?q=$searchText'));
-    if ((response.statusCode == 200 || response.statusCode == 201) &&
-        jsonDecode(response.body)['service_cities']['data'].isNotEmpty) {
-      var data = StatesDropdownModel.fromJson(jsonDecode(response.body));
-      for (int i = 0; i < data.serviceCities.data.length; i++) {
-        statesDropdownList.add(data.serviceCities.data[i].serviceCity);
-        statesDropdownIndexList.add(data.serviceCities.data[i].id);
-      }
-
+    if (query.isEmpty) {
+      statesDropdownList = List.from(_allStates.isNotEmpty ? _allStates : ['Riyadh']);
+      statesDropdownIndexList = List.from(_allStateIds.isNotEmpty ? _allStateIds : [2]);
       notifyListeners();
-
-      currentPage++;
-      setCurrentPage(currentPage);
-
       return true;
-    } else {
-      //error fetching data
-      statesDropdownList.add('Select City');
-      statesDropdownIndexList.add(defaultId);
-      selectedState = 'Select City';
-      selectedStateId = defaultId;
-      notifyListeners();
-      return false;
     }
+
+    final isRiyadhSearch = query.contains('رياض') || query.contains('riyadh');
+
+    List<String> matched = [];
+    List<int> matchedIds = [];
+    for (int i = 0; i < _allStates.length; i++) {
+      final name = _allStates[i].toLowerCase();
+      if (name.contains(query) || (isRiyadhSearch && name.contains('riyadh'))) {
+        matched.add(_allStates[i]);
+        matchedIds.add(_allStateIds[i]);
+      }
+    }
+
+    if (matched.isNotEmpty) {
+      statesDropdownList = matched;
+      statesDropdownIndexList = matchedIds;
+      notifyListeners();
+      return true;
+    }
+
+    if (isRiyadhSearch) {
+      statesDropdownList = ['Riyadh'];
+      statesDropdownIndexList = [2];
+      notifyListeners();
+      return true;
+    }
+
+    // Try backend search
+    try {
+      var response = await http
+          .get(Uri.parse('$baseApi/city-search?q=$searchText'))
+          .timeout(const Duration(seconds: 5));
+
+      if ((response.statusCode == 200 || response.statusCode == 201) &&
+          jsonDecode(response.body)['service_cities']['data'].isNotEmpty) {
+        var data = StatesDropdownModel.fromJson(jsonDecode(response.body));
+        statesDropdownList.clear();
+        statesDropdownIndexList.clear();
+        for (int i = 0; i < data.serviceCities.data.length; i++) {
+          statesDropdownList.add(data.serviceCities.data[i].serviceCity);
+          statesDropdownIndexList.add(data.serviceCities.data[i].id);
+        }
+        notifyListeners();
+        return true;
+      }
+    } catch (_) {}
+
+    statesDropdownList.clear();
+    statesDropdownIndexList.clear();
+    notifyListeners();
+    return false;
   }
 }

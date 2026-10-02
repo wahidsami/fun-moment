@@ -11,13 +11,20 @@ import 'package:funmoments/service/profile_service.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 
 class AreaDropdownService with ChangeNotifier {
-  var areaDropdownList = [];
-  var areaDropdownIndexList = [];
-  dynamic selectedArea = 'Select Area';
-  dynamic selectedAreaId = defaultId;
+  var areaDropdownList = ['Olaya'];
+  var areaDropdownIndexList = [2];
+
+  final List<String> _allAreas = ['Olaya'];
+  final List<dynamic> _allAreaIds = [2];
+
+  dynamic selectedArea = 'Olaya';
+  dynamic selectedAreaId = 2;
+
+  bool isLoading = false;
+  bool hasError = false;
+  String? errorMessage;
 
   late int totalPages;
-
   int currentPage = 1;
 
   setCurrentPage(newValue) {
@@ -31,11 +38,12 @@ class AreaDropdownService with ChangeNotifier {
   }
 
   setAreaDefault() {
-    areaDropdownList = [];
-    areaDropdownIndexList = [];
-    selectedArea = 'Select Area';
-    selectedAreaId = defaultId;
-
+    areaDropdownList = ['Olaya'];
+    areaDropdownIndexList = [2];
+    selectedArea = 'Olaya';
+    selectedAreaId = 2;
+    hasError = false;
+    errorMessage = null;
     currentPage = 1;
     notifyListeners();
   }
@@ -47,14 +55,12 @@ class AreaDropdownService with ChangeNotifier {
 
   setSelectedAreaId(value) {
     selectedAreaId = value;
-    print('selected area id $value');
     notifyListeners();
   }
 
-  bool isLoading = false;
-
   setLoadingTrue() {
     isLoading = true;
+    hasError = false;
     notifyListeners();
   }
 
@@ -63,141 +69,199 @@ class AreaDropdownService with ChangeNotifier {
     notifyListeners();
   }
 
-  //Set area based on user profile
-//==============================>
   setAreaBasedOnUserProfile(BuildContext context) {
-    selectedArea = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            .userDetails
-            .area
-            ?.serviceArea ??
-        'Select Area';
-    selectedAreaId = Provider.of<ProfileService>(context, listen: false)
-            .profileDetails
-            .userDetails
-            .area
-            ?.id ??
-        defaultId;
-    // Future.delayed(const Duration(milliseconds: 500), () {
-    //   notifyListeners();
-    // });
+    try {
+      final profile =
+          Provider.of<ProfileService>(context, listen: false).profileDetails;
+      if (profile != null &&
+          profile.userDetails.area != null &&
+          profile.userDetails.area?.serviceArea != null) {
+        selectedArea = profile.userDetails.area?.serviceArea;
+        selectedAreaId = profile.userDetails.area?.id ?? 2;
+      } else {
+        selectedArea = 'Olaya';
+        selectedAreaId = 2;
+      }
+    } catch (_) {
+      selectedArea = 'Olaya';
+      selectedAreaId = 2;
+    }
   }
 
   Future<bool> fetchArea(BuildContext context, {bool isrefresh = false}) async {
-    if (isrefresh) {
-      //making the list empty first to show loading bar (we are showing loading bar while the product list is empty)
-      //we are make the list empty when the sub category or brand is selected because then the refresh is true
-      setAreaDefault();
+    if (areaDropdownList.length > 1 && !isrefresh) return false;
 
-      setCurrentPage(currentPage);
+    if (isrefresh) {
+      areaDropdownList = [];
+      areaDropdownIndexList = [];
+      currentPage = 1;
     }
+
+    setLoadingTrue();
 
     var selectedCountryId =
         Provider.of<CountryDropdownService>(context, listen: false)
             .selectedCountryId;
-
     var selectedStateId =
         Provider.of<StateDropdownService>(context, listen: false)
             .selectedStateId;
 
-    var response = await http.get(Uri.parse(
-        '$baseApi/country/service-city/service-area/$selectedCountryId/$selectedStateId?page=$currentPage'));
-    print(
-        '$baseApi/country/service-city/service-area/$selectedCountryId/$selectedStateId?page=$currentPage');
-    if ((response.statusCode == 200 || response.statusCode == 201) &&
-        jsonDecode(response.body)['service_areas']['data'].isNotEmpty) {
-      var data = AreaDropdownModel.fromJson(jsonDecode(response.body));
-      for (int i = 0; i < data.serviceAreas.data.length; i++) {
-        areaDropdownList.add(data.serviceAreas.data[i].serviceArea);
-        areaDropdownIndexList.add(data.serviceAreas.data[i].id);
+    if (selectedCountryId == defaultId || selectedCountryId == '0' || selectedCountryId == null) {
+      selectedCountryId = saudiCountryId;
+    }
+    if (selectedStateId == defaultId || selectedStateId == '0' || selectedStateId == null) {
+      selectedStateId = 2;
+    }
+
+    try {
+      final response = await http
+          .get(Uri.parse('$baseApi/country/service-city/service-area/$selectedCountryId/$selectedStateId?page=$currentPage'))
+          .timeout(const Duration(seconds: 8));
+
+      setLoadingFalse();
+
+      if ((response.statusCode == 200 || response.statusCode == 201)) {
+        final decoded = jsonDecode(response.body);
+        final areasData = decoded['service_areas']?['data'];
+
+        if (areasData is List && areasData.isNotEmpty) {
+          var data = AreaDropdownModel.fromJson(decoded);
+
+          areaDropdownList.clear();
+          areaDropdownIndexList.clear();
+          _allAreas.clear();
+          _allAreaIds.clear();
+
+          for (int i = 0; i < data.serviceAreas.data.length; i++) {
+            final areaName = data.serviceAreas.data[i].serviceArea;
+            final areaId = data.serviceAreas.data[i].id;
+            areaDropdownList.add(areaName);
+            areaDropdownIndexList.add(areaId);
+            _allAreas.add(areaName);
+            _allAreaIds.add(areaId);
+          }
+
+          setArea(context, data: data);
+          hasError = false;
+          notifyListeners();
+
+          currentPage++;
+          return true;
+        }
       }
 
-      setArea(context, data: data);
+      // Default fallback to Olaya
+      selectedArea = 'Olaya';
+      selectedAreaId = 2;
+      areaDropdownList = ['Olaya'];
+      areaDropdownIndexList = [2];
       notifyListeners();
-
-      currentPage++;
-      setCurrentPage(currentPage);
       return true;
-    } else {
-      areaDropdownList.add('Select Area');
-      areaDropdownIndexList.add(defaultId);
-      selectedArea = 'Select Area';
-      selectedAreaId = defaultId;
+    } catch (e) {
+      setLoadingFalse();
+      hasError = true;
+      errorMessage = 'Could not load areas. Using default.';
+      selectedArea = 'Olaya';
+      selectedAreaId = 2;
+      areaDropdownList = ['Olaya'];
+      areaDropdownIndexList = [2];
       notifyListeners();
       return false;
     }
   }
 
-// ==================>
   setArea(BuildContext context, {AreaDropdownModel? data}) {
     var profileData =
         Provider.of<ProfileService>(context, listen: false).profileDetails;
 
-    if (profileData != null) {
-      var userCountryId = Provider.of<ProfileService>(context, listen: false)
-          .profileDetails
-          .userDetails
-          .countryId;
-
-      var selectedCountryId =
-          Provider.of<CountryDropdownService>(context, listen: false)
-              .selectedCountryId;
-
-      if (userCountryId == selectedCountryId) {
-        //if user selected the country id which is save in his profile
-        //only then show state/area based on that
-
-        setAreaBasedOnUserProfile(context);
-      } else {
-        if (data != null) {
+    if (profileData != null &&
+        profileData.userDetails.area != null &&
+        profileData.userDetails.area?.serviceArea != null) {
+      setAreaBasedOnUserProfile(context);
+    } else {
+      if (data != null && data.serviceAreas.data.isNotEmpty) {
+        // Prioritize Olaya if present or first
+        int olayaIdx = data.serviceAreas.data
+            .indexWhere((a) => a.id == 2 || a.serviceArea.toLowerCase().contains('olaya'));
+        if (olayaIdx >= 0) {
+          selectedArea = data.serviceAreas.data[olayaIdx].serviceArea;
+          selectedAreaId = data.serviceAreas.data[olayaIdx].id;
+        } else {
           selectedArea = data.serviceAreas.data[0].serviceArea;
           selectedAreaId = data.serviceAreas.data[0].id;
         }
-      }
-    } else {
-      if (data != null) {
-        selectedArea = data.serviceAreas.data[0].serviceArea;
-        selectedAreaId = data.serviceAreas.data[0].id;
+      } else {
+        selectedArea = 'Olaya';
+        selectedAreaId = 2;
       }
     }
 
-    Future.delayed(const Duration(milliseconds: 500), () {
-      notifyListeners();
-    });
+    notifyListeners();
   }
 
   // ================>
-  // Search
+  // Bilingual Search Area
   // ================>
-  Future<bool> searchArea(BuildContext context, String searchText,
+  Future<bool> searchArea(BuildContext? context, String searchText,
       {bool isrefresh = false, bool isSearching = false}) async {
-    if (isSearching) {
-      setAreaDefault();
-    }
+    final query = searchText.trim().toLowerCase();
 
-    var response =
-        await http.get(Uri.parse('$baseApi/area-search?q=$searchText'));
-
-    if ((response.statusCode == 200 || response.statusCode == 201) &&
-        jsonDecode(response.body)['service_areas']['data'].isNotEmpty) {
-      var data = AreaDropdownModel.fromJson(jsonDecode(response.body));
-      for (int i = 0; i < data.serviceAreas.data.length; i++) {
-        areaDropdownList.add(data.serviceAreas.data[i].serviceArea);
-        areaDropdownIndexList.add(data.serviceAreas.data[i].id);
-      }
-
+    if (query.isEmpty) {
+      areaDropdownList = List.from(_allAreas.isNotEmpty ? _allAreas : ['Olaya']);
+      areaDropdownIndexList = List.from(_allAreaIds.isNotEmpty ? _allAreaIds : [2]);
       notifyListeners();
-
-      currentPage++;
-      setCurrentPage(currentPage);
       return true;
-    } else {
-      areaDropdownList.add('Select Area');
-      areaDropdownIndexList.add(defaultId);
-      selectedArea = 'Select Area';
-      selectedAreaId = defaultId;
-      notifyListeners();
-      return false;
     }
+
+    final isOlayaSearch = query.contains('عليا') || query.contains('olaya');
+
+    List<String> matched = [];
+    List<int> matchedIds = [];
+    for (int i = 0; i < _allAreas.length; i++) {
+      final name = _allAreas[i].toLowerCase();
+      if (name.contains(query) || (isOlayaSearch && name.contains('olaya'))) {
+        matched.add(_allAreas[i]);
+        matchedIds.add(_allAreaIds[i]);
+      }
+    }
+
+    if (matched.isNotEmpty) {
+      areaDropdownList = matched;
+      areaDropdownIndexList = matchedIds;
+      notifyListeners();
+      return true;
+    }
+
+    if (isOlayaSearch) {
+      areaDropdownList = ['Olaya'];
+      areaDropdownIndexList = [2];
+      notifyListeners();
+      return true;
+    }
+
+    // Try backend search
+    try {
+      var response = await http
+          .get(Uri.parse('$baseApi/area-search?q=$searchText'))
+          .timeout(const Duration(seconds: 5));
+
+      if ((response.statusCode == 200 || response.statusCode == 201) &&
+          jsonDecode(response.body)['service_areas']['data'].isNotEmpty) {
+        var data = AreaDropdownModel.fromJson(jsonDecode(response.body));
+        areaDropdownList.clear();
+        areaDropdownIndexList.clear();
+        for (int i = 0; i < data.serviceAreas.data.length; i++) {
+          areaDropdownList.add(data.serviceAreas.data[i].serviceArea);
+          areaDropdownIndexList.add(data.serviceAreas.data[i].id);
+        }
+        notifyListeners();
+        return true;
+      }
+    } catch (_) {}
+
+    areaDropdownList.clear();
+    areaDropdownIndexList.clear();
+    notifyListeners();
+    return false;
   }
 }
