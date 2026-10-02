@@ -57,6 +57,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
      Route::get('/area-search',[UserController::class,'areaSearch']);
     
     Route::post('/register',[UserController::class,'register']);
+    Route::post('/provider/register',[UserController::class,'registerProvider']);
     Route::post('/login',[UserController::class,'login']);
     Route::post('social/login',[UserController::class,'socialLogin']);
     Route::post('/send-otp-in-mail',[UserController::class,'sendOTP']);

@@ -28,6 +28,10 @@ use Intervention\Image\Facades\Image;
 use Modules\Wallet\Entities\Wallet;
 use Modules\Wallet\Entities\WalletHistory;
 use Xgenious\Paymentgateway\Facades\XgPaymentGateway;
+use App\Category;
+use App\ProviderCategory;
+use App\Services\ProviderVerificationDocumentService;
+use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
@@ -397,6 +401,16 @@ class UserController extends Controller
     //register api
     public function register(Request $request)
     {
+        $user_type = 1;
+        if ($request->has('user_type')) {
+            $reqType = (int) $request->input('user_type');
+            $user_type = in_array($reqType, [0, 1], true) ? $reqType : 1;
+        }
+
+        // Route provider registrations to dedicated provider registration handler
+        if ($user_type === 0 || $request->input('user_type') === '0' || $request->input('user_type') === 'seller') {
+            return $this->registerProvider($request);
+        }
 
         $request->validate([
             'name' => 'required|max:191',
@@ -415,12 +429,6 @@ class UserController extends Controller
             ]);
         }
 
-        $user_type = 1;
-        if ($request->has('user_type')) {
-            $reqType = (int) $request->input('user_type');
-            $user_type = in_array($reqType, [0, 1], true) ? $reqType : 1;
-        }
-
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
@@ -432,13 +440,14 @@ class UserController extends Controller
             'service_area' => $request->service_area,
             'country_code' => $request->country_code,
             'country_id' => $request->country_id,
-            'user_type' => $user_type,
+            'user_type' => 1,
+            'seller_type' => User::SELLER_TYPE_NOT_APPLICABLE,
+            'user_status' => 1,
             'terms_condition' => 1,
+            'address' => $request->address,
+            'post_code' => $request->post_code,
         ]);
         if (!is_null($user)) {
-            if ($user_type === 0) {
-                SellerVerify::firstOrCreate(['seller_id' => $user->id], ['status' => 0]);
-            }
             $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
             return response()->success([
                 'users' => $user,
@@ -449,6 +458,217 @@ class UserController extends Controller
         return response()->error([
             'message' => __('Something Went Wrong, Please try again'),
         ]);
+    }
+
+    /**
+     * Dedicated Service Provider Registration Handler
+     *
+     * Handles Individual (seller_type: 1) and Company (seller_type: 2) provider registration
+     * with atomic persistence, secure document upload, and rollback cleanup.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function registerProvider(Request $request)
+    {
+        $baseRules = [
+            'name' => 'required|string|max:191',
+            'email' => 'required|email|unique:users,email|max:191',
+            'username' => 'required|string|unique:users,username|max:191',
+            'phone' => 'required|string|max:191',
+            'password' => 'required|string|min:8|max:191',
+            'service_city' => 'required',
+            'service_area' => 'required',
+            'country_id' => 'required',
+            'terms_conditions' => 'required',
+            'seller_type' => 'required|in:1,2',
+            'category_ids' => 'required',
+        ];
+
+        $sellerType = (int) $request->input('seller_type');
+
+        if ($sellerType === User::SELLER_TYPE_INDIVIDUAL) {
+            $baseRules['national_id_number'] = 'required|string|max:50';
+            $baseRules['national_id_document'] = 'required|file';
+            $baseRules['license_number'] = 'nullable|string|max:50';
+            $baseRules['license_document'] = 'nullable|file';
+            $baseRules['is_band_or_group'] = 'nullable';
+
+            if ($request->boolean('is_band_or_group')) {
+                $baseRules['band_name'] = 'required|string|max:191';
+                $baseRules['band_members_count'] = 'required|integer|min:2';
+            }
+        } elseif ($sellerType === User::SELLER_TYPE_COMPANY) {
+            $baseRules['company_name'] = 'required|string|max:191';
+            $baseRules['cr_number'] = 'required|string|max:50|unique:users,business_registration';
+            $baseRules['cr_document'] = 'required|file';
+            $baseRules['contact_person_name'] = 'required|string|max:191';
+            $baseRules['contact_person_email'] = 'required|email|max:191';
+            $baseRules['contact_person_phone'] = 'required|string|max:50';
+        }
+
+        $request->validate($baseRules);
+
+        if (!filter_var($request->email, FILTER_VALIDATE_EMAIL)) {
+            return response()->error([
+                'message' => __('Invalid email format'),
+            ]);
+        }
+
+        // Validate and normalize requested service category IDs
+        $categoryIds = $this->normalizeCategoryIds($request->input('category_ids'));
+
+        if (empty($categoryIds)) {
+            throw ValidationException::withMessages([
+                'category_ids' => [__('At least one service category is required for company providers.')]
+            ]);
+        }
+
+        $validCategoryIds = [];
+        if (!empty($categoryIds)) {
+            $validCategoryIds = Category::whereIn('id', $categoryIds)->where('status', 1)->pluck('id')->all();
+            if (count($validCategoryIds) !== count($categoryIds)) {
+                throw ValidationException::withMessages([
+                    'category_ids' => [__('One or more selected categories are invalid or inactive.')]
+                ]);
+            }
+        }
+
+        $documentService = app(ProviderVerificationDocumentService::class);
+        $uploadedFiles = [];
+
+        try {
+            $nationalIdDocName = null;
+            $licenseDocName = null;
+            $crDocName = null;
+
+            // 1. Validate and store documents onto private filesystem
+            if ($request->hasFile('national_id_document')) {
+                $nationalIdDocName = $documentService->store($request->file('national_id_document'), 'national_id');
+                $uploadedFiles[] = $nationalIdDocName;
+            }
+
+            if ($request->hasFile('license_document')) {
+                $licenseDocName = $documentService->store($request->file('license_document'), 'license');
+                $uploadedFiles[] = $licenseDocName;
+            }
+
+            if ($request->hasFile('cr_document')) {
+                $crDocName = $documentService->store($request->file('cr_document'), 'cr');
+                $uploadedFiles[] = $crDocName;
+            }
+
+            // 2. Atomic Database Transaction
+            $user = DB::transaction(function () use (
+                $request, $sellerType, $nationalIdDocName, $licenseDocName, $crDocName, $validCategoryIds
+            ) {
+                $userData = [
+                    'name' => $request->name,
+                    'email' => $request->email,
+                    'username' => $request->username,
+                    'phone' => $request->phone,
+                    'password' => Hash::make($request->password),
+                    'service_city' => $request->service_city,
+                    'state' => $request->service_city,
+                    'service_area' => $request->service_area,
+                    'country_code' => $request->country_code,
+                    'country_id' => $request->country_id,
+                    'user_type' => User::USER_TYPE_SELLER,
+                    'seller_type' => $sellerType,
+                    'user_status' => 1, // active for login and authentication
+                    'terms_condition' => 1,
+                    'address' => $request->address,
+                    'seller_address' => $request->address,
+                    'post_code' => $request->post_code,
+                ];
+
+                if ($sellerType === User::SELLER_TYPE_COMPANY) {
+                    $userData['business_registration'] = $request->cr_number;
+                }
+
+                $user = User::create($userData);
+
+                $verifyData = [
+                    'seller_id' => $user->id,
+                    'status' => SellerVerify::STATUS_PENDING, // 0 = Pending
+                ];
+
+                if ($sellerType === User::SELLER_TYPE_INDIVIDUAL) {
+                    $verifyData['national_id_number'] = $request->national_id_number;
+                    $verifyData['national_id_document'] = $nationalIdDocName;
+                    $verifyData['license_number'] = $request->license_number;
+                    $verifyData['license_document'] = $licenseDocName;
+                    $verifyData['is_band_or_group'] = $request->boolean('is_band_or_group');
+                    if ($request->boolean('is_band_or_group')) {
+                        $verifyData['band_name'] = $request->band_name;
+                        $verifyData['band_members_count'] = (int) $request->band_members_count;
+                    }
+                } elseif ($sellerType === User::SELLER_TYPE_COMPANY) {
+                    $verifyData['company_name'] = $request->company_name;
+                    $verifyData['cr_number'] = $request->cr_number;
+                    $verifyData['cr_document'] = $crDocName;
+                    $verifyData['contact_person_name'] = $request->contact_person_name;
+                    $verifyData['contact_person_email'] = $request->contact_person_email;
+                    $verifyData['contact_person_phone'] = $request->contact_person_phone;
+                }
+
+                SellerVerify::create($verifyData);
+
+                if (!empty($validCategoryIds)) {
+                    foreach ($validCategoryIds as $catId) {
+                        ProviderCategory::create([
+                            'provider_id' => $user->id,
+                            'category_id' => $catId,
+                        ]);
+                    }
+                }
+
+                return $user;
+            });
+
+            $user->load(['sellerVerify', 'registeredCategories']);
+            $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
+
+            return response()->success([
+                'users' => $user,
+                'token' => $token,
+                'status' => 'ok',
+                'provider_verification' => [
+                    'status' => SellerVerify::STATUS_PENDING,
+                    'status_label' => 'Pending',
+                    'seller_type' => (int) $user->seller_type,
+                    'seller_type_label' => (int) $user->seller_type === User::SELLER_TYPE_INDIVIDUAL ? 'Individual' : 'Company',
+                ],
+            ]);
+
+        } catch (\Throwable $e) {
+            // Clean up files written to private storage if database transaction fails
+            foreach ($uploadedFiles as $filename) {
+                $documentService->delete($filename);
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Helper to normalize category_ids from array, JSON string, or comma-delimited input
+     */
+    private function normalizeCategoryIds($raw): array
+    {
+        if (empty($raw)) {
+            return [];
+        }
+        if (is_array($raw)) {
+            return array_values(array_filter(array_map('intval', $raw)));
+        }
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                return array_values(array_filter(array_map('intval', $decoded)));
+            }
+            return array_values(array_filter(array_map('intval', explode(',', $raw))));
+        }
+        return [];
     }
 
     // send otp
