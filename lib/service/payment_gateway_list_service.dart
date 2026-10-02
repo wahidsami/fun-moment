@@ -45,7 +45,7 @@ class PaymentGatewayListService with ChangeNotifier {
     notifyListeners();
   }
 
-  Future fetchGatewayList(BuildContext context, {bool forceRefresh = false}) async {
+  Future fetchGatewayList(BuildContext context, {bool forceRefresh = false, bool isFromDepositeToWallet = false}) async {
     // If payment list already loaded and not force-refreshing, don't reload
     if (!forceRefresh && isLoaded && paymentList.isNotEmpty) {
       return;
@@ -87,11 +87,13 @@ class PaymentGatewayListService with ChangeNotifier {
         var rawList = decoded['gateway_list'];
         if (rawList is List && rawList.isNotEmpty) {
           paymentList = List.from(rawList);
-          // add wallet payment
-          paymentList.add({
-            "name": "wallet",
-            "logo_link": "https://i.postimg.cc/y8pMmqF4/wallet.png"
-          });
+          // Only show wallet payment if eligible: user is signed in and not depositing to wallet
+          if (!isFromDepositeToWallet && (token != null && token.isNotEmpty)) {
+            paymentList.add({
+              "name": "wallet",
+              "logo_link": "https://i.postimg.cc/y8pMmqF4/wallet.png"
+            });
+          }
           try {
             setSelectedMethodName(paymentList.first?['name']);
             setKey(paymentList.first?['name'], 0);
