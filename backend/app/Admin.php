@@ -37,4 +37,7 @@ class Admin extends Authenticatable
         return MediaUpload::where(['user_id' => $this->attributes['id'],'type' => 'admin'])->get();
     }
 
+    public function verifiedSellers(){
+        return $this->hasMany(SellerVerify::class, 'verified_by', 'id');
+    }
 }

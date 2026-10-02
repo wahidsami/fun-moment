@@ -22,6 +22,7 @@ Route::middleware(['setlang'])->group(function(){
     Route::post('/frontend-users/{id}/balance', 'FrontendUserManageController@apiUpdateUserBalance')->name('admin.frontend.users.balance.api');
     Route::post('/frontend-users/{id}/verify', 'FrontendUserManageController@apiVerifySeller')->name('admin.frontend.users.verify.api');
     Route::get('/frontend-users/{id}/verification', 'FrontendUserManageController@apiGetVerification')->name('admin.frontend.users.verification.api');
+    Route::get('/verification-documents/{sellerId}/{type}', 'VerificationDocumentController@streamAdmin')->name('admin.verification.document');
     Route::get('/admin-directory', 'AdminRoleManageController@apiDirectory')->name('admin.directory.api');
     Route::get('/services-json', 'ServiceController@apiServices')->name('admin.services.api');
     Route::post('/services-json', 'ServiceController@apiCreateService')->name('admin.services.create.api');

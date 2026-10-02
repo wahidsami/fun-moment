@@ -26,5 +26,7 @@ class Category extends Model
         return $this->morphOne(MetaData::class,'meta_taggable');
     }
 
-
+    public function providers(){
+        return $this->belongsToMany(User::class, 'provider_categories', 'category_id', 'provider_id')->withTimestamps();
+    }
 }

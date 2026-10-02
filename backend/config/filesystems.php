@@ -64,6 +64,12 @@ return [
             'url' => env('AWS_URL'),
         ],
 
+        'verification_docs' => [
+            'driver' => 'local',
+            'root' => storage_path('app/verification-documents'),
+            'visibility' => 'private',
+        ],
+
     ],
 
 ];

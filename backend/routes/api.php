@@ -252,6 +252,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
             Route::post('/edit',[SellerController::class,'profileEdit']);
             Route::post('/verify',[SellerController::class,'profileVerify']);
             Route::post('/deactivate',[SellerController::class,'profileDeactivate']);
+            Route::get('/verification-document/{type}', [\App\Http\Controllers\VerificationDocumentController::class, 'streamProvider']);
         }); 
         
         //Services

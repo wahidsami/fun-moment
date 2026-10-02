@@ -14,6 +14,13 @@ class User extends Authenticatable
 {
     use HasApiTokens,Notifiable;
 
+    public const USER_TYPE_SELLER = 0;
+    public const USER_TYPE_BUYER = 1;
+
+    public const SELLER_TYPE_NOT_APPLICABLE = 0;
+    public const SELLER_TYPE_INDIVIDUAL = 1;
+    public const SELLER_TYPE_COMPANY = 2;
+
     protected $fillable = [
         'name',
         'email',
@@ -134,5 +141,35 @@ class User extends Authenticatable
     public function job_requests()
     {
         return $this->hasMany(\Modules\JobPost\Entities\JobRequest::class, 'seller_id', 'id');
+    }
+
+    public function providerCategories()
+    {
+        return $this->hasMany(ProviderCategory::class, 'provider_id', 'id');
+    }
+
+    public function registeredCategories()
+    {
+        return $this->belongsToMany(Category::class, 'provider_categories', 'provider_id', 'category_id')->withTimestamps();
+    }
+
+    public function isProvider(): bool
+    {
+        return (int) $this->user_type === self::USER_TYPE_SELLER;
+    }
+
+    public function isCustomer(): bool
+    {
+        return (int) $this->user_type === self::USER_TYPE_BUYER;
+    }
+
+    public function isIndividualProvider(): bool
+    {
+        return $this->isProvider() && (int) $this->seller_type === self::SELLER_TYPE_INDIVIDUAL;
+    }
+
+    public function isCompanyProvider(): bool
+    {
+        return $this->isProvider() && (int) $this->seller_type === self::SELLER_TYPE_COMPANY;
     }
 }
