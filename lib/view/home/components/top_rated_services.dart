@@ -24,18 +24,8 @@ class TopRatedServices extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<TopRatedServicesSerivce>(
       builder: (context, provider, child) {
-        if (provider.topServiceMap.isEmpty) {
+        if (provider.topServiceMap.isEmpty || provider.topServiceMap[0] == 'error') {
           return const SizedBox.shrink();
-        }
-
-        if (provider.topServiceMap[0] == 'error') {
-          return FMScreenState.error(
-            title: asProvider.getString('Something went wrong'),
-            message: asProvider.getString(
-                'We could not load top services right now. Please try again.'),
-            actionLabel: asProvider.getString('Retry'),
-            onAction: () => provider.fetchTopService(),
-          );
         }
 
         return Column(
@@ -64,9 +54,8 @@ class TopRatedServices extends StatelessWidget {
                 clipBehavior: Clip.none,
                 itemCount: provider.topServiceMap.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 16),
-                itemBuilder: (context, i) => InkWell(
-                  splashColor: Colors.transparent,
-                  highlightColor: Colors.transparent,
+                itemBuilder: (context, i) => GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () {
                     Navigator.push(
                       context,

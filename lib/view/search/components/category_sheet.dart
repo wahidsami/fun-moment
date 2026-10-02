@@ -14,6 +14,7 @@ import 'package:funmoments/view/utils/responsive.dart';
 import '../../../model/categoryModel.dart';
 import '../../../service/filter_category_service.dart';
 import '../../../service/filter_services_service.dart';
+import '../../../service/rtl_service.dart';
 import '../../utils/constant_colors.dart';
 
 class CategorySheet extends StatelessWidget {
@@ -22,6 +23,9 @@ class CategorySheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sfm = ServiceFilterViewModel.instance;
+    final rtl = Provider.of<RtlService>(context, listen: false);
+    final isArabic = rtl.isArabic || Directionality.of(context) == TextDirection.rtl;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       margin:
@@ -67,15 +71,20 @@ class CategorySheet extends StatelessWidget {
                         builder: (context, category, child) => CustomDropdown(
                               lnProvider.getString("Select category"),
                               fc.categoryModel.category
-                                  .map((e) => e.name ?? "")
+                                  .map((e) => e.displayName(isArabic))
                                   .toList(),
-                              (name) {
-                                sfm.selectedCategory.value = fc.getCat(name);
+                              (displayName) {
+                                sfm.selectedCategory.value = fc.categoryModel.category
+                                    .firstWhere(
+                                        (element) =>
+                                            element.displayName(isArabic) == displayName ||
+                                            element.name == displayName,
+                                        orElse: () => fc.categoryModel.category.first);
                                 fc.fetchSubcategory(
                                     sfm.selectedCategory.value?.id);
                                 sfm.selectedSubcategory.value = null;
                               },
-                              value: category?.name,
+                              value: category?.displayName(isArabic),
                             )),
                   ),
                   12.toHeight,

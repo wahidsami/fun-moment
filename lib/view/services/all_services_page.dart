@@ -4,6 +4,7 @@ import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:funmoments/service/all_services_service.dart';
 import 'package:funmoments/service/common_service.dart';
 import 'package:funmoments/service/service_details_service.dart';
+import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/services/components/service_filter_dropdowns.dart';
 import 'package:funmoments/view/services/service_details_page.dart';
@@ -92,19 +93,15 @@ class _AllServicePageState extends State<AllServicePage> {
                                   height: 35,
                                 ),
                                 if (provider.serviceMap.isEmpty)
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 20),
-                                        child: Text(
-                                          lnProvider
-                                              .getString("No result found"),
-                                          style:
-                                              TextStyle(color: cc.greyPrimary),
-                                        ),
-                                      )
-                                    ],
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 30, horizontal: 20),
+                                    child: FMScreenState.empty(
+                                      title: lnProvider
+                                          .getString('No services yet'),
+                                      message: lnProvider.getString(
+                                          'There are no services available right now.'),
+                                    ),
                                   ),
                                 for (int i = 0;
                                     i < provider.serviceMap.length;

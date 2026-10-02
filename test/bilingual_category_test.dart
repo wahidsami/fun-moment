@@ -39,12 +39,17 @@ void main() {
       expect(cat.displayName(false), 'Music & DJ');
     });
 
-    test('Category displayName falls back to name if name_ar is null or empty in Arabic mode', () {
-      final catNullAr = Category(id: 2, name: 'Food & Hospitality', nameAr: null);
-      expect(catNullAr.displayName(true), 'Food & Hospitality');
+    test('Category displayName falls back to dictionary or name if name_ar is null or empty in Arabic mode', () {
+      final catFood = Category(id: 2, name: 'Food & Hospitality', nameAr: null);
+      // 'Food & Hospitality' maps via built-in dictionary to 'الأطعمة والضيافة' in Arabic mode
+      expect(catFood.displayName(true), 'الأطعمة والضيافة');
 
-      final catEmptyAr = Category(id: 2, name: 'Food & Hospitality', nameAr: '   ');
-      expect(catEmptyAr.displayName(true), 'Food & Hospitality');
+      final catUnknown = Category(id: 99, name: 'Custom Exotic Category', nameAr: null);
+      // Unmapped category falls back to English name
+      expect(catUnknown.displayName(true), 'Custom Exotic Category');
+
+      final catEmptyUnknown = Category(id: 99, name: 'Custom Exotic Category', nameAr: '   ');
+      expect(catEmptyUnknown.displayName(true), 'Custom Exotic Category');
     });
 
     test('SubCategory deserializes name_ar and provides displayName', () {

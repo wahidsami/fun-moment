@@ -11,6 +11,7 @@ import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/constant_styles.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 
+import 'package:funmoments/service/app_string_service.dart';
 import '../../../service/home_services/category_service.dart';
 
 class AllCategoriesPage extends StatefulWidget {
@@ -34,9 +35,10 @@ class _AllCategoriesPageState extends State<AllCategoriesPage> {
   @override
   Widget build(BuildContext context) {
     ConstantColors cc = ConstantColors();
+    final asProvider = Provider.of<AppStringService>(context);
     return Scaffold(
         backgroundColor: cc.bgColor,
-        appBar: CommonHelper().appbarCommon('All Categories', context, () {
+        appBar: CommonHelper().appbarCommon(asProvider.getString('All Categories'), context, () {
           Navigator.pop(context);
         }),
         body: Consumer<CategoryService>(

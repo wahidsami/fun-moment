@@ -11,6 +11,9 @@ import 'package:http/http.dart' as http;
 import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
+import 'package:funmoments/model/categoryModel.dart';
+import 'package:funmoments/service/rtl_service.dart';
+
 class AllServicesService with ChangeNotifier {
   bool isLoading = true;
 
@@ -160,11 +163,21 @@ class AllServicesService with ChangeNotifier {
   }
 
   fetchCategories(BuildContext context) async {
+    RtlService? rtl;
+    try {
+      rtl = Provider.of<RtlService>(context, listen: false);
+    } catch (_) {}
+    final isArabic = (rtl?.isArabic ?? false) || (rtl?.isRtl ?? false);
+
     var categoriesList = Provider.of<CategoryService>(context, listen: false)
         .categoriesDropdownList;
     if (categoriesList.isNotEmpty && categoryDropdownList.length == 1) {
       for (int i = 0; i < categoriesList.length; i++) {
-        categoryDropdownList.add(categoriesList[i].name);
+        final cat = categoriesList[i];
+        final name = (cat is Category)
+            ? cat.displayName(isArabic)
+            : (isArabic ? (cat.nameAr ?? cat.name) : cat.name);
+        categoryDropdownList.add(name);
         categoryDropdownIndexList.add(categoriesList[i].id);
       }
       Future.delayed(const Duration(microseconds: 500), () {

@@ -26,6 +26,16 @@ class CategoryModel {
       };
 }
 
+const Map<String, String> defaultCategoryTranslations = {
+  'Music & DJ': 'الموسيقى والـ DJ',
+  'Food & Hospitality': 'الأطعمة والضيافة',
+  'Sound & Lighting': 'الصوت والإضاءة',
+  'Event Setup & Equipment': 'تجهيز الفعاليات والمعدات',
+  'Decor & Event Styling': 'الديكور وتنسيق المناسبات',
+  'Photography & Video': 'التصوير والفيديو',
+  'Entertainment Activities': 'الترفيه والأنشطة',
+};
+
 class Category {
   Category({
     this.id,
@@ -59,7 +69,12 @@ class Category {
 
   String displayName(bool isArabic) {
     if (isArabic) {
-      return (nameAr != null && nameAr!.trim().isNotEmpty) ? nameAr! : (name ?? '');
+      if (nameAr != null && nameAr!.trim().isNotEmpty) {
+        return nameAr!.trim();
+      }
+      if (name != null && defaultCategoryTranslations.containsKey(name!.trim())) {
+        return defaultCategoryTranslations[name!.trim()]!;
+      }
     }
     return name ?? '';
   }

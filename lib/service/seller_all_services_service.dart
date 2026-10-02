@@ -12,6 +12,7 @@ class SellerAllServicesService with ChangeNotifier {
   var serviceMap = [];
   bool alreadySaved = false;
   bool hasError = false;
+  bool isLoading = false;
 
   late int totalPages;
 
@@ -34,37 +35,45 @@ class SellerAllServicesService with ChangeNotifier {
     currentPage = 1;
     averageRateList = [];
     hasError = false;
+    isLoading = false;
+    notifyListeners();
   }
 
   fetchSellerAllService(context, sellerId, {bool isrefresh = false}) async {
-    //=================>
-
     if (isrefresh) {
-      //making the list empty first to show loading bar (we are showing loading bar while the product list is empty)
-      //we make the list empty when the sub category or brand is selected because then the refresh is true
-
       serviceMap = [];
+      currentPage = 1;
+      hasError = false;
+      isLoading = true;
       notifyListeners();
-
       setCurrentPage(1);
     } else {
-      // if (currentPage > 2) {
-      //   refreshController.loadNoData();
-      //   return false;
-      // }
+      isLoading = true;
+      notifyListeners();
     }
     if (!isrefresh && currentPage > totalPages) {
+      isLoading = false;
+      notifyListeners();
       return false;
     }
 
-    var connection = await checkConnection();
-    if (connection) {
-      //if connection is ok
+    try {
+      var connection = await checkConnection();
+      if (!connection) {
+        if (serviceMap.isEmpty) {
+          hasError = true;
+        }
+        isLoading = false;
+        notifyListeners();
+        return false;
+      }
 
       String apiLink =
           '$baseApi/services-by-seller-id?seller_id=$sellerId?page=$currentPage';
-      var response = await http.get(Uri.parse(apiLink));
-      print(response.body);
+      var response = await http
+          .get(Uri.parse(apiLink))
+          .timeout(const Duration(seconds: 12));
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         var data = SellerAllServiceModel.fromJson(jsonDecode(response.body));
 
@@ -88,28 +97,41 @@ class SellerAllServicesService with ChangeNotifier {
         }
 
         if (isrefresh) {
-          print('refresh true');
-          //if refreshed, then remove all service from list and insert new data
           setServiceList(data.services.data, averageRateList, false);
         } else {
-          print('add new data');
-
-          //else add new data
           setServiceList(data.services.data, averageRateList, true);
         }
 
         currentPage++;
-        hasError = serviceMap.isEmpty;
+        hasError = false;
+        isLoading = false;
         setCurrentPage(currentPage);
+        notifyListeners();
+        return true;
+      } else if (response.statusCode == 404 ||
+          response.body.contains('Service Not Found') ||
+          response.body.contains('service not found')) {
+        serviceMap = [];
+        hasError = false;
+        isLoading = false;
+        notifyListeners();
         return true;
       } else {
         if (serviceMap.isEmpty) {
           hasError = true;
-          notifyListeners();
         }
+        isLoading = false;
         notifyListeners();
         return false;
       }
+    } catch (e) {
+      debugPrint('fetchSellerAllService error: $e');
+      if (serviceMap.isEmpty) {
+        hasError = true;
+      }
+      isLoading = false;
+      notifyListeners();
+      return false;
     }
   }
 

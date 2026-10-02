@@ -62,7 +62,7 @@ class _WalletPageState extends State<WalletPage> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      provider.walletBalance,
+                                      provider.walletBalance.toString(),
                                       style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
@@ -159,7 +159,7 @@ class _WalletPageState extends State<WalletPage> {
                                                       Row(
                                                         children: [
                                                           Text(
-                                                            lnProvider.getString(
+                                                            ln.getString(
                                                                     "Gateway") +
                                                                 ": ${removeUnderscore(provider.walletHistory[i].paymentGateway)}",
                                                             style: TextStyle(
@@ -173,7 +173,7 @@ class _WalletPageState extends State<WalletPage> {
                                                             width: 19,
                                                           ),
                                                           Text(
-                                                            lnProvider.getString(
+                                                            ln.getString(
                                                                     "Amount") +
                                                                 ": " +
                                                                 (rtlProvider.currencyDirection ==
@@ -193,9 +193,9 @@ class _WalletPageState extends State<WalletPage> {
                                                       Row(
                                                         children: [
                                                           Text(
-                                                            lnProvider.getString(
+                                                            ln.getString(
                                                                     "Payment Status") +
-                                                                ": ${lnProvider.getString(provider.walletHistory[i].paymentStatus)}",
+                                                                ": ${ln.getString(provider.walletHistory[i].paymentStatus)}",
                                                             style: TextStyle(
                                                               color:
                                                                   cc.greyFour,
@@ -239,7 +239,7 @@ class _WalletPageState extends State<WalletPage> {
                                 height: screenHeight - 280,
                                 alignment: Alignment.center,
                                 child: Text(
-                                    lnProvider.getString('No history found')),
+                                    ln.getString('No history found')),
                               ),
                       ],
                     ),

@@ -8,6 +8,7 @@ import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:provider/provider.dart';
 
+import 'package:funmoments/model/categoryModel.dart';
 import '../../../services/service_by_category_page.dart';
 
 class CategoryCard extends StatelessWidget {
@@ -39,10 +40,17 @@ class CategoryCard extends StatelessWidget {
       rtl = null;
     }
 
-    final isArabic = rtl?.isArabic ?? false;
-    final resolvedDisplayName = isArabic
-        ? ((nameAr != null && nameAr.toString().trim().isNotEmpty) ? nameAr.toString() : (name?.toString() ?? ''))
-        : (name?.toString() ?? '');
+    final isArabic = (rtl?.isArabic ?? false) ||
+        (rtl?.isRtl ?? false) ||
+        Directionality.of(context) == TextDirection.rtl ||
+        Localizations.localeOf(context).languageCode == 'ar';
+
+    final String baseName = name?.toString() ?? '';
+    final String resolvedDisplayName = isArabic
+        ? ((nameAr != null && nameAr.toString().trim().isNotEmpty)
+            ? nameAr.toString().trim()
+            : (defaultCategoryTranslations[baseName.trim()] ?? baseName))
+        : baseName;
 
     return InkWell(
       splashColor: Colors.transparent,

@@ -115,15 +115,13 @@ class AppStringService with ChangeNotifier {
     }
   }
 
-  getString(String staticString) {
+  String getString(String staticString) {
     try {
-      if (tStrings.containsKey(staticString)) {
-        return tStrings[staticString];
-      } else {
-        return staticString;
+      if (tStrings.containsKey(staticString) && tStrings[staticString] != null) {
+        return tStrings[staticString].toString();
       }
+      return staticString;
     } catch (e) {
-      debugPrint(e.toString());
       return staticString;
     }
   }

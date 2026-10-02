@@ -29,6 +29,10 @@ class RecentServices extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
+        if (provider.isLoading && provider.recentServiceMap.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
         if (provider.recentServiceMap.isEmpty) {
           return FMScreenState.empty(
             title: asProvider.getString('No service available in your area'),
@@ -77,9 +81,8 @@ class RecentServices extends StatelessWidget {
                 clipBehavior: Clip.none,
                 itemCount: provider.recentServiceMap.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 16),
-                itemBuilder: (context, i) => InkWell(
-                  splashColor: Colors.transparent,
-                  highlightColor: Colors.transparent,
+                itemBuilder: (context, i) => GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () {
                     Navigator.push(
                       context,

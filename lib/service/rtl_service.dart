@@ -16,8 +16,8 @@ class RtlService with ChangeNotifier {
   String? langId;
   String langSlug = 'en_US';
 
-  bool get isRtl => direction == 'rtl';
-  bool get isArabic => langSlug.startsWith('ar');
+  bool get isRtl => direction == 'rtl' || langSlug.startsWith('ar');
+  bool get isArabic => langSlug.startsWith('ar') || direction == 'rtl';
 
   String currency = 'SAR';
   String currencyDirection = 'right';

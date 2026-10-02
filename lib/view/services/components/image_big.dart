@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 
+import 'package:funmoments/theme/fun_moment_theme.dart';
+
 class ImageBig extends StatelessWidget {
   const ImageBig({Key? key, required this.serviceName, required this.imageLink})
       : super(key: key);
@@ -12,39 +14,35 @@ class ImageBig extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final validUrl = sanitizeImageUrl(imageLink);
+    final rawUrl = imageLink?.toString().trim();
+    final hasValidRemoteUrl = rawUrl != null &&
+        rawUrl.isNotEmpty &&
+        rawUrl.startsWith('http') &&
+        rawUrl != placeHolderUrl &&
+        !rawUrl.contains('i.postimg.cc/rpsKNndW/New-Project.png');
+
+    final Widget fallbackWidget = Image.asset(
+      FMAssets.djPerformance,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: 295,
+    );
 
     return Stack(
       children: [
         SizedBox(
             height: 295,
             width: double.infinity,
-            child: CachedNetworkImage(
-              imageUrl: validUrl,
-              memCacheWidth: 800,
-              maxWidthDiskCache: 1200,
-              errorWidget: (context, url, error) => Image.network(
-                placeHolderUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: Colors.grey[200],
-                  child: const Center(
-                    child: Icon(Icons.broken_image, color: Colors.grey, size: 40),
-                  ),
-                ),
-              ),
-              placeholder: (context, url) => Container(
-                color: Colors.grey[200],
-                child: const Center(
-                  child: SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              ),
-              fit: BoxFit.cover,
-            )),
+            child: hasValidRemoteUrl
+                ? CachedNetworkImage(
+                    imageUrl: rawUrl,
+                    memCacheWidth: 800,
+                    maxWidthDiskCache: 1200,
+                    errorWidget: (context, url, error) => fallbackWidget,
+                    placeholder: (context, url) => fallbackWidget,
+                    fit: BoxFit.cover,
+                  )
+                : fallbackWidget),
         Container(
           height: 295,
           decoration: BoxDecoration(

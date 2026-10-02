@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../view/utils/others_helper.dart';
 import 'fun_moment_theme.dart';
 
 class FMBrandLogo extends StatelessWidget {
@@ -396,6 +397,7 @@ class FMNetworkImageFrame extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.overlay = false,
     this.placeholder,
+    this.fallbackAssetPath,
   });
 
   final String? imageUrl;
@@ -405,17 +407,26 @@ class FMNetworkImageFrame extends StatelessWidget {
   final BoxFit fit;
   final bool overlay;
   final Widget? placeholder;
+  final String? fallbackAssetPath;
 
   @override
   Widget build(BuildContext context) {
-    final validUrl = (imageUrl != null &&
-            imageUrl!.trim().isNotEmpty &&
-            imageUrl!.trim().startsWith('http'))
-        ? imageUrl!.trim()
+    final trimmed = imageUrl?.trim();
+    final validUrl = (trimmed != null &&
+            trimmed.isNotEmpty &&
+            trimmed.startsWith('http') &&
+            trimmed != placeHolderUrl &&
+            !trimmed.contains('i.postimg.cc/rpsKNndW/New-Project.png'))
+        ? trimmed
         : null;
 
-    final fallback =
-        placeholder ?? const ColoredBox(color: FMColors.surfaceElevated);
+    final fallback = placeholder ??
+        Image.asset(
+          fallbackAssetPath ?? FMAssets.djPerformance,
+          fit: fit,
+          height: height,
+          width: width,
+        );
 
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.circular(FMRadii.lg),
@@ -435,9 +446,9 @@ class FMNetworkImageFrame extends StatelessWidget {
                 )
               : fallback,
           if (overlay)
-            const DecoratedBox(
-              decoration: BoxDecoration(gradient: FMGradients.darkCinematic),
-            ),
+              const DecoratedBox(
+                decoration: BoxDecoration(gradient: FMGradients.darkCinematic),
+              ),
         ],
       ),
     );

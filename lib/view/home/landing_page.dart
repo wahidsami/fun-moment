@@ -22,6 +22,7 @@ import 'package:funmoments/view/jobs/my_jobs_page.dart';
 import 'package:funmoments/view/provider/provider_dashboard_page.dart';
 import 'package:funmoments/view/provider/provider_services_page.dart';
 
+import 'package:funmoments/view/utils/constant_colors.dart';
 import '../search/service_filter_molde.dart';
 
 class LandingPage extends StatefulWidget {
@@ -33,15 +34,38 @@ class LandingPage extends StatefulWidget {
 
 class _HomePageState extends State<LandingPage> {
   DateTime? currentBackPressTime;
+  bool _isRoleResolved = false;
+  bool _isSeller = false;
 
   @override
   void initState() {
     super.initState();
     setChatSellerId(null);
+    _resolveUserRole();
+  }
+
+  Future<void> _resolveUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.get('userType');
+    int? uType;
+    if (raw is int) {
+      uType = raw;
+    } else if (raw is num) {
+      uType = raw.toInt();
+    } else if (raw is String) {
+      uType = int.tryParse(raw);
+    }
+    if (mounted) {
+      setState(() {
+        _isSeller = (uType == 0);
+        _isRoleResolved = true;
+      });
+    }
   }
 
   void onTabTapped(int index) {
-    if (index == 1) {
+    final profileProvider = Provider.of<ProfileService>(context, listen: false);
+    if (!profileProvider.isSeller && index == 1) {
       Provider.of<FilterServicesService>(context, listen: false).resetFilters();
       ServiceFilterViewModel.instance.searchTextController.text = "";
     }
@@ -105,7 +129,19 @@ class _HomePageState extends State<LandingPage> {
   @override
   Widget build(BuildContext context) {
     final profileProvider = Provider.of<ProfileService>(context);
-    final isSeller = profileProvider.isSeller;
+    final isRoleResolved = _isRoleResolved || profileProvider.isRoleResolved;
+    final isSeller = profileProvider.profileDetails != null
+        ? profileProvider.isSeller
+        : _isSeller;
+
+    if (!isRoleResolved) {
+      return Scaffold(
+        backgroundColor: ConstantColors().bgColor,
+        body: Center(
+          child: OthersHelper().showLoading(ConstantColors().primaryColor),
+        ),
+      );
+    }
 
     return Scaffold(
       body: ValueListenableBuilder<int>(

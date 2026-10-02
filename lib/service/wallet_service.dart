@@ -32,6 +32,16 @@ class WalletService with ChangeNotifier {
     notifyListeners();
   }
 
+  void resetState() {
+    walletHistory = null;
+    walletBalance = 0.cur;
+    walletHistoryId = null;
+    isloading = false;
+    hasWalletHistory = true;
+    amountToAdd = null;
+    notifyListeners();
+  }
+
   var amountToAdd;
 
   setAmount(v) {
@@ -107,14 +117,21 @@ class WalletService with ChangeNotifier {
     final decodedData = jsonDecode(response.body);
 
     if (response.statusCode == 200) {
-      print(response.body);
-      walletBalance = decodedData['balance'];
+      debugPrint(response.body);
+      if (decodedData is Map && decodedData['balance'] != null) {
+        walletBalance = decodedData['balance'].toString();
+      } else if (decodedData is Map && decodedData['raw_balance'] != null) {
+        walletBalance = decodedData['raw_balance'].toString();
+      } else {
+        walletBalance = '0.00';
+      }
+      setLoadingStatus(false);
       notifyListeners();
 
       return true;
     } else {
-      print('Error fetching wallet balance' + response.body);
-
+      debugPrint('Error fetching wallet balance: ${response.body}');
+      setLoadingStatus(false);
       return false;
     }
   }
@@ -169,16 +186,17 @@ class WalletService with ChangeNotifier {
       ),
     );
 
-    print(response.data);
-    print(response.statusCode);
+    debugPrint('Deposit response: ${response.data}');
 
     Provider.of<PlaceOrderService>(context, listen: false).setLoadingFalse();
 
     if (response.statusCode == 200) {
-      walletHistoryId = response.data['deposit_info']['wallet_history_id'];
+      final resData = response.data is String ? jsonDecode(response.data) : response.data;
+      if (resData is Map && resData['deposit_info'] is Map) {
+        walletHistoryId = resData['deposit_info']['wallet_history_id'];
+      }
 
       if (isManualOrCod == true) {
-        print('manual or code ran');
         inSuccess(context);
       }
 
@@ -186,7 +204,7 @@ class WalletService with ChangeNotifier {
 
       return true;
     } else {
-      print('error depositing to wallet ${response.data}');
+      debugPrint('error depositing to wallet ${response.data}');
 
       OthersHelper().showToast('Something went wrong', Colors.black);
       return false;

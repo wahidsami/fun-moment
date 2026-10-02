@@ -49,9 +49,11 @@ class History {
   factory History.fromJson(Map<String, dynamic> json) => History(
         id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
         buyerId: json["buyer_id"] is int ? json["buyer_id"] : int.tryParse(json["buyer_id"]?.toString() ?? ''),
-        paymentGateway: json["payment_gateway"]?.toString(),
-        paymentStatus: json["payment_status"]?.toString(),
-        amount: json["amount"] is num ? (json["amount"] as num).toDouble() : double.tryParse(json["amount"]?.toString() ?? ''),
+        paymentGateway: json["payment_gateway"]?.toString() ?? 'wallet',
+        paymentStatus: json["payment_status"]?.toString() ?? 'complete',
+        amount: json["amount"] is num
+            ? (json["amount"] as num).toDouble()
+            : (double.tryParse(json["amount"]?.toString() ?? '') ?? 0.0),
       );
 
   Map<String, dynamic> toJson() => {

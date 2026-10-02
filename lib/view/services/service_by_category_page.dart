@@ -4,6 +4,7 @@ import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:funmoments/service/common_service.dart';
 import 'package:funmoments/service/service_details_service.dart';
 import 'package:funmoments/service/serviceby_category_service.dart';
+import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/view/services/service_details_page.dart';
 import 'package:funmoments/view/utils/common_helper.dart';
 import 'package:funmoments/view/utils/constant_colors.dart';
@@ -88,90 +89,113 @@ class _ServicebyCategoryPageState extends State<ServicebyCategoryPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 25),
               child: Consumer<ServiceByCategoryService>(
-                builder: (context, provider, child) => provider.hasError != true
-                    ? provider.serviceMap.isNotEmpty
-                        ? Column(children: [
-                            // Service List ===============>
-                            const SizedBox(
-                              height: 15,
-                            ),
-                            for (int i = 0; i < provider.serviceMap.length; i++)
-                              Column(
-                                children: [
-                                  InkWell(
-                                    splashColor: Colors.transparent,
-                                    highlightColor: Colors.transparent,
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute<void>(
-                                          builder: (BuildContext context) =>
-                                              const ServiceDetailsPage(),
-                                        ),
-                                      );
-                                      Provider.of<ServiceDetailsService>(
-                                              context,
-                                              listen: false)
-                                          .fetchServiceDetails(provider
-                                              .serviceMap[i]['serviceId']);
-                                    },
-                                    child: ServiceCard(
-                                      cc: cc,
-                                      imageLink: provider.serviceMap[i]
-                                              ['image'] ??
-                                          placeHolderUrl,
-                                      rating: twoDouble(
-                                          provider.serviceMap[i]['rating']),
-                                      title: provider.serviceMap[i]['title'],
-                                      sellerName: provider.serviceMap[i]
-                                          ['sellerName'],
-                                      price: provider.serviceMap[i]['price'],
-                                      buttonText: 'Book Now',
-                                      width: double.infinity,
-                                      marginRight: 0.0,
-                                      pressed: () {
-                                        provider.saveOrUnsave(
-                                            provider.serviceMap[i]['serviceId'],
-                                            provider.serviceMap[i]['title'],
-                                            provider.serviceMap[i]['image'],
-                                            provider.serviceMap[i]['price']
-                                                .round(),
-                                            provider.serviceMap[i]
-                                                ['sellerName'],
-                                            twoDouble(provider.serviceMap[i]
-                                                ['rating']),
-                                            i,
-                                            context,
-                                            provider.serviceMap[i]['sellerId']);
-                                      },
-                                      isSaved: provider.serviceMap[i]
-                                                  ['isSaved'] ==
-                                              true
-                                          ? true
-                                          : false,
-                                      serviceId: provider.serviceMap[i]
-                                          ['serviceId'],
-                                      sellerId: provider.serviceMap[i]
-                                          ['sellerId'],
-                                    ),
-                                  ),
-                                  const SizedBox(
-                                    height: 25,
-                                  ),
-                                ],
-                              )
-                          ])
-                        : Container(
+                builder: (context, provider, child) =>
+                    (provider.isLoading && provider.serviceMap.isEmpty)
+                        ? Container(
                             alignment: Alignment.center,
                             height: screenHeight - 140,
                             child: OthersHelper().showLoading(cc.primaryColor),
                           )
-                    : Container(
-                        alignment: Alignment.center,
-                        height: screenHeight - 140,
-                        child:
-                            Text(lnProvider.getString("No service available")),
-                      ),
+                        : provider.hasError
+                            ? Container(
+                                alignment: Alignment.center,
+                                height: screenHeight - 140,
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                child: FMScreenState.error(
+                                  title: lnProvider.getString('We could not load services'),
+                                  message: lnProvider.getString('Please check your connection and try again.'),
+                                  actionLabel: lnProvider.getString('Retry'),
+                                  onAction: () {
+                                    provider.fetchCategoryService(
+                                        context, widget.categoryId,
+                                        isrefresh: true);
+                                  },
+                                ),
+                              )
+                            : provider.serviceMap.isEmpty
+                                ? Container(
+                                    alignment: Alignment.center,
+                                    height: screenHeight - 140,
+                                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                                    child: FMScreenState.empty(
+                                      title: lnProvider.getString('no services in this category yet'),
+                                      message: lnProvider.getString(
+                                          'No services available yet in this category.'),
+                                    ),
+                                  )
+                                : Column(children: [
+                                    // Service List ===============>
+                                    const SizedBox(
+                                      height: 15,
+                                    ),
+                                    for (int i = 0;
+                                        i < provider.serviceMap.length;
+                                        i++)
+                                      Column(
+                                        children: [
+                                          InkWell(
+                                            splashColor: Colors.transparent,
+                                            highlightColor: Colors.transparent,
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute<void>(
+                                                  builder: (BuildContext context) =>
+                                                      const ServiceDetailsPage(),
+                                                ),
+                                              );
+                                              Provider.of<ServiceDetailsService>(
+                                                      context,
+                                                      listen: false)
+                                                  .fetchServiceDetails(provider
+                                                      .serviceMap[i]['serviceId']);
+                                            },
+                                            child: ServiceCard(
+                                              cc: cc,
+                                              imageLink: provider.serviceMap[i]
+                                                      ['image'] ??
+                                                  placeHolderUrl,
+                                              rating: twoDouble(
+                                                  provider.serviceMap[i]['rating']),
+                                              title: provider.serviceMap[i]['title'],
+                                              sellerName: provider.serviceMap[i]
+                                                  ['sellerName'],
+                                              price: provider.serviceMap[i]['price'],
+                                              buttonText: 'Book Now',
+                                              width: double.infinity,
+                                              marginRight: 0.0,
+                                              pressed: () {
+                                                provider.saveOrUnsave(
+                                                    provider.serviceMap[i]['serviceId'],
+                                                    provider.serviceMap[i]['title'],
+                                                    provider.serviceMap[i]['image'],
+                                                    provider.serviceMap[i]['price']
+                                                        .round(),
+                                                    provider.serviceMap[i]
+                                                        ['sellerName'],
+                                                    twoDouble(provider.serviceMap[i]
+                                                        ['rating']),
+                                                    i,
+                                                    context,
+                                                    provider.serviceMap[i]['sellerId']);
+                                              },
+                                              isSaved: provider.serviceMap[i]
+                                                          ['isSaved'] ==
+                                                      true
+                                                  ? true
+                                                  : false,
+                                              serviceId: provider.serviceMap[i]
+                                                  ['serviceId'],
+                                              sellerId: provider.serviceMap[i]
+                                                  ['sellerId'],
+                                            ),
+                                          ),
+                                          const SizedBox(
+                                            height: 25,
+                                          ),
+                                        ],
+                                      )
+                                  ]),
               ),
             ),
           ),

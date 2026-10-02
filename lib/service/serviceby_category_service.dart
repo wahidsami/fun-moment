@@ -14,6 +14,8 @@ class ServiceByCategoryService with ChangeNotifier {
   var serviceMap = [];
   bool alreadySaved = false;
   bool hasError = false;
+  bool isLoading = false;
+  bool hasLoadedOnce = false;
 
   late int totalPages;
 
@@ -38,46 +40,76 @@ class ServiceByCategoryService with ChangeNotifier {
     averageRateList = [];
     imageList = [];
     hasError = false;
+    isLoading = false;
+    hasLoadedOnce = false;
     notifyListeners();
   }
 
   fetchCategoryService(context, categoryId, {bool isrefresh = false}) async {
-    //=================>
-    String apiLink;
-    apiLink =
+    String apiLink =
         '$baseApi/service-list/search-by-category/$categoryId?page=$currentPage';
-    //====================>
 
     if (isrefresh) {
-      //making the list empty first to show loading bar (we are showing loading bar while the product list is empty)
-      //we are make the list empty when the sub category or brand is selected because then the refresh is true
       serviceMap = [];
+      currentPage = 1;
+      hasError = false;
+      isLoading = true;
       notifyListeners();
 
       Provider.of<ServiceByCategoryService>(context, listen: false)
           .setCurrentPage(currentPage);
     } else {
-      // if (currentPage > 2) {
-      //   refreshController.loadNoData();
-      //   return false;
-      // }
+      isLoading = true;
+      notifyListeners();
     }
-    // serviceMap = [];
-    // Future.delayed(const Duration(microseconds: 500), () {
-    //   notifyListeners();
-    // });
-    var connection = await checkConnection();
-    if (connection) {
-      //if connection is ok
-      var response = await http.get(Uri.parse(apiLink));
 
-      print(response.body);
-      print(response.statusCode);
+    try {
+      var connection = await checkConnection();
+      if (!connection) {
+        if (serviceMap.isEmpty) {
+          hasError = true;
+        }
+        isLoading = false;
+        notifyListeners();
+        return false;
+      }
 
-      // var jsonDataServiceList =
-      //     jsonDecode(response.body)['all_services']['data'];
+      for (int attempt = 1; attempt <= 3; attempt++) {
+        final success = await _fetchSingleAttempt(apiLink, isrefresh);
+        if (success) {
+          return true;
+        }
+        if (attempt < 3) {
+          await Future.delayed(Duration(milliseconds: 400 * attempt));
+        }
+      }
 
-      if (response.statusCode == 201) {
+      if (serviceMap.isEmpty) {
+        hasError = true;
+      }
+      isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('fetchCategoryService error: $e');
+      if (serviceMap.isEmpty) {
+        hasError = true;
+      }
+      isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> _fetchSingleAttempt(String apiLink, bool isrefresh) async {
+    try {
+      var response = await http
+          .get(Uri.parse(apiLink))
+          .timeout(const Duration(seconds: 6));
+
+      debugPrint('Category services response [${response.statusCode}]');
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
         var data = ServicebyCategoryModel.fromJson(jsonDecode(response.body));
         imageList = [];
         setTotalPage(data.allServices.lastPage);
@@ -109,14 +141,9 @@ class ServiceByCategoryService with ChangeNotifier {
         }
 
         if (isrefresh) {
-          print('refresh true');
-          //if refreshed, then remove all service from list and insert new data
           setServiceList(
               data.allServices.data, averageRateList, imageList, false);
         } else {
-          print('add new data');
-
-          //else add new data
           setServiceList(
               data.allServices.data, averageRateList, imageList, true);
         }
@@ -124,15 +151,29 @@ class ServiceByCategoryService with ChangeNotifier {
         imageList = [];
         currentPage++;
         setCurrentPage(currentPage);
+        hasError = false;
+        hasLoadedOnce = true;
+        isLoading = false;
+        notifyListeners();
+        return true;
+      } else if (response.statusCode == 404 ||
+          response.body.contains('Service Not Found') ||
+          response.body.contains('service not found')) {
+        // Backend returns 404 when category has 0 services.
+        // This is a normal empty state, not a network/server crash.
+        debugPrint('[ServiceByCategory] Category has no services (404/Empty). Setting empty state.');
+        serviceMap = [];
+        hasError = false;
+        hasLoadedOnce = true;
+        isLoading = false;
+        notifyListeners();
         return true;
       } else {
-        if (serviceMap.isEmpty) {
-          hasError = true;
-          notifyListeners();
-        }
-        notifyListeners();
         return false;
       }
+    } catch (e) {
+      debugPrint('_fetchSingleAttempt error: $e');
+      return false;
     }
   }
 
