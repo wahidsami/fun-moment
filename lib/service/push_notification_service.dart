@@ -250,11 +250,13 @@ class PushNotificationService with ChangeNotifier {
         "device_type": deviceType,
       });
 
-      var response = await http.post(
-        Uri.parse('$baseApi/user/device-token'),
-        headers: header,
-        body: body,
-      );
+      var response = await http
+          .post(
+            Uri.parse('$baseApi/user/device-token'),
+            headers: header,
+            body: body,
+          )
+          .timeout(const Duration(seconds: 3));
 
       print('registerDeviceToken response: ${response.statusCode} - ${response.body}');
       return response.statusCode == 200 || response.statusCode == 201;

@@ -13,75 +13,99 @@ class RecentServicesService with ChangeNotifier {
   bool alreadySaved = false;
   bool hasService = true;
 
-  fetchRecentService() async {
-    if (recentServiceMap.isEmpty) {
-      String apiLink;
-      apiLink = '$baseApi/latest-services';
+  bool isLoading = false;
+  bool _isFetching = false;
 
-      print(apiLink);
-      var connection = await checkConnection();
-      if (connection) {
-        //if connection is ok
-        var response = await http.get(Uri.parse(apiLink));
+  fetchRecentService({bool isRefresh = false}) async {
+    if (_isFetching) return;
+    if (recentServiceMap.isNotEmpty &&
+        recentServiceMap[0] != 'error' &&
+        !isRefresh) return;
 
-        print(response.body);
-        if (response.statusCode == 201) {
-          var data = RecentServiceModel.fromJson(jsonDecode(response.body));
+    if (isRefresh || (recentServiceMap.isNotEmpty && recentServiceMap[0] == 'error')) {
+      recentServiceMap = [];
+    }
+    _isFetching = true;
+    isLoading = true;
+    // Yield execution to allow caller (e.g. initState) and build lifecycle to finish before notifying listeners
+    await Future<void>.delayed(Duration.zero);
+    if (!_isFetching) return;
+    notifyListeners();
 
-          //check if have service under this state =====>
-          if (data.latestServices.isEmpty) {
-            hasService = false;
-            notifyListeners();
-            return;
-          } else {
-            hasService = true;
+    try {
+      http.Response? response;
+      for (int attempt = 0; attempt < 3; attempt++) {
+        try {
+          response = await http
+              .get(Uri.parse('$baseApi/latest-services'))
+              .timeout(const Duration(seconds: 4));
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            break;
           }
-          //==============>
-
-          for (int i = 0; i < data.latestServices.length; i++) {
-            String? serviceImage;
-            if (data.serviceImage.length > i) {
-              serviceImage = data.serviceImage[i]?.imgUrl;
-            } else {
-              serviceImage = null;
-            }
-
-            int totalRating = 0;
-            for (int j = 0;
-                j < data.latestServices[i].reviewsForMobile.length;
-                j++) {
-              totalRating = totalRating +
-                  (data.latestServices[i].reviewsForMobile[j].rating?.toInt() ?? 0);
-            }
-
-            double averageRate = 0;
-
-            if (data.latestServices[i].reviewsForMobile.isNotEmpty) {
-              averageRate = (totalRating /
-                  data.latestServices[i].reviewsForMobile.length);
-            }
-
-            setServiceList(
-                data.latestServices[i].id,
-                data.latestServices[i].title,
-                data.latestServices[i].sellerForMobile.name,
-                data.latestServices[i].price,
-                averageRate,
-                serviceImage,
-                i,
-                data.latestServices[i].sellerId);
-
-            // print(averageRate);
-          }
-          notifyListeners();
-        } else {
-          //Something went wrong
-          recentServiceMap.add('error');
-          notifyListeners();
+        } catch (attemptErr) {
+          debugPrint('fetchRecentService attempt $attempt failed: $attemptErr');
+          if (attempt == 2) rethrow;
+          await Future.delayed(Duration(milliseconds: 300 * (attempt + 1)));
         }
       }
-    } else {
-      //already loaded from api
+
+      if (response != null && (response.statusCode == 201 || response.statusCode == 200)) {
+        var data = RecentServiceModel.fromJson(jsonDecode(response.body));
+
+        if (data.latestServices.isEmpty) {
+          hasService = false;
+          recentServiceMap.clear();
+          return;
+        } else {
+          hasService = true;
+          recentServiceMap.clear();
+        }
+
+        for (int i = 0; i < data.latestServices.length; i++) {
+          String? serviceImage;
+          if (data.serviceImage.length > i) {
+            serviceImage = data.serviceImage[i]?.imgUrl;
+          } else {
+            serviceImage = null;
+          }
+
+          int totalRating = 0;
+          for (int j = 0;
+              j < data.latestServices[i].reviewsForMobile.length;
+              j++) {
+            totalRating = totalRating +
+                (data.latestServices[i].reviewsForMobile[j].rating?.toInt() ?? 0);
+          }
+
+          double averageRate = 0;
+
+          if (data.latestServices[i].reviewsForMobile.isNotEmpty) {
+            averageRate = (totalRating /
+                data.latestServices[i].reviewsForMobile.length);
+          }
+
+          setServiceList(
+              data.latestServices[i].id,
+              data.latestServices[i].title,
+              data.latestServices[i].sellerForMobile.name,
+              data.latestServices[i].price,
+              averageRate,
+              serviceImage,
+              i,
+              data.latestServices[i].sellerId);
+        }
+      } else {
+        recentServiceMap.add('error');
+      }
+    } catch (e) {
+      debugPrint('fetchRecentService non-fatal: $e');
+      if (recentServiceMap.isEmpty) {
+        recentServiceMap.add('error');
+      }
+    } finally {
+      isLoading = false;
+      _isFetching = false;
+      notifyListeners();
     }
   }
 

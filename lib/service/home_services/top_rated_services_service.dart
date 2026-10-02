@@ -12,64 +12,90 @@ class TopRatedServicesSerivce with ChangeNotifier {
   var topServiceMap = [];
   bool alreadySaved = false;
 
-  fetchTopService() async {
-    if (topServiceMap.isEmpty) {
-      //=================>
-      String apiLink;
-      apiLink = '$baseApi/top-services';
+  bool isLoading = false;
+  bool _isFetching = false;
 
-      //====================>
+  fetchTopService({bool isRefresh = false}) async {
+    if (_isFetching) return;
+    if (topServiceMap.isNotEmpty &&
+        topServiceMap[0] != 'error' &&
+        !isRefresh) return;
 
-      var connection = await checkConnection();
-      if (connection) {
-        //if connection is ok
-        var response = await http.get(Uri.parse(apiLink));
+    if (isRefresh || (topServiceMap.isNotEmpty && topServiceMap[0] == 'error')) {
+      topServiceMap = [];
+    }
+    _isFetching = true;
+    isLoading = true;
+    // Yield execution to allow caller (e.g. initState) and build lifecycle to finish before notifying listeners
+    await Future<void>.delayed(Duration.zero);
+    if (!_isFetching) return;
+    notifyListeners();
 
-        if (response.statusCode == 201) {
-          var data = TopServiceModel.fromJson(jsonDecode(response.body));
-
-          for (int i = 0; i < data.topServices.length; i++) {
-            String? serviceImage;
-
-            if (data.serviceImage.length > i) {
-              serviceImage = data.serviceImage[i]?.imgUrl;
-            } else {
-              serviceImage = null;
-            }
-
-            int totalRating = 0;
-            for (int j = 0;
-                j < data.topServices[i].reviewsForMobile.length;
-                j++) {
-              totalRating = totalRating +
-                  (data.topServices[i].reviewsForMobile[j].rating?.toInt() ?? 0);
-            }
-            double averageRate = 0;
-
-            if (data.topServices[i].reviewsForMobile.isNotEmpty) {
-              averageRate =
-                  (totalRating / data.topServices[i].reviewsForMobile.length);
-            }
-            setServiceList(
-                data.topServices[i].id,
-                data.topServices[i].title,
-                data.topServices[i].sellerForMobile.name,
-                data.topServices[i].price,
-                averageRate,
-                serviceImage,
-                i,
-                data.topServices[i].sellerId);
+    try {
+      http.Response? response;
+      for (int attempt = 0; attempt < 2; attempt++) {
+        try {
+          response = await http
+              .get(Uri.parse('$baseApi/top-services'))
+              .timeout(const Duration(seconds: 6));
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            break;
           }
-
-          notifyListeners();
-        } else {
-          //Something went wrong
-          topServiceMap.add('error');
-          notifyListeners();
+        } catch (attemptErr) {
+          debugPrint('fetchTopService attempt $attempt failed: $attemptErr');
+          if (attempt == 1) rethrow;
+          await Future.delayed(const Duration(milliseconds: 400));
         }
       }
-    } else {
-      //already loaded from api
+
+      if (response != null && (response.statusCode == 201 || response.statusCode == 200)) {
+        var data = TopServiceModel.fromJson(jsonDecode(response.body));
+        topServiceMap.clear();
+
+        for (int i = 0; i < data.topServices.length; i++) {
+          String? serviceImage;
+
+          if (data.serviceImage.length > i) {
+            serviceImage = data.serviceImage[i]?.imgUrl;
+          } else {
+            serviceImage = null;
+          }
+
+          int totalRating = 0;
+          for (int j = 0;
+              j < data.topServices[i].reviewsForMobile.length;
+              j++) {
+            totalRating = totalRating +
+                (data.topServices[i].reviewsForMobile[j].rating?.toInt() ?? 0);
+          }
+          double averageRate = 0;
+
+          if (data.topServices[i].reviewsForMobile.isNotEmpty) {
+            averageRate =
+                (totalRating / data.topServices[i].reviewsForMobile.length);
+          }
+          setServiceList(
+              data.topServices[i].id,
+              data.topServices[i].title,
+              data.topServices[i].sellerForMobile.name,
+              data.topServices[i].price,
+              averageRate,
+              serviceImage,
+              i,
+              data.topServices[i].sellerId);
+        }
+      } else {
+        topServiceMap.add('error');
+      }
+    } catch (e) {
+      debugPrint('fetchTopService non-fatal: $e');
+      if (topServiceMap.isEmpty) {
+        topServiceMap.add('error');
+      }
+    } finally {
+      isLoading = false;
+      _isFetching = false;
+      notifyListeners();
     }
   }
 

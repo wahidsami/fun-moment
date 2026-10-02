@@ -90,8 +90,14 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  await PushNotificationService().initializeFCM();
+  // Initialize FCM with timeout protection so backend token registration never blocks runApp
+  try {
+    await PushNotificationService()
+        .initializeFCM()
+        .timeout(const Duration(seconds: 3));
+  } catch (e) {
+    debugPrint('PushNotificationService.initializeFCM startup non-fatal: $e');
+  }
 
   // Trigger location permission check asynchronously so it never blocks runApp
   HomepageHelper().locationPermissionCheck().catchError((e) {

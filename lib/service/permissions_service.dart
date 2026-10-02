@@ -21,19 +21,24 @@ class PermissionsService with ChangeNotifier {
     var connection = await checkConnection();
     if (!connection) return;
 
-    var response = await http.get(Uri.parse('$baseApi/module-permission'),
-        headers: header);
+    try {
+      var response = await http
+          .get(Uri.parse('$baseApi/module-permission'), headers: header)
+          .timeout(const Duration(seconds: 5));
 
-    final decodedData = jsonDecode(response.body);
+      final decodedData = jsonDecode(response.body);
 
-    print("permission api response ${response.body}");
+      debugPrint("permission api response ${response.body}");
 
-    if (response.statusCode == 201) {
-      jobPermission = decodedData['permissions']['JobPost'];
-      subsPermission = decodedData['permissions']['Subscription'];
-      chatPermission = decodedData['permissions']['LiveChat'];
-      walletPermission = decodedData['permissions']['Wallet'];
-      notifyListeners();
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        jobPermission = decodedData['permissions']['JobPost'];
+        subsPermission = decodedData['permissions']['Subscription'];
+        chatPermission = decodedData['permissions']['LiveChat'];
+        walletPermission = decodedData['permissions']['Wallet'];
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('PermissionsService.fetchUserPermissions error: $e');
     }
   }
 }

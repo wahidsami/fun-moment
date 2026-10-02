@@ -24,18 +24,24 @@ class RecentJobsService with ChangeNotifier {
 
     if (recentJobs != null) return;
 
-    var response = await http.get(
-      Uri.parse('$baseApi/job/recent-jobs'),
-    );
-    print('$baseApi/job/recent-jobs');
-    if (response.statusCode == 201) {
-      var data = RecentJobsModel.fromJson(jsonDecode(response.body));
+    try {
+      var response = await http
+          .get(
+            Uri.parse('$baseApi/job/recent-jobs'),
+          )
+          .timeout(const Duration(seconds: 5));
+      debugPrint('$baseApi/job/recent-jobs');
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        var data = RecentJobsModel.fromJson(jsonDecode(response.body));
 
-      recentJobs = data.recent10Jobs;
-      recentJobsImages = data.jobsImage;
-      notifyListeners();
-    } else {
-      print(response.body);
+        recentJobs = data.recent10Jobs;
+        recentJobsImages = data.jobsImage;
+        notifyListeners();
+      } else {
+        debugPrint(response.body);
+      }
+    } catch (e) {
+      debugPrint('RecentJobsService.fetchRecentJobs error: $e');
     }
   }
 }

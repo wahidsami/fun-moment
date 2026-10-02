@@ -74,7 +74,9 @@ class RtlService with ChangeNotifier {
   fetchCurrency() async {
     if (alreadyCurrencyLoaded == false) {
       try {
-        var response = await http.get(Uri.parse('$baseApi/currency'));
+        var response = await http
+            .get(Uri.parse('$baseApi/currency'))
+            .timeout(const Duration(seconds: 3));
         if (response.statusCode == 200 || response.statusCode == 201) {
           final data = jsonDecode(response.body);
           final curr = data['currency'];

@@ -10,20 +10,26 @@ class SliderService with ChangeNotifier {
   List sliderImageList = [];
   loadSlider() async {
     if (sliderDetailsList.isEmpty) {
-      var response = await http.get(Uri.parse('$baseApi/slider'));
+      try {
+        var response = await http
+            .get(Uri.parse('$baseApi/slider'))
+            .timeout(const Duration(seconds: 5));
 
-      if (response.statusCode == 201) {
-        var data = SliderModel.fromJson(jsonDecode(response.body));
+        if (response.statusCode == 201 || response.statusCode == 200) {
+          var data = SliderModel.fromJson(jsonDecode(response.body));
 
-        for (int i = 0; i < data.sliderDetails.length; i++) {
-          sliderDetailsList.add({
-            'title': data.sliderDetails[i].title,
-            'subtitle': data.sliderDetails[i].subTitle
-          });
+          for (int i = 0; i < data.sliderDetails.length; i++) {
+            sliderDetailsList.add({
+              'title': data.sliderDetails[i].title,
+              'subtitle': data.sliderDetails[i].subTitle
+            });
 
-          sliderImageList.add(data.imageUrl[i].imgUrl);
+            sliderImageList.add(data.imageUrl[i].imgUrl);
+          }
+          notifyListeners();
         }
-        notifyListeners();
+      } catch (e) {
+        debugPrint('SliderService.loadSlider error: $e');
       }
     } else {
       //already loaded from server. no need to load again

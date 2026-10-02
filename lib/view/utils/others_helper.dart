@@ -12,7 +12,7 @@ import '../../service/app_string_service.dart';
 //===========================>
 
 const String _defaultBaseApi =
-    'http://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io/api/v1';
+    'https://bkfunmoments.testproject.cloud/api/v1';
 const String _defaultGoogleMapsApiKey = 'AIzaSyCa_4rCTW1k8PZ90yGmyhUyG9reXuPURiw';
 
 String baseApi =
