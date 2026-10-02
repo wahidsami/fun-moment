@@ -183,7 +183,8 @@ class _ServicePersonalizationPageState
                               Provider.of<SheduleService>(context, listen: false)
                                   .fetchShedule(provider.sellerId,
                                       firstThreeLetter(DateTime.now(), null),
-                                      serviceId: bookService.serviceId);
+                                      serviceId: bookService.serviceId,
+                                      date: DateTime.now());
 
                               //go to shedule page
                               Navigator.push(

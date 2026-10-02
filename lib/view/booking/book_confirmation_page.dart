@@ -224,12 +224,32 @@ class _BookConfirmationPageState extends State<BookConfirmationPage> {
                                     children: [
                                       BookingHelper().bRow(
                                           'assets/svg/location.svg',
-                                          asProvider.getString('Post code'),
-                                          bookProvider.postCode ?? ''),
+                                          asProvider.getString('Selected Location'),
+                                          () {
+                                            final stateP = Provider.of<StateDropdownService>(context, listen: false);
+                                            final areaP = Provider.of<AreaDropdownService>(context, listen: false);
+                                            String c = stateP.selectedState;
+                                            if (c.toLowerCase() == 'riyadh') c = asProvider.getString('Riyadh');
+                                            String a = areaP.selectedArea;
+                                            if (a.toLowerCase() == 'olaya') a = asProvider.getString('Olaya');
+                                            return '$c • $a';
+                                          }()),
                                       BookingHelper().bRow(
                                           'assets/svg/location.svg',
                                           asProvider.getString('Address'),
                                           bookProvider.address ?? ''),
+                                      if (bookProvider.postCode != null &&
+                                          bookProvider.postCode!.isNotEmpty)
+                                        BookingHelper().bRow(
+                                            'assets/svg/location.svg',
+                                            asProvider.getString('Post code'),
+                                            bookProvider.postCode ?? ''),
+                                      if (bookProvider.orderNote != null &&
+                                          bookProvider.orderNote!.isNotEmpty)
+                                        BookingHelper().bRow(
+                                            'assets/svg/receipt-circle.svg',
+                                            asProvider.getString('Additional details / Notes'),
+                                            bookProvider.orderNote ?? ''),
                                     ],
                                   )
                                 : Container(),

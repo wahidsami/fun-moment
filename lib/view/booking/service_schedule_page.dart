@@ -1,6 +1,7 @@
 import 'package:date_picker_timeline/date_picker_timeline.dart';
 import 'package:flutter/material.dart';
 import 'package:flutterzilla_fixed_grid/flutterzilla_fixed_grid.dart';
+import 'package:intl/intl.dart';
 
 import 'package:page_transition/page_transition.dart';
 import 'package:provider/provider.dart';
@@ -31,18 +32,118 @@ class ServiceSchedulePage extends StatefulWidget {
 }
 
 class _ServiceSchedulePageState extends State<ServiceSchedulePage> {
+  int selectedShedule = 0;
+  String? _selectedTime;
+  late DateTime _currentWeekStartDate;
+  late DateTime _selectedDate;
+  late String _selectedWeekday;
+  late String _monthAndDate;
+
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    _currentWeekStartDate = today;
+    _selectedDate = now;
+    // CRITICAL: Always use English (null) for the API weekday identifier so it returns canonical 'Sun', 'Mon', etc.
+    _selectedWeekday = firstThreeLetter(now.toLocal(), null);
+    _monthAndDate = getMonthAndDate(now.toLocal(), null);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final bookService = Provider.of<BookService>(context, listen: false);
+      Provider.of<SheduleService>(context, listen: false).fetchShedule(
+          bookService.sellerId,
+          _selectedWeekday,
+          serviceId: bookService.serviceId,
+          date: _selectedDate);
+    });
   }
 
-  int selectedShedule = 0;
-  var _selectedWeekday = firstThreeLetter(
-      DateTime.now().toLocal(), rtlProvider.langSlug.substring(0, 2));
-  var _monthAndDate = getMonthAndDate(
-      DateTime.now().toLocal(), rtlProvider.langSlug.substring(0, 2));
-  var _selectedTime;
-  DateTime _selectedDate = DateTime.now();
+  void _onPreviousWeek() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (!_currentWeekStartDate.isAfter(today)) return;
+
+    DateTime newWeekStart = _currentWeekStartDate.subtract(const Duration(days: 7));
+    if (newWeekStart.isBefore(today)) {
+      newWeekStart = today;
+    }
+
+    setState(() {
+      _currentWeekStartDate = newWeekStart;
+      final weekEnd = _currentWeekStartDate.add(const Duration(days: 6));
+      if (_selectedDate.isBefore(_currentWeekStartDate) || _selectedDate.isAfter(weekEnd)) {
+        _selectedDate = _currentWeekStartDate;
+        _selectedWeekday = firstThreeLetter(_selectedDate, null);
+        _monthAndDate = getMonthAndDate(_selectedDate, null);
+        selectedShedule = 0;
+        _selectedTime = null;
+      }
+    });
+
+    final bookService = Provider.of<BookService>(context, listen: false);
+    Provider.of<SheduleService>(context, listen: false).fetchShedule(
+        bookService.sellerId,
+        _selectedWeekday,
+        serviceId: bookService.serviceId,
+        date: _selectedDate);
+  }
+
+  void _onNextWeek() {
+    setState(() {
+      _currentWeekStartDate = _currentWeekStartDate.add(const Duration(days: 7));
+      final weekEnd = _currentWeekStartDate.add(const Duration(days: 6));
+      if (_selectedDate.isBefore(_currentWeekStartDate) || _selectedDate.isAfter(weekEnd)) {
+        _selectedDate = _currentWeekStartDate;
+        _selectedWeekday = firstThreeLetter(_selectedDate, null);
+        _monthAndDate = getMonthAndDate(_selectedDate, null);
+        selectedShedule = 0;
+        _selectedTime = null;
+      }
+    });
+
+    final bookService = Provider.of<BookService>(context, listen: false);
+    Provider.of<SheduleService>(context, listen: false).fetchShedule(
+        bookService.sellerId,
+        _selectedWeekday,
+        serviceId: bookService.serviceId,
+        date: _selectedDate);
+  }
+
+  Future<void> _openCalendarPicker() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final initial = _selectedDate.isBefore(today) ? today : _selectedDate;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 365)),
+    );
+
+    if (picked != null) {
+      final pickedDateOnly = DateTime(picked.year, picked.month, picked.day);
+      setState(() {
+        _selectedDate = picked;
+        final weekEnd = _currentWeekStartDate.add(const Duration(days: 6));
+        if (pickedDateOnly.isBefore(_currentWeekStartDate) || pickedDateOnly.isAfter(weekEnd)) {
+          _currentWeekStartDate = pickedDateOnly;
+        }
+        _selectedWeekday = firstThreeLetter(picked, null);
+        _monthAndDate = getMonthAndDate(picked, null);
+        selectedShedule = 0;
+        _selectedTime = null;
+      });
+
+      final bookService = Provider.of<BookService>(context, listen: false);
+      Provider.of<SheduleService>(context, listen: false).fetchShedule(
+          bookService.sellerId,
+          _selectedWeekday,
+          serviceId: bookService.serviceId,
+          date: picked);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,16 +166,16 @@ class _ServiceSchedulePageState extends State<ServiceSchedulePage> {
         body: Consumer<AppStringService>(
           builder: (context, asProvider, child) => Consumer<SheduleService>(
             builder: (context, provider, child) {
-              print(provider.totalDay);
-              //if user didnt select anything then go with the default value
+              //if user didnt select anything or current selection is invalid, preselect the first available slot
               if (provider.isloading == false &&
                   provider.schedules != 'nothing' &&
-                  _selectedTime == null) {
-                print(provider.totalDay);
-                _selectedTime = provider.schedules.schedules[0].schedule;
-                Future.delayed(const Duration(milliseconds: 500), () {
-                  setState(() {});
-                });
+                  provider.schedules.schedules != null &&
+                  provider.schedules.schedules.isNotEmpty) {
+                if (_selectedTime == null ||
+                    selectedShedule >= provider.schedules.schedules.length) {
+                  selectedShedule = 0;
+                  _selectedTime = provider.schedules.schedules[0].schedule;
+                }
               }
               return Column(
                 children: [
@@ -124,14 +225,78 @@ class _ServiceSchedulePageState extends State<ServiceSchedulePage> {
                               //   });
                               // }),
 
+                              // Week navigation header
+                              Builder(builder: (context) {
+                                final now = DateTime.now();
+                                final today = DateTime(now.year, now.month, now.day);
+                                final canGoPrevious = _currentWeekStartDate.isAfter(today);
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 14, bottom: 8),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.calendar_month_rounded, color: cc.primaryColor, size: 20),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            DateFormat.yMMMM(rtlPorvider.langSlug).format(_currentWeekStartDate),
+                                            style: TextStyle(
+                                              color: cc.greyPrimary,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: Icon(
+                                              Icons.chevron_left_rounded,
+                                              color: canGoPrevious ? cc.primaryColor : Colors.grey.withOpacity(0.4),
+                                              size: 26,
+                                            ),
+                                            splashRadius: 20,
+                                            tooltip: asProvider.getString('Previous Week'),
+                                            onPressed: canGoPrevious ? _onPreviousWeek : null,
+                                          ),
+                                          IconButton(
+                                            icon: Icon(
+                                              Icons.date_range_rounded,
+                                              color: cc.primaryColor,
+                                              size: 22,
+                                            ),
+                                            splashRadius: 20,
+                                            tooltip: asProvider.getString('Select Date'),
+                                            onPressed: _openCalendarPicker,
+                                          ),
+                                          IconButton(
+                                            icon: Icon(
+                                              Icons.chevron_right_rounded,
+                                              color: cc.primaryColor,
+                                              size: 26,
+                                            ),
+                                            splashRadius: 20,
+                                            tooltip: asProvider.getString('Next Week'),
+                                            onPressed: _onNextWeek,
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+
                               DatePicker(
-                                DateTime.now(),
+                                _currentWeekStartDate,
+                                key: ValueKey('dp_${_currentWeekStartDate.millisecondsSinceEpoch}_${_selectedDate.millisecondsSinceEpoch}'),
                                 height: 88,
                                 locale: rtlPorvider.langSlug,
-                                initialSelectedDate: DateTime.now(),
-                                daysCount: provider.totalDay == 0
-                                    ? 7
-                                    : provider.totalDay,
+                                initialSelectedDate: _selectedDate,
+                                daysCount: 7,
                                 selectionColor: cc.primaryColor,
                                 selectedTextColor: Colors.white,
                                 dateTextStyle: TextStyle(
@@ -144,25 +309,25 @@ class _ServiceSchedulePageState extends State<ServiceSchedulePage> {
                                     color: cc.greyParagraph, fontSize: 11),
                                 onDateChange: (value) {
                                   // New date selected
-
                                   setState(() {
                                     _selectedWeekday =
                                         firstThreeLetter(value, null);
                                     _monthAndDate =
                                         getMonthAndDate(value, null);
                                     _selectedDate = value;
+                                    selectedShedule = 0;
+                                    _selectedTime = null;
                                   });
-                                  print(_selectedWeekday);
 
-                                   //fetch shedule
+                                  //fetch shedule with selected date
+                                  final bookService = Provider.of<BookService>(
+                                      context,
+                                      listen: false);
                                   provider.fetchShedule(
-                                      Provider.of<BookService>(context,
-                                              listen: false)
-                                          .sellerId,
+                                      bookService.sellerId,
                                       _selectedWeekday,
-                                      serviceId: Provider.of<BookService>(
-                                              context, listen: false)
-                                          .serviceId);
+                                      serviceId: bookService.serviceId,
+                                      date: value);
                                 },
                               ),
 
@@ -328,8 +493,7 @@ class _ServiceSchedulePageState extends State<ServiceSchedulePage> {
 
                                 return;
                               }
-                              if (_selectedTime != null &&
-                                  _selectedWeekday != null) {
+                              if (_selectedTime != null) {
                                 //increase page steps by one
                                 BookStepsService().onNext(context);
                                 //set selected shedule so that we can use it later

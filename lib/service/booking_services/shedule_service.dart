@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:funmoments/model/shedule_model.dart';
 import 'package:funmoments/service/common_service.dart';
 import 'package:http/http.dart' as http;
@@ -22,39 +23,38 @@ class SheduleService with ChangeNotifier {
     notifyListeners();
   }
 
-  fetchShedule(sellerId, selectedWeek, {int? serviceId}) async {
+  fetchShedule(sellerId, selectedWeek, {int? serviceId, DateTime? date}) async {
     setLoadingTrue();
     var connection = await checkConnection();
     if (connection) {
       //internet connection is on
       var header = {
-        //if header type is application/json then the data should be in jsonEncode method
         "Accept": "application/json",
-        // "Content-Type": "application/json"
       };
 
-      String urlStr =
-          '$baseApi/service-list/service-schedule/$selectedWeek/$sellerId';
+      final baseUri =
+          Uri.parse('$baseApi/service-list/service-schedule/$selectedWeek/$sellerId');
+      final queryParams = <String, String>{};
       if (serviceId != null) {
-        urlStr += '?service_id=$serviceId';
+        queryParams['service_id'] = serviceId.toString();
       }
+      if (date != null) {
+        queryParams['date'] = DateFormat('yyyy-MM-dd').format(date);
+      }
+      final requestUri = queryParams.isNotEmpty
+          ? baseUri.replace(queryParameters: queryParams)
+          : baseUri;
 
-      var response = await http.get(
-          Uri.parse(urlStr),
-          headers: header);
+      var response = await http.get(requestUri, headers: header);
 
       if (response.statusCode == 200 && response.body.contains('day')) {
         var data = SheduleModel.fromJson(jsonDecode(response.body));
-        print('total day is $totalDay');
         totalDay = data.day.totalDay ?? 0;
         schedules = data;
-
-        // var data = ServiceDetailsModel.fromJson(jsonDecode(response.body));
 
         notifyListeners();
         setLoadingFalse();
       } else {
-        print(response.body);
         schedules = 'nothing';
         setLoadingFalse();
         notifyListeners();

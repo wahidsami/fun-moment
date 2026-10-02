@@ -171,16 +171,28 @@ class _PaymentChoosePageState extends State<PaymentChoosePage> {
                                                     ? cc.primaryColor
                                                     : cc.borderColor),
                                           ),
-                                          child: CachedNetworkImage(
-                                            imageUrl:
-                                                pgProvider.paymentList[index]
-                                                    ['logo_link'],
-                                            placeholder: (context, url) {
-                                              return Image.asset(
-                                                  'assets/images/loading_image.png');
-                                            },
-                                            // fit: BoxFit.fitWidth,
-                                          ),
+                                          child: (pgProvider.paymentList[index]['logo_link'] != null &&
+                                                  pgProvider.paymentList[index]['logo_link'].toString().trim().isNotEmpty)
+                                              ? CachedNetworkImage(
+                                                  imageUrl: sanitizeImageUrl(pgProvider.paymentList[index]['logo_link']),
+                                                  memCacheHeight: 120,
+                                                  placeholder: (context, url) {
+                                                    return Image.asset(
+                                                        'assets/images/loading_image.png');
+                                                  },
+                                                  errorWidget: (context, url, error) => Center(
+                                                    child: Text(
+                                                      (pgProvider.paymentList[index]['name'] ?? 'Payment').toString().toUpperCase(),
+                                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                )
+                                              : Center(
+                                                  child: Text(
+                                                    (pgProvider.paymentList[index]['name'] ?? 'PAYMENT').toString().toUpperCase(),
+                                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                                  ),
+                                                ),
                                         ),
                                         selectedMethod == index
                                             ? Positioned(

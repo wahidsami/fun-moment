@@ -124,7 +124,9 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
                                   height: 7,
                                 ),
                                 Text(
-                                  '${asProvider.getString('Payment successful')}!',
+                                  widget.paymentStatus.toLowerCase() == 'pending'
+                                      ? '${asProvider.getString('Booking Submitted')}!'
+                                      : '${asProvider.getString('Payment successful')}!',
                                   style: TextStyle(
                                       color: cc.greyPrimary,
                                       fontSize: 21,
