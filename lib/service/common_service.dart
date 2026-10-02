@@ -70,12 +70,14 @@ checkPlatform() {
   }
 }
 
-removeUnderscore(value) {
-  return value.replaceAll(RegExp('_'), ' ');
+String removeUnderscore(dynamic value) {
+  if (value == null) return '';
+  return value.toString().replaceAll(RegExp('_'), ' ');
 }
 
-removeDollar(value) {
-  return value.replaceAll(RegExp('[^0-9.]'), '');
+String removeDollar(dynamic value) {
+  if (value == null) return '0';
+  return value.toString().replaceAll(RegExp('[^0-9.]'), '');
 }
 
 runAtstart(BuildContext context) async {
@@ -104,11 +106,15 @@ runAtstart(BuildContext context) async {
 
 runAtHome(BuildContext context, {bool isRefresh = false}) async {
   try {
-    await Provider.of<PushNotificationService>(context, listen: false)
+    Provider.of<PushNotificationService>(context, listen: false)
         .fetchPusherCredential(context: context)
-        .timeout(const Duration(seconds: 4));
+        .timeout(const Duration(seconds: 4))
+        .catchError((e) {
+      debugPrint('runAtHome fetchPusherCredential non-fatal: $e');
+      return false;
+    });
   } catch (e) {
-    debugPrint('runAtHome fetchPusherCredential non-fatal: $e');
+    debugPrint('runAtHome fetchPusherCredential dispatch error: $e');
   }
 
   try {

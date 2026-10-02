@@ -97,7 +97,12 @@ class LoginService with ChangeNotifier {
           saveDetails(email, token, userId, state, countryId,
               pass: pass, keepLogin: keepLoggedIn, userType: userType);
         } else {
-          setKeepLoggedInFalseSaveToken(token, userType: userType);
+          setKeepLoggedInFalseSaveToken(token,
+              userType: userType,
+              userId: userId,
+              email: email,
+              state: state,
+              countryId: countryId);
         }
 
         //start pusher
@@ -154,10 +159,19 @@ class LoginService with ChangeNotifier {
     prefs.setInt('userType', userType);
   }
 
-  setKeepLoggedInFalseSaveToken(token, {int userType = 1}) async {
+  setKeepLoggedInFalseSaveToken(token,
+      {int userType = 1,
+      int? userId,
+      String? email,
+      String? state,
+      String? countryId}) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     prefs.setBool('keepLoggedIn', false);
     prefs.setString("token", token);
     prefs.setInt('userType', userType);
+    if (userId != null) prefs.setInt('userId', userId);
+    if (email != null) prefs.setString('email', email);
+    if (state != null) prefs.setString('state', state);
+    if (countryId != null) prefs.setString('countryId', countryId);
   }
 }

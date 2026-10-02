@@ -69,6 +69,11 @@ class ProfileService with ChangeNotifier {
     var token = prefs.getString('token');
 
     print('token is $token');
+    if (token == null || token.isEmpty) {
+      profileDetails = null;
+      setLoadingFalse();
+      return false;
+    }
 
     setLoadingTrue();
 
@@ -128,8 +133,20 @@ class ProfileService with ChangeNotifier {
 
   Future<void> initUserType() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    _cachedUserType = prefs.getInt('userType');
+    final rawUserType = prefs.get('userType');
+    if (rawUserType is int) {
+      _cachedUserType = rawUserType;
+    } else if (rawUserType is num) {
+      _cachedUserType = rawUserType.toInt();
+    } else if (rawUserType is String) {
+      _cachedUserType = int.tryParse(rawUserType);
+    }
     notifyListeners();
+  }
+
+  bool get isRoleResolved {
+    if (profileDetails is ProfileModel) return true;
+    return _cachedUserType != null;
   }
 
   bool get isSeller {
