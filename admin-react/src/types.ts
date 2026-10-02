@@ -75,19 +75,89 @@ export interface User {
   };
 }
 
+export interface SellerVerificationDocument {
+  type: 'national_id' | 'license' | 'cr';
+  label_en: string;
+  label_ar: string;
+  filename: string;
+  exists: boolean;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  download_url: string;
+}
+
+export interface SellerVerificationCategory {
+  id: number;
+  name_en: string;
+  name_ar: string;
+  slug?: string;
+}
+
+export interface SellerVerificationSubscription {
+  id: number;
+  plan_name: string;
+  type?: string;
+  price?: number;
+  status: number;
+  status_label: string;
+  expire_date?: string | null;
+  is_expired: boolean;
+  connect_balance: number;
+  service_quota: number;
+  job_quota: number;
+  payment_gateway?: string | null;
+  payment_status?: string | null;
+}
+
 export interface SellerVerificationDetail {
-  user_id: number;
-  name: string;
+  seller_id: number;
+  user_id?: number;
+  seller_name: string;
+  name?: string;
+  username?: string;
   email: string;
   phone?: string;
+  seller_type: number; // 1 = individual, 2 = company
+  seller_type_label: string;
+  seller_type_label_ar: string;
   status: number; // 0=pending, 1=approved, 2=rejected
   is_verified: boolean;
-  national_id?: string;
+
+  // Location & Contact
+  country?: string;
+  country_id?: number;
+  city?: string;
+  area?: string;
   address?: string;
+  post_code?: string;
+
+  // Individual fields
+  national_id?: string;
+  license_number?: string;
+  is_band_or_group?: boolean;
+  band_name?: string;
+  band_members_count?: number;
+
+  // Company fields
+  company_name?: string;
+  cr_number?: string;
+  contact_person_name?: string;
+  contact_person_email?: string;
+  contact_person_phone?: string;
   tax_number?: string;
   business_registration?: string;
+
+  // Lifecycle / Audit
+  rejection_reason?: string;
+  verified_at?: string;
+  verified_by?: number;
   created_at?: string;
   updated_at?: string;
+
+  // Collections
+  documents?: SellerVerificationDocument[];
+  categories?: SellerVerificationCategory[];
+  subscription?: SellerVerificationSubscription | null;
 }
 
 export interface PayoutRequestItem {

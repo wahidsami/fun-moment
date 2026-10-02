@@ -26,7 +26,14 @@ import {
   Briefcase,
   Eye,
   FileCheck,
-  XCircle
+  XCircle,
+  Download,
+  ExternalLink,
+  FileText,
+  MapPin,
+  Tag,
+  Layers,
+  User as UserIcon,
 } from 'lucide-react';
 
 interface UsersViewProps {
@@ -81,6 +88,8 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
   const [verificationDetail, setVerificationDetail] = useState<SellerVerificationDetail | null>(null);
   const [loadingVerification, setLoadingVerification] = useState(false);
   const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
+  const [showRejectForm, setShowRejectForm] = useState(false);
+  const [rejectReasonInput, setRejectReasonInput] = useState('');
 
   // Edit Wallet
   const [editingBalanceUser, setEditingBalanceUser] = useState<User | null>(null);
@@ -330,9 +339,12 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
   const handleOpenSellerAudit = async (sellerId: number) => {
     setSelectedSellerId(sellerId);
     setLoadingVerification(true);
+    setShowRejectForm(false);
+    setRejectReasonInput('');
     try {
       const res = await LaravelAPI.getSellerVerification(sellerId);
-      setVerificationDetail(res.verification);
+      const detailData = (res as any)?.verification ?? res;
+      setVerificationDetail(detailData);
     } catch (e) {
       console.error(e);
       setVerificationDetail(null);
@@ -341,14 +353,14 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
     }
   };
 
-  const handleVerifySeller = async (userId: number, targetStatus: number) => {
+  const handleVerifySeller = async (userId: number, targetStatus: number, reason?: string) => {
     if (!hasPermission) {
       alert(language === 'en' ? "Access Denied." : "تم رفض الوصول.");
       return;
     }
 
     try {
-      const res = await LaravelAPI.verifySeller(userId, targetStatus);
+      const res = await LaravelAPI.verifySeller(userId, targetStatus, reason);
       const isNowVerified = res.seller_verified ?? (targetStatus === 1);
 
       setUsers(current => current.map(u => {
@@ -366,13 +378,18 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
         return u;
       }));
 
-      if (verificationDetail && verificationDetail.user_id === userId) {
+      if (verificationDetail && (verificationDetail.seller_id === userId || verificationDetail.user_id === userId)) {
         setVerificationDetail({
           ...verificationDetail,
           status: targetStatus,
-          is_verified: isNowVerified
+          is_verified: isNowVerified,
+          rejection_reason: reason ?? verificationDetail.rejection_reason,
+          verified_at: targetStatus === 1 ? new Date().toISOString() : undefined,
         });
       }
+
+      setShowRejectForm(false);
+      setRejectReasonInput('');
 
       showSuccess(
         targetStatus === 1
@@ -766,117 +783,354 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
         </div>
       )}
 
-      {/* ======================= AUDIT SELLER DRAWER MODAL ======================= */}
+      {/* ======================= AUDIT SELLER DRAWER / PROVIDER DOSSIER MODAL ======================= */}
       {selectedSellerId && (() => {
         const user = users.find(u => u.id === selectedSellerId);
         const detail = verificationDetail;
         const currentStatus = detail?.status ?? (user?.seller_verified ? 1 : 0);
         const isVerified = currentStatus === 1;
+        const isRejected = currentStatus === 2;
+        const isCompany = detail ? detail.seller_type === 2 : user?.seller_type === 2;
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-lg rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl animate-scale-in">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">
-                  {language === 'en' ? 'Provider Identity & Document Verification' : 'توثيق هوية ومستندات المزود'} #{selectedSellerId}
-                </span>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-2xl border border-slate-100 bg-white shadow-2xl animate-scale-in overflow-hidden">
+              
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                    {isCompany ? <Building className="h-5 w-5" /> : <UserIcon className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-sm">
+                      {language === 'en' ? 'Provider Dossier & Verification' : 'ملف المزود الشامل والتوثيق'} #{selectedSellerId}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                      <span className="font-semibold text-slate-600">
+                        {detail?.seller_name || user?.name}
+                      </span>
+                      <span>•</span>
+                      <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-600">
+                        {isCompany ? (language === 'en' ? 'Company Provider' : 'مزود شركة') : (language === 'en' ? 'Individual Provider' : 'مزود فردي')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
                 <button
-                  onClick={() => { setSelectedSellerId(null); setVerificationDetail(null); }}
-                  className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                  onClick={() => { setSelectedSellerId(null); setVerificationDetail(null); setShowRejectForm(false); setRejectReasonInput(''); }}
+                  className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition text-sm font-bold"
                 >
                   ✕
                 </button>
               </div>
 
-              {loadingVerification ? (
-                <div className="py-12 text-center text-slate-400">
-                  <RefreshCcw className="mx-auto h-6 w-6 animate-spin mb-2 text-indigo-500" />
-                  <p className="text-xs">{language === 'en' ? 'Fetching government verification records...' : 'جاري جلب سجلات التوثيق من الخادم...'}</p>
-                </div>
-              ) : user ? (
-                <div className="space-y-4">
-                  <div className="rounded-xl bg-slate-50 p-4 border flex items-center gap-3">
-                    <Building className="h-10 w-10 text-slate-400 shrink-0" />
-                    <div>
-                      <h4 className="font-bold text-slate-800 text-sm">{user.business_registration || user.name}</h4>
-                      <p className="text-xs text-slate-500">{user.email} • {user.phone || 'No phone'}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{user.country || 'Saudi Arabia'}</p>
-                    </div>
+              {/* Modal Content - Scrollable */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                {loadingVerification ? (
+                  <div className="py-16 text-center text-slate-400">
+                    <RefreshCcw className="mx-auto h-7 w-7 animate-spin mb-3 text-indigo-500" />
+                    <p className="text-xs font-semibold">{language === 'en' ? 'Loading provider records and verified attachments...' : 'جاري تحميل ملف المزود والمستندات المرفقة...'}</p>
                   </div>
+                ) : user ? (
+                  <>
+                    {/* Status & Financial Summary Banner */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 flex flex-col justify-between">
+                        <span className="text-[10px] font-bold uppercase text-slate-400">
+                          {language === 'en' ? 'Verification Status' : 'حالة التوثيق'}
+                        </span>
+                        <div className="mt-1.5">
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                            isVerified 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : isRejected 
+                              ? 'bg-rose-100 text-rose-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${isVerified ? 'bg-emerald-600' : isRejected ? 'bg-rose-600' : 'bg-amber-600'}`} />
+                            {isVerified ? (language === 'en' ? 'APPROVED & VERIFIED' : 'موثق ومعتمد') : isRejected ? (language === 'en' ? 'REJECTED' : 'مرفوض') : (language === 'en' ? 'PENDING DECISION' : 'قيد المراجعة')}
+                          </span>
+                        </div>
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-1">
-                    <div className="rounded-lg border border-slate-100 p-2.5 bg-white">
-                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'National ID / Iqama' : 'الهوية الوطنية / الإقامة'}</h4>
-                      <p className="text-xs font-semibold text-slate-700 mt-1 font-mono">{detail?.national_id || user.seller_verification?.national_id || '—'}</p>
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 flex flex-col justify-between">
+                        <span className="text-[10px] font-bold uppercase text-slate-400">
+                          {language === 'en' ? 'Account Balance' : 'رصيد المحفظة'}
+                        </span>
+                        <div className="mt-1.5 flex items-baseline gap-1">
+                          <span className="text-base font-extrabold text-slate-900">{user.wallet_balance ?? 0}</span>
+                          <span className="text-xs font-semibold text-slate-500">SAR</span>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 flex flex-col justify-between">
+                        <span className="text-[10px] font-bold uppercase text-slate-400">
+                          {language === 'en' ? 'Platform Subscription' : 'خطة الاشتراك'}
+                        </span>
+                        <div className="mt-1.5">
+                          {detail?.subscription ? (
+                            <div>
+                              <span className="font-bold text-xs text-indigo-700">{detail.subscription.plan_name}</span>
+                              <span className="text-[10px] text-slate-400 ml-1">({detail.subscription.status_label})</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">{language === 'en' ? 'No active subscription' : 'لا يوجد اشتراك نشط'}</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="rounded-lg border border-slate-100 p-2.5 bg-white">
-                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'Tax / VAT Number' : 'الرقم الضريبي'}</h4>
-                      <p className="text-xs font-semibold text-slate-700 mt-1 font-mono">{detail?.tax_number || user.tax_number || '—'}</p>
+
+                    {/* Section 1: Business / Legal Identity */}
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-4 space-y-3">
+                      <div className="flex items-center gap-2 border-b border-slate-100 pb-2 text-xs font-bold text-slate-800">
+                        <Briefcase className="h-4 w-4 text-indigo-600" />
+                        <span>{language === 'en' ? 'Legal & Registration Identity' : 'بيانات الهوية والترخيص النظامية'}</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        {isCompany ? (
+                          <>
+                            <div className="rounded-lg bg-slate-50 p-2.5">
+                              <span className="text-[10px] font-bold uppercase text-slate-400">{language === 'en' ? 'Company Name' : 'اسم الشركة المسجل'}</span>
+                              <p className="font-semibold text-slate-800 mt-0.5">{detail?.company_name || user.name}</p>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 p-2.5">
+                              <span className="text-[10px] font-bold uppercase text-slate-400">{language === 'en' ? 'Commercial Registration (CR)' : 'رقم السجل التجاري'}</span>
+                              <p className="font-mono font-semibold text-slate-800 mt-0.5">{detail?.cr_number || user.business_registration || '—'}</p>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 p-2.5">
+                              <span className="text-[10px] font-bold uppercase text-slate-400">{language === 'en' ? 'Contact Person' : 'الشخص المفوض'}</span>
+                              <p className="font-semibold text-slate-800 mt-0.5">{detail?.contact_person_name || '—'}</p>
+                              {detail?.contact_person_email && <p className="text-[11px] text-slate-500">{detail.contact_person_email} • {detail.contact_person_phone}</p>}
+                            </div>
+                            <div className="rounded-lg bg-slate-50 p-2.5">
+                              <span className="text-[10px] font-bold uppercase text-slate-400">{language === 'en' ? 'VAT / Tax Number' : 'الرقم الضريبي'}</span>
+                              <p className="font-mono font-semibold text-slate-800 mt-0.5">{detail?.tax_number || user.tax_number || '—'}</p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="rounded-lg bg-slate-50 p-2.5">
+                              <span className="text-[10px] font-bold uppercase text-slate-400">{language === 'en' ? 'National ID / Iqama' : 'الهوية الوطنية / الإقامة'}</span>
+                              <p className="font-mono font-semibold text-slate-800 mt-0.5">{detail?.national_id || user.seller_verification?.national_id || '—'}</p>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 p-2.5">
+                              <span className="text-[10px] font-bold uppercase text-slate-400">{language === 'en' ? 'Freelance / Professional License' : 'وثيقة العمل الحر / الترخيص'}</span>
+                              <p className="font-mono font-semibold text-slate-800 mt-0.5">{detail?.license_number || '—'}</p>
+                            </div>
+                            {detail?.is_band_or_group && (
+                              <div className="rounded-lg bg-slate-50 p-2.5 md:col-span-2">
+                                <span className="text-[10px] font-bold uppercase text-slate-400">{language === 'en' ? 'Musical Band / Entertainment Group' : 'الفرقة الموسيقية / الاستعراضية'}</span>
+                                <p className="font-semibold text-slate-800 mt-0.5">{detail.band_name} ({detail.band_members_count} {language === 'en' ? 'members' : 'أعضاء'})</p>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="rounded-lg border border-slate-100 p-2.5 bg-white">
-                    <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'Business Address' : 'العنوان التجاري المسجل'}</h4>
-                    <p className="text-xs font-semibold text-slate-700 mt-1">{detail?.address || user.address || '—'}</p>
-                  </div>
+                    {/* Section 2: Contact & Operational Location */}
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-4 space-y-3">
+                      <div className="flex items-center gap-2 border-b border-slate-100 pb-2 text-xs font-bold text-slate-800">
+                        <MapPin className="h-4 w-4 text-indigo-600" />
+                        <span>{language === 'en' ? 'Contact & Operational Coverage' : 'بيانات التواصل والتغطية الجغرافية'}</span>
+                      </div>
 
-                  <div className="rounded-xl bg-slate-50 p-3.5 border flex items-center justify-between">
-                    <div>
-                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'Current Verification Status' : 'حالة التوثيق في النظام'}</h4>
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
-                          isVerified ? 'bg-emerald-100 text-emerald-800' : currentStatus === 2 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {isVerified ? (language === 'en' ? 'APPROVED & VERIFIED' : 'موثق ومعتمد') : currentStatus === 2 ? (language === 'en' ? 'REJECTED' : 'مرفوض') : (language === 'en' ? 'PENDING DECISION' : 'قيد المراجعة')}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                        <div className="rounded-lg bg-slate-50 p-2.5">
+                          <span className="text-[10px] font-bold uppercase text-slate-400">{language === 'en' ? 'Email & Phone' : 'البريد والهاتف'}</span>
+                          <p className="font-semibold text-slate-800 mt-0.5">{user.email}</p>
+                          <p className="text-[11px] text-slate-500 font-mono">{user.phone || '—'}</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 p-2.5">
+                          <span className="text-[10px] font-bold uppercase text-slate-400">{language === 'en' ? 'City / Area' : 'المدينة والحي'}</span>
+                          <p className="font-semibold text-slate-800 mt-0.5">{detail?.city || '—'}, {detail?.area || '—'}</p>
+                          <p className="text-[11px] text-slate-500">{detail?.country || user.country || 'Saudi Arabia'}</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 p-2.5">
+                          <span className="text-[10px] font-bold uppercase text-slate-400">{language === 'en' ? 'Street Address' : 'العنوان المسجل'}</span>
+                          <p className="font-semibold text-slate-800 mt-0.5">{detail?.address || user.address || '—'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 3: Service Categories */}
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-4 space-y-2.5">
+                      <div className="flex items-center gap-2 border-b border-slate-100 pb-2 text-xs font-bold text-slate-800">
+                        <Tag className="h-4 w-4 text-indigo-600" />
+                        <span>{language === 'en' ? 'Registered Service Categories' : 'تصنيفات الخدمات المعتمدة'}</span>
+                      </div>
+
+                      {detail?.categories && detail.categories.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {detail.categories.map((cat) => (
+                            <span
+                              key={cat.id}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                              <span>{language === 'en' ? cat.name_en : cat.name_ar}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 italic pt-1">{language === 'en' ? 'No registered categories associated with this provider.' : 'لا توجد تصنيفات مرتبطة بهذا المزود حالياً.'}</p>
+                      )}
+                    </div>
+
+                    {/* Section 4: Submitted Documents & Attachments */}
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-4 space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                          <FileText className="h-4 w-4 text-indigo-600" />
+                          <span>{language === 'en' ? 'Submitted Verification Documents' : 'المستندات والوثائق المرفوعة'}</span>
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-400">
+                          {detail?.documents?.length || 0} {language === 'en' ? 'files' : 'ملفات'}
                         </span>
                       </div>
+
+                      {detail?.documents && detail.documents.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                          {detail.documents.map((doc, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-3 hover:bg-slate-50 transition"
+                            >
+                              <div className="flex items-center gap-2.5 overflow-hidden">
+                                <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 shrink-0">
+                                  <FileText className="h-4 w-4" />
+                                </div>
+                                <div className="overflow-hidden">
+                                  <p className="text-xs font-bold text-slate-800 truncate">
+                                    {language === 'en' ? doc.label_en : doc.label_ar}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 font-mono truncate mt-0.5">
+                                    {doc.filename} {doc.size_bytes ? `• ${(doc.size_bytes / 1024).toFixed(0)} KB` : ''}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 ml-2">
+                                {doc.exists ? (
+                                  <a
+                                    href={doc.download_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition shadow-2xs"
+                                  >
+                                    <Download className="h-3 w-3" />
+                                    <span>{language === 'en' ? 'Open' : 'عرض'}</span>
+                                  </a>
+                                ) : (
+                                  <span className="text-[10px] font-semibold text-rose-500 bg-rose-50 px-2 py-1 rounded">
+                                    {language === 'en' ? 'File Missing' : 'الملف مفقود'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-lg bg-slate-50 p-4 text-center">
+                          <p className="text-xs text-slate-400 italic">
+                            {language === 'en' ? 'No verification documents were uploaded by this provider during registration.' : 'لم يقم هذا المزود برفع أي مستندات توثيق أثناء التسجيل.'}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="text-right">
-                      <h4 className="text-[10px] text-slate-400 font-bold uppercase">{language === 'en' ? 'Ledger Balance' : 'الرصيد المالي'}</h4>
-                      <p className="text-sm font-extrabold text-slate-900 mt-0.5">{user.wallet_balance ?? 0} SAR</p>
-                    </div>
-                  </div>
-
-                  {hasPermission && (
-                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 text-xs space-y-2">
-                      <p className="text-[11px] font-semibold text-indigo-900">
-                        {language === 'en' ? 'Administrative Decision (Persists directly to PostgreSQL):' : 'القرار الإداري (يتم الحفظ مباشرة في قاعدة البيانات):'}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleVerifySeller(user.id, 1)}
-                          disabled={isVerified}
-                          className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5"
-                        >
-                          <FileCheck className="h-4 w-4" />
-                          <span>{language === 'en' ? 'Approve Verification' : 'اعتماد التوثيق'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleVerifySeller(user.id, 2)}
-                          disabled={currentStatus === 2}
-                          className="flex-1 rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5"
-                        >
-                          <XCircle className="h-4 w-4" />
-                          <span>{language === 'en' ? 'Reject Submission' : 'رفض التوثيق'}</span>
-                        </button>
+                    {/* Rejection / Decision Feedback if already rejected */}
+                    {isRejected && detail?.rejection_reason && (
+                      <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-3 text-xs text-rose-800">
+                        <span className="font-bold">{language === 'en' ? 'Rejection Reason Recorded:' : 'سبب الرفض المسجل:'}</span>
+                        <p className="mt-0.5">{detail.rejection_reason}</p>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ) : null}
+                    )}
 
-              <div className="mt-5 flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                    {/* Section 5: Administrative Decision Actions */}
+                    {hasPermission && (
+                      <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 text-xs space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="font-bold text-indigo-950">
+                            {language === 'en' ? 'Administrative Decision (Persists directly to PostgreSQL):' : 'القرار الإداري للتوثيق (يُحفظ مباشرة في قاعدة البيانات):'}
+                          </p>
+                          {detail?.verified_at && (
+                            <span className="text-[10px] text-indigo-600 font-mono">
+                              {language === 'en' ? 'Last Verified:' : 'تاريخ الاعتماد:'} {detail.verified_at}
+                            </span>
+                          )}
+                        </div>
+
+                        {showRejectForm ? (
+                          <div className="rounded-lg border border-rose-200 bg-white p-3 space-y-2.5">
+                            <label className="text-[11px] font-bold text-slate-700">
+                              {language === 'en' ? 'Specify Reason for Rejection:' : 'حدد سبب رفض التوثيق:'}
+                            </label>
+                            <input
+                              type="text"
+                              value={rejectReasonInput}
+                              onChange={(e) => setRejectReasonInput(e.target.value)}
+                              placeholder={language === 'en' ? 'e.g. Expired Commercial Registration or Invalid ID...' : 'مثال: السجل التجاري منتهي الصلاحية أو الهوية غير مطابقة...'}
+                              className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-hidden focus:border-rose-500"
+                            />
+                            <div className="flex items-center justify-end gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => { setShowRejectForm(false); setRejectReasonInput(''); }}
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                              >
+                                {t.cancel}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleVerifySeller(user.id, 2, rejectReasonInput)}
+                                className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 transition"
+                              >
+                                {language === 'en' ? 'Confirm Rejection' : 'تأكيد الرفض'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => handleVerifySeller(user.id, 1)}
+                              disabled={isVerified}
+                              className="flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5 shadow-xs"
+                            >
+                              <FileCheck className="h-4 w-4" />
+                              <span>{language === 'en' ? 'Approve Verification' : 'اعتماد وتوثيق الحساب'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setShowRejectForm(true)}
+                              disabled={isRejected}
+                              className="flex-1 rounded-lg bg-rose-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5 shadow-xs"
+                            >
+                              <XCircle className="h-4 w-4" />
+                              <span>{language === 'en' ? 'Reject Submission' : 'رفض طلب التوثيق'}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : null}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end border-t border-slate-100 px-6 py-3 bg-slate-50/50">
                 <button
-                  onClick={() => { setSelectedSellerId(null); setVerificationDetail(null); }}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  onClick={() => { setSelectedSellerId(null); setVerificationDetail(null); setShowRejectForm(false); setRejectReasonInput(''); }}
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                 >
                   {t.back}
                 </button>
               </div>
+
             </div>
           </div>
         );

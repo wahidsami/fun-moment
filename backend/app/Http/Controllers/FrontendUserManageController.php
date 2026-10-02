@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use App\Services\ProviderVerificationDocumentService;
 use App\Mail\BasicMail;
 use App\Mail\SingleMailToUser;
 use App\Accountdeactive;
@@ -167,11 +169,26 @@ class FrontendUserManageController extends Controller
             ['status' => 0]
         );
 
-        $newStatus = $request->has('status') 
-            ? ($request->boolean('status') ? 1 : 0) 
-            : ($sellerVerify->status === 1 ? 0 : 1);
+        if ($request->has('status')) {
+            $rawStatus = (int) $request->input('status');
+            $newStatus = in_array($rawStatus, [0, 1, 2], true) ? $rawStatus : ($request->boolean('status') ? 1 : 0);
+        } else {
+            $newStatus = $sellerVerify->status === 1 ? 0 : 1;
+        }
 
-        $sellerVerify->update(['status' => $newStatus]);
+        $adminId = Auth::guard('admin')->id();
+        $updateData = [
+            'status' => $newStatus,
+            'verified_by' => $adminId,
+            'verified_at' => $newStatus === 1 ? now() : null,
+        ];
+        if ($request->filled('rejection_reason')) {
+            $updateData['rejection_reason'] = $request->input('rejection_reason');
+        } elseif ($newStatus === 1) {
+            $updateData['rejection_reason'] = null;
+        }
+
+        $sellerVerify->update($updateData);
 
         if ($newStatus === 1) {
             try {
@@ -190,35 +207,172 @@ class FrontendUserManageController extends Controller
 
         $freshUser = User::with(['country', 'sellerVerify'])->findOrFail($id);
 
+        $statusMsg = $newStatus === 1 
+            ? __('Seller verified successfully.') 
+            : ($newStatus === 2 ? __('Seller verification rejected.') : __('Seller verification revoked.'));
+
         return response()->json([
             'status' => 'success',
-            'message' => $newStatus === 1 
-                ? __('Seller verified successfully.') 
-                : __('Seller verification revoked.'),
+            'message' => $statusMsg,
             'user' => $this->formatUserPayload($freshUser),
         ]);
     }
 
     public function apiGetVerification(Request $request, $id): JsonResponse
     {
-        $user = User::with(['country', 'sellerVerify'])->findOrFail($id);
+        $user = User::with([
+            'country', 
+            'city', 
+            'area', 
+            'sellerVerify', 
+            'registeredCategories', 
+            'subscribedSeller.subscription'
+        ])->findOrFail($id);
+
         $verify = $user->sellerVerify;
+        $docService = app(ProviderVerificationDocumentService::class);
+
+        $documents = [];
+
+        // 1. National ID Document
+        $natIdDoc = optional($verify)->national_id_document;
+        if (!empty($natIdDoc)) {
+            $exists = $docService->exists($natIdDoc);
+            $mime = $exists ? (Storage::disk(ProviderVerificationDocumentService::DISK)->mimeType($natIdDoc) ?: 'application/octet-stream') : null;
+            $size = $exists ? Storage::disk(ProviderVerificationDocumentService::DISK)->size($natIdDoc) : null;
+            $documents[] = [
+                'type' => 'national_id',
+                'label_en' => 'National ID / Iqama Document',
+                'label_ar' => 'وثيقة الهوية الوطنية / الإقامة',
+                'filename' => basename($natIdDoc),
+                'exists' => $exists,
+                'mime_type' => $mime,
+                'size_bytes' => $size,
+                'download_url' => "/admin-home/verification-documents/{$user->id}/national_id",
+            ];
+        }
+
+        // 2. License Document
+        $licenseDoc = optional($verify)->license_document;
+        if (!empty($licenseDoc)) {
+            $exists = $docService->exists($licenseDoc);
+            $mime = $exists ? (Storage::disk(ProviderVerificationDocumentService::DISK)->mimeType($licenseDoc) ?: 'application/octet-stream') : null;
+            $size = $exists ? Storage::disk(ProviderVerificationDocumentService::DISK)->size($licenseDoc) : null;
+            $documents[] = [
+                'type' => 'license',
+                'label_en' => 'Freelance / Professional License',
+                'label_ar' => 'وثيقة العمل الحر / الترخيص المهني',
+                'filename' => basename($licenseDoc),
+                'exists' => $exists,
+                'mime_type' => $mime,
+                'size_bytes' => $size,
+                'download_url' => "/admin-home/verification-documents/{$user->id}/license",
+            ];
+        }
+
+        // 3. Commercial Registration Document
+        $crDoc = optional($verify)->cr_document;
+        if (!empty($crDoc)) {
+            $exists = $docService->exists($crDoc);
+            $mime = $exists ? (Storage::disk(ProviderVerificationDocumentService::DISK)->mimeType($crDoc) ?: 'application/octet-stream') : null;
+            $size = $exists ? Storage::disk(ProviderVerificationDocumentService::DISK)->size($crDoc) : null;
+            $documents[] = [
+                'type' => 'cr',
+                'label_en' => 'Commercial Registration (CR) Document',
+                'label_ar' => 'وثيقة السجل التجاري',
+                'filename' => basename($crDoc),
+                'exists' => $exists,
+                'mime_type' => $mime,
+                'size_bytes' => $size,
+                'download_url' => "/admin-home/verification-documents/{$user->id}/cr",
+            ];
+        }
+
+        $categories = $user->registeredCategories->map(function ($cat) {
+            return [
+                'id' => $cat->id,
+                'name_en' => $cat->name,
+                'name_ar' => $cat->name_ar ?? $cat->name,
+                'slug' => $cat->slug,
+            ];
+        })->values();
+
+        $sub = $user->subscribedSeller;
+        $subscriptionData = null;
+        if ($sub) {
+            $subscriptionData = [
+                'id' => $sub->id,
+                'plan_name' => optional($sub->subscription)->title ?? $sub->type ?? 'Active Plan',
+                'type' => $sub->type,
+                'price' => (float) $sub->price,
+                'status' => (int) $sub->status,
+                'status_label' => (int) $sub->status === 1 ? 'Active' : 'Inactive',
+                'expire_date' => optional($sub->expire_date)->toDateTimeString(),
+                'is_expired' => $sub->isExpired(),
+                'connect_balance' => (int) $sub->connect,
+                'service_quota' => (int) $sub->service,
+                'job_quota' => (int) $sub->job,
+                'payment_gateway' => $sub->payment_gateway,
+                'payment_status' => $sub->payment_status,
+            ];
+        }
+
+        $sellerType = (int) ($user->seller_type ?: 1);
+        $cityName = optional($user->city)->service_city ?? $user->service_city;
+        $areaName = optional($user->area)->service_area ?? $user->service_area;
+        $countryName = optional($user->country)->country ?? 'Saudi Arabia';
 
         return response()->json([
             'status' => 'success',
             'verification' => [
                 'seller_id' => $user->id,
+                'user_id' => $user->id,
                 'seller_name' => $user->name,
+                'name' => $user->name,
+                'username' => $user->username,
                 'email' => $user->email,
                 'phone' => $user->phone,
+                'seller_type' => $sellerType,
+                'seller_type_label' => $sellerType === 2 ? 'Company' : 'Individual',
+                'seller_type_label_ar' => $sellerType === 2 ? 'شركة' : 'أفراد',
                 'status' => (int) optional($verify)->status,
                 'is_verified' => optional($verify)->status === 1,
-                'national_id' => optional($verify)->national_id,
+                
+                // Location & Contact
+                'country' => $countryName,
+                'country_id' => $user->country_id,
+                'city' => $cityName,
+                'area' => $areaName,
                 'address' => optional($verify)->address ?? $user->seller_address ?? $user->address,
+                'post_code' => $user->post_code,
+
+                // Individual provider fields
+                'national_id' => optional($verify)->national_id_number ?? optional($verify)->national_id,
+                'license_number' => optional($verify)->license_number,
+                'is_band_or_group' => (bool) optional($verify)->is_band_or_group,
+                'band_name' => optional($verify)->band_name,
+                'band_members_count' => optional($verify)->band_members_count,
+
+                // Company provider fields
+                'company_name' => optional($verify)->company_name,
+                'cr_number' => optional($verify)->cr_number ?? $user->business_registration,
+                'contact_person_name' => optional($verify)->contact_person_name,
+                'contact_person_email' => optional($verify)->contact_person_email,
+                'contact_person_phone' => optional($verify)->contact_person_phone,
                 'tax_number' => $user->tax_number,
-                'business_registration' => $user->business_registration,
+                'business_registration' => $user->business_registration ?? optional($verify)->cr_number,
+
+                // Lifecycle / Audit
+                'rejection_reason' => optional($verify)->rejection_reason,
+                'verified_at' => optional(optional($verify)->verified_at)->toDateTimeString(),
+                'verified_by' => optional($verify)->verified_by,
                 'created_at' => optional(optional($verify)->created_at)->toDateTimeString(),
                 'updated_at' => optional(optional($verify)->updated_at)->toDateTimeString(),
+
+                // Associated collections
+                'documents' => $documents,
+                'categories' => $categories,
+                'subscription' => $subscriptionData,
             ],
         ]);
     }
@@ -252,6 +406,7 @@ class FrontendUserManageController extends Controller
             'email' => $user->email,
             'role' => $role,
             'status' => $status,
+            'seller_type' => (int) ($user->seller_type ?: 1),
             'avatar' => $avatar,
             'phone' => $user->phone,
             'country' => $countryName,
@@ -265,7 +420,7 @@ class FrontendUserManageController extends Controller
             'seller_verification' => [
                 'status' => (int) optional($user->sellerVerify)->status,
                 'is_verified' => $isVerified,
-                'national_id' => optional($user->sellerVerify)->national_id,
+                'national_id' => optional($user->sellerVerify)->national_id_number ?? optional($user->sellerVerify)->national_id,
                 'address' => optional($user->sellerVerify)->address ?? $user->seller_address ?? $user->address,
             ],
         ];

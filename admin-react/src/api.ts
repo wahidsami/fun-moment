@@ -15,6 +15,7 @@ import {
   OverviewStats,
   DashboardActivityLog,
   DashboardSummaryPayload,
+  SellerVerificationDetail,
 } from './types';
 
 export interface DashboardSettings {
@@ -942,7 +943,11 @@ export const LaravelAPI = {
   },
 
   // Seller Verification
-  async verifySeller(id: number, status?: boolean | number): Promise<User> {
+  async verifySeller(id: number, status?: boolean | number, rejectionReason?: string): Promise<User> {
+    const payloadBody: any = {};
+    if (status !== undefined) payloadBody.status = status;
+    if (rejectionReason) payloadBody.rejection_reason = rejectionReason;
+
     const response = await fetch(`/admin-home/frontend-users/${id}/verify`, {
       method: 'POST',
       headers: {
@@ -950,7 +955,7 @@ export const LaravelAPI = {
         'Content-Type': 'application/json',
       },
       credentials: 'include',
-      body: JSON.stringify(status !== undefined ? { status } : {}),
+      body: JSON.stringify(payloadBody),
     });
 
     if (!response.ok) {
@@ -964,7 +969,7 @@ export const LaravelAPI = {
     throw new Error(payload?.message || 'Verification update failed');
   },
 
-  async getSellerVerification(id: number): Promise<any> {
+  async getSellerVerification(id: number): Promise<SellerVerificationDetail | null> {
     const response = await fetch(`/admin-home/frontend-users/${id}/verification`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
