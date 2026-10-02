@@ -93,7 +93,7 @@ class SliderHome extends StatelessWidget {
                                       MediaQuery.of(context).size.width * .62,
                                 ),
                                 child: Text(
-                                  promoTitles[itemIndex],
+                                  promoTitles[itemIndex % promoTitles.length],
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: rtlP.direction == 'ltr'
@@ -115,7 +115,7 @@ class SliderHome extends StatelessWidget {
                                       MediaQuery.of(context).size.width * .58,
                                 ),
                                 child: Text(
-                                  promoSubtitles[itemIndex],
+                                  promoSubtitles[itemIndex % promoSubtitles.length],
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: rtlP.direction == 'ltr'

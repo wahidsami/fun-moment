@@ -8,23 +8,49 @@ import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
-class StateDropdownPopup extends StatelessWidget {
+class StateDropdownPopup extends StatefulWidget {
   const StateDropdownPopup({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final RefreshController refreshController =
-        RefreshController(initialRefresh: true);
+  State<StateDropdownPopup> createState() => _StateDropdownPopupState();
+}
 
+class _StateDropdownPopupState extends State<StateDropdownPopup> {
+  late final RefreshController _refreshController;
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshController = RefreshController(initialRefresh: false);
+    _searchController = TextEditingController();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final p = Provider.of<StateDropdownService>(context, listen: false);
+      if (p.statesDropdownList.isEmpty || p.statesDropdownList.length <= 1) {
+        p.fetchStates(context, isrefresh: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: FMColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        title: Text(lnProvider.getString('Search state')),
+        title: Text(lnProvider.getString('Choose city')),
       ),
       body: SmartRefresher(
-        controller: refreshController,
+        controller: _refreshController,
         enablePullUp: true,
         enablePullDown: context.watch<StateDropdownService>().currentPage > 1
             ? false
@@ -32,11 +58,11 @@ class StateDropdownPopup extends StatelessWidget {
         onRefresh: () async {
           final result =
               await Provider.of<StateDropdownService>(context, listen: false)
-                  .fetchStates(context);
+                  .fetchStates(context, isrefresh: true);
           if (result) {
-            refreshController.refreshCompleted();
+            _refreshController.refreshCompleted();
           } else {
-            refreshController.refreshFailed();
+            _refreshController.refreshFailed();
           }
         },
         onLoading: () async {
@@ -44,11 +70,13 @@ class StateDropdownPopup extends StatelessWidget {
               await Provider.of<StateDropdownService>(context, listen: false)
                   .fetchStates(context);
           if (result) {
-            refreshController.loadComplete();
+            _refreshController.loadComplete();
           } else {
-            refreshController.loadNoData();
+            _refreshController.loadNoData();
             Future.delayed(const Duration(seconds: 1), () {
-              refreshController.resetNoData();
+              if (mounted) {
+                _refreshController.resetNoData();
+              }
             });
           }
         },
@@ -59,14 +87,35 @@ class StateDropdownPopup extends StatelessWidget {
               builder: (context, p, child) => Column(
                 children: [
                   FMTextField(
-                    controller: TextEditingController(),
-                    label: lnProvider.getString('Search state'),
-                    hintText: lnProvider.getString('Search state'),
+                    controller: _searchController,
+                    label: lnProvider.getString('Search city'),
+                    hintText: lnProvider.getString('Search city'),
                     prefixIcon: const Icon(Icons.search_rounded),
                     onChanged: (v) => p.searchState(context, v, isSearching: true),
                   ),
                   const SizedBox(height: 14),
-                  if (p.statesDropdownList.isNotEmpty &&
+                  if (p.isLoading && p.statesDropdownList.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(FMColors.magenta),
+                        ),
+                      ),
+                    )
+                  else if (p.hasError && p.statesDropdownList.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: FMScreenState.error(
+                        title: lnProvider.getString('Failed to load cities'),
+                        message: lnProvider.getString('Please check your connection and try again.'),
+                        actionLabel: lnProvider.getString('Retry'),
+                        onAction: () => p.fetchStates(context, isrefresh: true),
+                      ),
+                    )
+                  else if (p.statesDropdownList.isNotEmpty &&
                       p.statesDropdownList[0] != 'Select City')
                     ListView.separated(
                       shrinkWrap: true,
@@ -74,51 +123,66 @@ class StateDropdownPopup extends StatelessWidget {
                       itemCount: p.statesDropdownList.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, i) {
+                        final isSelected = p.selectedState == p.statesDropdownList[i];
                         return InkWell(
                           onTap: () {
-                            p.setStatesValue(p.statesDropdownList[i]);
-                            p.setSelectedStatesId(
-                              p.statesDropdownIndexList[
-                                  p.statesDropdownList.indexOf(
-                                      p.statesDropdownList[i])],
-                            );
+                            final chosenCity = p.statesDropdownList[i];
+                            final chosenCityId = p.statesDropdownIndexList[
+                                p.statesDropdownList.indexOf(chosenCity)];
+
+                            p.setStatesValue(chosenCity);
+                            p.setSelectedStatesId(chosenCityId);
                             Navigator.pop(context);
+
+                            // Cascade to Area: clear previous area and load areas for new city
                             final areaProv = Provider.of<AreaDropdownService>(context,
-                                    listen: false);
-                            areaProv.setAreaDefault();
-                            areaProv.fetchArea(context, isrefresh: true);
-                            final sProvider = Provider.of<
-                                    SearchBarWithDropdownService>(
-                                context,
                                 listen: false);
-                            sProvider.setCityValue(p.selectedState);
-                            sProvider.setSelectedCityId(p.selectedStateId);
-                            sProvider.fetchService(context);
+                            areaProv.clearArea();
+                            areaProv.fetchArea(context, isrefresh: true);
+
+                            try {
+                              final sProvider = Provider.of<
+                                      SearchBarWithDropdownService>(
+                                  context,
+                                  listen: false);
+                              sProvider.setCityValue(chosenCity);
+                              sProvider.setSelectedCityId(chosenCityId);
+                            } catch (_) {}
                           },
                           child: FMSurfaceCard(
+                            borderColor: isSelected ? FMColors.magenta : FMColors.border,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 14,
                             ),
-                            child: Text(
-                              lnProvider.getString('${p.statesDropdownList[i]}'),
-                              style: Theme.of(context).textTheme.bodyMedium,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  lnProvider.getString(p.statesDropdownList[i]),
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                                        color: isSelected ? FMColors.magentaLight : FMColors.textPrimary,
+                                      ),
+                                ),
+                                if (isSelected)
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    size: 18,
+                                    color: FMColors.magenta,
+                                  ),
+                              ],
                             ),
                           ),
                         );
                       },
                     )
-                  else if (p.statesDropdownList.isNotEmpty)
-                    FMScreenState.empty(
-                      title: lnProvider.getString('No city found'),
-                      message: '',
-                    )
                   else
-                    const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(FMColors.magenta),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: FMScreenState.empty(
+                        title: lnProvider.getString('No city found'),
+                        message: '',
                       ),
                     ),
                 ],

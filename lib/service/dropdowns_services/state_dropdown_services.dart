@@ -90,7 +90,7 @@ class StateDropdownService with ChangeNotifier {
     try {
       final response = await http
           .get(Uri.parse('$baseApi/country/service-city/$selectedCountryId?page=$currentPage'))
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 12));
 
       setLoadingFalse();
 

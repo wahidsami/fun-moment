@@ -15,7 +15,7 @@ class StateDropdown extends StatelessWidget {
     return Consumer<StateDropdownService>(
       builder: (context, p, child) => InkWell(
         onTap: () {
-          // p.fetchStates(context, isrefresh: true);
+          p.fetchStates(context);
           showModalBottomSheet(
               context: context,
               isScrollControlled: true,
@@ -27,7 +27,8 @@ class StateDropdown extends StatelessWidget {
               });
         },
         child: dropdownPlaceholder(
-            hintText: p.selectedState, textWidth: textWidth),
+            hintText: p.selectedState ?? lnProvider.getString('Choose city'),
+            textWidth: textWidth),
       ),
     );
   }

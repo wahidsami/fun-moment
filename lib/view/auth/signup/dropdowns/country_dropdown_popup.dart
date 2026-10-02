@@ -8,14 +8,33 @@ import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
-class CountryDropdownPopup extends StatelessWidget {
+class CountryDropdownPopup extends StatefulWidget {
   const CountryDropdownPopup({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final RefreshController refreshController =
-        RefreshController(initialRefresh: true);
+  State<CountryDropdownPopup> createState() => _CountryDropdownPopupState();
+}
 
+class _CountryDropdownPopupState extends State<CountryDropdownPopup> {
+  late final RefreshController _refreshController;
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshController = RefreshController(initialRefresh: false);
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _refreshController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: FMColors.background,
       appBar: AppBar(
@@ -24,7 +43,7 @@ class CountryDropdownPopup extends StatelessWidget {
         title: Text(lnProvider.getString('Search country')),
       ),
       body: SmartRefresher(
-        controller: refreshController,
+        controller: _refreshController,
         enablePullUp: true,
         enablePullDown: context.watch<CountryDropdownService>().currentPage > 1
             ? false
@@ -32,11 +51,11 @@ class CountryDropdownPopup extends StatelessWidget {
         onRefresh: () async {
           final result =
               await Provider.of<CountryDropdownService>(context, listen: false)
-                  .fetchCountries(context);
+                  .fetchCountries(context, isrefresh: true);
           if (result) {
-            refreshController.refreshCompleted();
+            _refreshController.refreshCompleted();
           } else {
-            refreshController.refreshFailed();
+            _refreshController.refreshFailed();
           }
         },
         onLoading: () async {
@@ -44,11 +63,13 @@ class CountryDropdownPopup extends StatelessWidget {
               await Provider.of<CountryDropdownService>(context, listen: false)
                   .fetchCountries(context);
           if (result) {
-            refreshController.loadComplete();
+            _refreshController.loadComplete();
           } else {
-            refreshController.loadNoData();
+            _refreshController.loadNoData();
             Future.delayed(const Duration(seconds: 1), () {
-              refreshController.resetNoData();
+              if (mounted) {
+                _refreshController.resetNoData();
+              }
             });
           }
         },
@@ -59,7 +80,7 @@ class CountryDropdownPopup extends StatelessWidget {
               builder: (context, p, child) => Column(
                 children: [
                   FMTextField(
-                    controller: TextEditingController(),
+                    controller: _searchController,
                     label: lnProvider.getString('Search country'),
                     hintText: lnProvider.getString('Search country'),
                     prefixIcon: const Icon(Icons.search_rounded),
@@ -85,9 +106,11 @@ class CountryDropdownPopup extends StatelessWidget {
                             Provider.of<StateDropdownService>(context,
                                     listen: false)
                                 .setStateDefault();
-                            Provider.of<SearchBarWithDropdownService>(context,
-                                    listen: false)
-                                .fetchService(context);
+                            try {
+                              Provider.of<SearchBarWithDropdownService>(context,
+                                      listen: false)
+                                  .fetchService(context);
+                            } catch (_) {}
                           },
                           child: FMSurfaceCard(
                             padding: const EdgeInsets.symmetric(
@@ -95,25 +118,17 @@ class CountryDropdownPopup extends StatelessWidget {
                               vertical: 14,
                             ),
                             child: Text(
-                              lnProvider.getString('${p.countryDropdownList[i]}'),
+                              lnProvider.getString(p.countryDropdownList[i]),
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           ),
                         );
                       },
                     )
-                  else if (p.countryDropdownList.isNotEmpty)
+                  else
                     FMScreenState.empty(
                       title: lnProvider.getString('No country found'),
                       message: '',
-                    )
-                  else
-                    const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(FMColors.magenta),
-                      ),
                     ),
                 ],
               ),

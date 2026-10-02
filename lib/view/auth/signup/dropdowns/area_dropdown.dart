@@ -14,7 +14,7 @@ class AreaDropdown extends StatelessWidget {
     return Consumer<AreaDropdownService>(
       builder: (context, p, child) => InkWell(
         onTap: () {
-          // p.fetchArea(context, isrefresh: true);
+          p.fetchArea(context);
           showModalBottomSheet(
               context: context,
               isScrollControlled: true,
@@ -25,7 +25,8 @@ class AreaDropdown extends StatelessWidget {
                     child: const AreaDropdownPopup());
               });
         },
-        child: dropdownPlaceholder(hintText: p.selectedArea),
+        child: dropdownPlaceholder(
+            hintText: p.selectedArea ?? lnProvider.getString('Choose area')),
       ),
     );
   }

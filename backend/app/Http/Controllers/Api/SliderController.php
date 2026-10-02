@@ -12,14 +12,28 @@ class SliderController extends Controller
 {
     public function slider(){
         $slider = Slider::select('background_image','title','sub_title', 'service_id')->get();
-        $image_url=[];
-
+        $image_url = [];
 
         foreach($slider as $sli){
-            $image_url[]= get_attachment_image_by_id($sli->background_image);
+            $bg = $sli->background_image;
+            if (!empty($bg) && (is_int($bg) || (is_string($bg) && ctype_digit($bg)))) {
+                $attach = get_attachment_image_by_id((int)$bg);
+                if (!empty($attach) && is_array($attach) && !empty($attach['img_url'])) {
+                    $image_url[] = $attach;
+                    continue;
+                }
+            }
+
+            // If non-numeric filename or unresolved ID, return clean object structure rather than empty array
+            $image_url[] = [
+                'image_id' => null,
+                'path' => is_string($bg) ? $bg : null,
+                'img_url' => null,
+                'img_alt' => null,
+            ];
         }
 
-        if($slider){
+        if($slider->isNotEmpty()){
             return response()->success([
                 'slider-details'=>$slider,
                 'image_url'=>$image_url,

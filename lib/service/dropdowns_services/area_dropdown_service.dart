@@ -37,6 +37,19 @@ class AreaDropdownService with ChangeNotifier {
     notifyListeners();
   }
 
+  void clearArea() {
+    selectedArea = null;
+    selectedAreaId = null;
+    areaDropdownList.clear();
+    areaDropdownIndexList.clear();
+    _allAreas.clear();
+    _allAreaIds.clear();
+    hasError = false;
+    errorMessage = null;
+    currentPage = 1;
+    notifyListeners();
+  }
+
   setAreaDefault() {
     areaDropdownList = ['Olaya'];
     areaDropdownIndexList = [2];
@@ -94,6 +107,8 @@ class AreaDropdownService with ChangeNotifier {
     if (isrefresh) {
       areaDropdownList = [];
       areaDropdownIndexList = [];
+      _allAreas.clear();
+      _allAreaIds.clear();
       currentPage = 1;
     }
 
@@ -109,14 +124,17 @@ class AreaDropdownService with ChangeNotifier {
     if (selectedCountryId == defaultId || selectedCountryId == '0' || selectedCountryId == null) {
       selectedCountryId = saudiCountryId;
     }
-    if (selectedStateId == defaultId || selectedStateId == '0' || selectedStateId == null) {
-      selectedStateId = 2;
+
+    if (selectedStateId == null || selectedStateId == defaultId || selectedStateId == '0') {
+      setLoadingFalse();
+      notifyListeners();
+      return false;
     }
 
     try {
       final response = await http
           .get(Uri.parse('$baseApi/country/service-city/service-area/$selectedCountryId/$selectedStateId?page=$currentPage'))
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 12));
 
       setLoadingFalse();
 
@@ -150,21 +168,40 @@ class AreaDropdownService with ChangeNotifier {
         }
       }
 
-      // Default fallback to Olaya
-      selectedArea = 'Olaya';
-      selectedAreaId = 2;
-      areaDropdownList = ['Olaya'];
-      areaDropdownIndexList = [2];
+      // If no areas exist for this city
+      if (selectedStateId == 2 || selectedStateId == '2') {
+        // Riyadh fallback
+        selectedArea = 'Olaya';
+        selectedAreaId = 2;
+        areaDropdownList = ['Olaya'];
+        areaDropdownIndexList = [2];
+      } else {
+        selectedArea = null;
+        selectedAreaId = null;
+        areaDropdownList.clear();
+        areaDropdownIndexList.clear();
+        _allAreas.clear();
+        _allAreaIds.clear();
+      }
       notifyListeners();
       return true;
     } catch (e) {
       setLoadingFalse();
       hasError = true;
-      errorMessage = 'Could not load areas. Using default.';
-      selectedArea = 'Olaya';
-      selectedAreaId = 2;
-      areaDropdownList = ['Olaya'];
-      areaDropdownIndexList = [2];
+      errorMessage = 'Could not load areas.';
+      if (selectedStateId == 2 || selectedStateId == '2') {
+        selectedArea = 'Olaya';
+        selectedAreaId = 2;
+        areaDropdownList = ['Olaya'];
+        areaDropdownIndexList = [2];
+      } else {
+        selectedArea = null;
+        selectedAreaId = null;
+        areaDropdownList.clear();
+        areaDropdownIndexList.clear();
+        _allAreas.clear();
+        _allAreaIds.clear();
+      }
       notifyListeners();
       return false;
     }
@@ -180,7 +217,6 @@ class AreaDropdownService with ChangeNotifier {
       setAreaBasedOnUserProfile(context);
     } else {
       if (data != null && data.serviceAreas.data.isNotEmpty) {
-        // Prioritize Olaya if present or first
         int olayaIdx = data.serviceAreas.data
             .indexWhere((a) => a.id == 2 || a.serviceArea.toLowerCase().contains('olaya'));
         if (olayaIdx >= 0) {
@@ -191,8 +227,8 @@ class AreaDropdownService with ChangeNotifier {
           selectedAreaId = data.serviceAreas.data[0].id;
         }
       } else {
-        selectedArea = 'Olaya';
-        selectedAreaId = 2;
+        selectedArea = null;
+        selectedAreaId = null;
       }
     }
 
@@ -207,8 +243,8 @@ class AreaDropdownService with ChangeNotifier {
     final query = searchText.trim().toLowerCase();
 
     if (query.isEmpty) {
-      areaDropdownList = List.from(_allAreas.isNotEmpty ? _allAreas : ['Olaya']);
-      areaDropdownIndexList = List.from(_allAreaIds.isNotEmpty ? _allAreaIds : [2]);
+      areaDropdownList = List.from(_allAreas);
+      areaDropdownIndexList = List.from(_allAreaIds);
       notifyListeners();
       return true;
     }
@@ -232,32 +268,12 @@ class AreaDropdownService with ChangeNotifier {
       return true;
     }
 
-    if (isOlayaSearch) {
+    if (isOlayaSearch && _allAreas.contains('Olaya')) {
       areaDropdownList = ['Olaya'];
       areaDropdownIndexList = [2];
       notifyListeners();
       return true;
     }
-
-    // Try backend search
-    try {
-      var response = await http
-          .get(Uri.parse('$baseApi/area-search?q=$searchText'))
-          .timeout(const Duration(seconds: 5));
-
-      if ((response.statusCode == 200 || response.statusCode == 201) &&
-          jsonDecode(response.body)['service_areas']['data'].isNotEmpty) {
-        var data = AreaDropdownModel.fromJson(jsonDecode(response.body));
-        areaDropdownList.clear();
-        areaDropdownIndexList.clear();
-        for (int i = 0; i < data.serviceAreas.data.length; i++) {
-          areaDropdownList.add(data.serviceAreas.data[i].serviceArea);
-          areaDropdownIndexList.add(data.serviceAreas.data[i].id);
-        }
-        notifyListeners();
-        return true;
-      }
-    } catch (_) {}
 
     areaDropdownList.clear();
     areaDropdownIndexList.clear();

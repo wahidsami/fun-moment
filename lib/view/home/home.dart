@@ -148,13 +148,13 @@ class _HomepageState extends State<Homepage> {
                 const SizedBox(height: 20),
                 Consumer<SliderService>(
                   builder: (context, provider, child) =>
-                      provider.sliderImageList.isNotEmpty
-                          ? SliderHome(
+                      provider.isLoading && provider.sliderImageList.isEmpty
+                          ? const _DarkLoadingCard(height: 180)
+                          : SliderHome(
                               cc: cc,
                               sliderDetailsList: provider.sliderDetailsList,
                               sliderImageList: provider.sliderImageList,
-                            )
-                          : const _DarkLoadingCard(height: 180),
+                            ),
                 ),
                 const SizedBox(height: 22),
                 Consumer<AppStringService>(

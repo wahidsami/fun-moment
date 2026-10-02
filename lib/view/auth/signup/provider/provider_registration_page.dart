@@ -116,7 +116,7 @@ class _ProviderRegistrationPageState extends State<ProviderRegistrationPage> {
 
     prs.model.serviceCity = int.tryParse(stateId?.toString() ?? '') ?? 0;
     prs.model.serviceArea = int.tryParse(areaId?.toString() ?? '') ?? 0;
-    prs.model.countryId = int.tryParse(countryId?.toString() ?? '') ?? 166;
+    prs.model.countryId = int.tryParse(countryId?.toString() ?? '') ?? saudiCountryId;
 
     if (prs.model.sellerType == 1) {
       prs.model.nationalIdNumber = nationalIdController.text.trim();
