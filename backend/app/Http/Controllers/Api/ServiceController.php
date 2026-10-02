@@ -240,13 +240,29 @@ class ServiceController extends Controller
             'message' => 'required',
         ]);
 
+        $user = auth('sanctum')->user();
+        if (!$user || $user->user_type !== 1) {
+            return response()->error([
+                'message' => __('You need to buy this service to leave feedback'),
+            ]);
+        }
+
         $service_details = Service::select('id','seller_id')->where('id',$id)->first();
-        $order_count = Order::where(['service_id' => $service_details->id,'buyer_id' => auth('sanctum')->user()->id,'status' => 'complete' ])->count();
+        if (!$service_details) {
+            return response()->error([
+                'message' => __('Service not found'),
+            ]);
+        }
+
+        $completed_order = Order::where('service_id', $service_details->id)
+            ->where('buyer_id', $user->id)
+            ->whereIn('status', [2, 3])
+            ->latest()
+            ->first();
         
-        
-        if(!empty($order_count) && $order_count > 0){
+        if($completed_order){
             //todo add another filter to check this buyer already leave a review in this or not
-            $old_review = Review::where(['service_id' => $service_details->id,'buyer_id' => auth('sanctum')->user()->id])->count();
+            $old_review = Review::where(['service_id' => $service_details->id,'buyer_id' => $user->id])->count();
             if($old_review > 0){
                  return response()->error([
                         'message'=>__('you have already leave a review in this service'),
@@ -255,11 +271,13 @@ class ServiceController extends Controller
              Review::create([
                 'service_id' => $service_details->id,
                 'seller_id' => $service_details->seller_id,
-                'buyer_id' => auth('sanctum')->user()->id,
+                'buyer_id' => $user->id,
+                'order_id' => $completed_order->id,
                 'rating' => $request->rating,
                 'name' => $request->name,
                 'email' => $request->email,
                 'message' => $request->message,
+                'type' => 1,
             ]);
     
             return response()->success([
@@ -516,6 +534,7 @@ class ServiceController extends Controller
         }
 
         $service_id = request()->query('service_id') ?? request()->service_id;
+        $date = request()->query('date') ?? request()->date;
 
         $dayMap = [
             'sunday' => 'Sun', 'sun' => 'Sun',
@@ -551,6 +570,7 @@ class ServiceController extends Controller
         if (!$get_day || (int) $get_day->status === 0) {
             return response()->json([
                 'status' => __('no schedule'),
+                'schedules' => [],
             ]);
         }
 
@@ -572,6 +592,81 @@ class ServiceController extends Controller
             $schedules = $schedulesQuery->orderBy('id', 'asc')->get();
         }
 
+        // Authoritative availability check: filter out already-booked or temporarily held slots
+        $reqDateYmd = null;
+        if (!empty($date)) {
+            try {
+                $reqDateYmd = \Carbon\Carbon::parse($date)->format('Y-m-d');
+            } catch (\Exception $e) {
+                $reqDateYmd = null;
+            }
+        }
+
+        if ($schedules->isNotEmpty() && $reqDateYmd) {
+            // Active bookings / holds for this provider
+            $holdingOrders = Order::where('seller_id', $seller_id)
+                ->where('status', '!=', 4) // exclude cancelled orders
+                ->where(function ($q) {
+                    // Confirmed/completed/delivered OR paid orders
+                    $q->whereIn('status', [1, 2, 3])
+                      ->orWhere('payment_status', 'complete')
+                      // Offline orders pending confirmation (COD, manual payment)
+                      ->orWhere(function ($q2) {
+                          $q2->where('status', 0)
+                             ->whereIn('payment_gateway', ['cash_on_delivery', 'manual_payment'])
+                             ->whereNotIn('payment_status', ['failed', 'canceled']);
+                      })
+                      // Online orders currently holding the slot while payment is pending (20-minute reservation window)
+                      ->orWhere(function ($q3) {
+                          $q3->where('status', 0)
+                             ->whereNotIn('payment_gateway', ['cash_on_delivery', 'manual_payment'])
+                             ->where('payment_status', 'pending')
+                             ->where('created_at', '>=', now()->subMinutes(20));
+                      });
+                })
+                ->get();
+
+            if ($holdingOrders->isNotEmpty()) {
+                $parseSlotSec = function ($slotStr) {
+                    if (empty($slotStr)) return null;
+                    $parts = explode('-', $slotStr);
+                    if (count($parts) < 2) return null;
+                    $s = strtotime(trim($parts[0]));
+                    $e = strtotime(trim($parts[1]));
+                    if ($s === false || $e === false) return null;
+                    $sSec = (int) date('H', $s) * 3600 + (int) date('i', $s) * 60;
+                    $eSec = (int) date('H', $e) * 3600 + (int) date('i', $e) * 60;
+                    return ['start' => $sSec, 'end' => $eSec];
+                };
+
+                $schedules = $schedules->filter(function ($sch) use ($holdingOrders, $reqDateYmd, $parseSlotSec) {
+                    $schSlot = $parseSlotSec($sch->schedule);
+                    foreach ($holdingOrders as $ord) {
+                        if (empty($ord->date)) continue;
+                        $ordDateYmd = null;
+                        try {
+                            $ordDateYmd = \Carbon\Carbon::parse($ord->date)->format('Y-m-d');
+                        } catch (\Exception $e) {
+                            $ordDateYmd = null;
+                        }
+
+                        if ($ordDateYmd === $reqDateYmd) {
+                            $ordSlot = $parseSlotSec($ord->schedule);
+                            if ($schSlot && $ordSlot) {
+                                // Overlap check: startA < endB && endA > startB
+                                if ($schSlot['start'] < $ordSlot['end'] && $schSlot['end'] > $ordSlot['start']) {
+                                    return false; // Conflicting/overlapping slot -> exclude from available slots
+                                }
+                            } elseif (trim($ord->schedule) === trim($sch->schedule)) {
+                                return false; // Exact match -> exclude
+                            }
+                        }
+                    }
+                    return true; // Slot is available
+                })->values();
+            }
+        }
+
         if ($schedules->count() >= 1) {
             return response()->json([
                 'day' => $get_day,
@@ -580,6 +675,7 @@ class ServiceController extends Controller
         }
         return response()->json([
             'status' => __('no schedule'),
+            'schedules' => [],
         ]);
     }
 
