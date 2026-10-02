@@ -141,14 +141,24 @@ class MyOrder {
         couponType: json["coupon_type"],
         couponAmount: json["coupon_amount"],
         commissionType: json["commission_type"],
-        commissionCharge: json["commission_charge"],
+        commissionCharge: json["commission_charge"] is int
+            ? json["commission_charge"]
+            : int.tryParse(json["commission_charge"]?.toString() ?? ''),
         commissionAmount: json["commission_amount"],
-        paymentGateway: json["payment_gateway"],
-        paymentStatus: json["payment_status"],
-        status: json["status"],
-        isOrderOnline: json["is_order_online"],
-        orderCompleteRequest: json["order_complete_request"],
-        cancelOrderMoneyReturn: json["cancel_order_money_return"],
+        paymentGateway: json["payment_gateway"]?.toString(),
+        paymentStatus: json["payment_status"]?.toString(),
+        status: json["status"] is int
+            ? json["status"]
+            : int.tryParse(json["status"]?.toString() ?? ''),
+        isOrderOnline: json["is_order_online"] is int
+            ? json["is_order_online"]
+            : int.tryParse(json["is_order_online"]?.toString() ?? ''),
+        orderCompleteRequest: json["order_complete_request"] is int
+            ? json["order_complete_request"]
+            : int.tryParse(json["order_complete_request"]?.toString() ?? ''),
+        cancelOrderMoneyReturn: json["cancel_order_money_return"] is int
+            ? json["cancel_order_money_return"]
+            : int.tryParse(json["cancel_order_money_return"]?.toString() ?? ''),
         transactionId: json["transaction_id"],
         orderNote: json["order_note"],
         manualPaymentImage: json["manual_payment_image"],

@@ -43,11 +43,18 @@ class _OrdersPageState extends State<OrdersPage> {
         backgroundColor: cc.bgColor,
         body: SafeArea(
           child: Consumer<ProfileService>(builder: (context, ps, child) {
-            return ps.profileDetails == null || ps.profileDetails is String
-                ? const LoginOrRegister()
-                : FutureBuilder(
-                    future: Provider.of<MyOrdersService>(context, listen: false)
-                        .fetchMyOrders(),
+            if (ps.profileDetails == null || ps.profileDetails is String) {
+              return const LoginOrRegister();
+            }
+            if (!ps.isRoleResolved) {
+              return Container(
+                  alignment: Alignment.center,
+                  height: MediaQuery.of(context).size.height - 120,
+                  child: OthersHelper().showLoading(cc.primaryColor));
+            }
+            return FutureBuilder(
+                future: Provider.of<MyOrdersService>(context, listen: false)
+                    .fetchMyOrders(isSellerOverride: ps.isSeller),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return Container(
@@ -56,7 +63,13 @@ class _OrdersPageState extends State<OrdersPage> {
                             child: OthersHelper().showLoading(cc.primaryColor));
                       }
                       return Consumer<MyOrdersService>(
-                        builder: (context, provider, child) => Container(
+                        builder: (context, provider, child) {
+                          final count = provider.myServices is List
+                              ? provider.myServices.length
+                              : 0;
+                          debugPrint(
+                              '[PROVIDER ORDERS] UI rebuild with orders count: $count');
+                          return Container(
                             padding:
                                 EdgeInsets.symmetric(horizontal: screenPadding),
                             child: Column(
@@ -165,27 +178,33 @@ class _OrdersPageState extends State<OrdersPage> {
                                                                               cc.greyFour),
 
                                                                           //popup button
-                                                                          PopupMenuButton(
-                                                                            itemBuilder: (BuildContext context) =>
-                                                                                <PopupMenuEntry>[
-                                                                              for (int j = 0; j < OrdersHelper().ordersPopupMenuList.length; j++)
-                                                                                PopupMenuItem(
-                                                                                  onTap: () {
-                                                                                    Future.delayed(Duration.zero, () {
-                                                                                      //
-
-                                                                                      if (j == 1 && (provider.myServices[i].paymentStatus == 'complete' || provider.myServices[i].status != 0)) {
-                                                                                        //0 means pending
-                                                                                        OthersHelper().showToast('You can not cancel this order', Colors.black);
-                                                                                        return;
-                                                                                      }
-                                                                                      OrdersHelper().navigateMyOrders(context, index: j, serviceId: provider.myServices[i].serviceId, orderId: provider.myServices[i].id);
-                                                                                    });
-                                                                                  },
-                                                                                  child: Text(lnProvider.getString(OrdersHelper().ordersPopupMenuList[j])),
-                                                                                ),
-                                                                            ],
-                                                                          )
+                                                                          Builder(builder: (context) {
+                                                                            final actionItems = OrdersHelper().getOrderActions(
+                                                                              isSeller: ps.isSeller,
+                                                                              orderStatus: provider.myServices[i].status,
+                                                                              paymentStatus: provider.myServices[i].paymentStatus,
+                                                                            );
+                                                                            if (actionItems.isEmpty) return const SizedBox.shrink();
+                                                                            return PopupMenuButton(
+                                                                              itemBuilder: (BuildContext context) =>
+                                                                                  <PopupMenuEntry>[
+                                                                                for (int j = 0; j < actionItems.length; j++)
+                                                                                  PopupMenuItem(
+                                                                                    onTap: () {
+                                                                                      Future.delayed(Duration.zero, () {
+                                                                                        OrdersHelper().handleOrderAction(
+                                                                                          context,
+                                                                                          actionKey: actionItems[j].actionKey,
+                                                                                          serviceId: provider.myServices[i].serviceId,
+                                                                                          orderId: provider.myServices[i].id,
+                                                                                        );
+                                                                                      });
+                                                                                    },
+                                                                                    child: Text(lnProvider.getString(actionItems[j].title)),
+                                                                                  ),
+                                                                              ],
+                                                                            );
+                                                                          })
                                                                         ],
                                                                       )
                                                                     ],
@@ -274,8 +293,8 @@ class _OrdersPageState extends State<OrdersPage> {
                                                                       'Billed',
                                                                       rtlP.currencyDirection ==
                                                                               'left'
-                                                                          ? '${rtlP.currency}${provider.myServices[i].total.toStringAsFixed(2)}'
-                                                                          : '${provider.myServices[i].total.toStringAsFixed(2)}${rtlP.currency}',
+                                                                          ? '${rtlP.currency}${(provider.myServices[i].total ?? 0.0).toStringAsFixed(2)}'
+                                                                          : '${(provider.myServices[i].total ?? 0.0).toStringAsFixed(2)}${rtlP.currency}',
                                                                     ),
                                                                   ),
                                                                 )
@@ -297,10 +316,13 @@ class _OrdersPageState extends State<OrdersPage> {
                                                 .showLoading(cc.primaryColor)),
                                   ),
 
-                                  //
-                                ])),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
                       );
-                    });
           }),
         ));
   }
