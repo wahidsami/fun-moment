@@ -19,6 +19,7 @@ class CategoryService with ChangeNotifier {
     }
 
     _isFetching = true;
+    notifyListeners();
 
     // Fast-path: on cold launch, immediately restore from local cache if memory state is empty
     if (categories == null || categories == 'error') {
@@ -50,6 +51,7 @@ class CategoryService with ChangeNotifier {
       }
     } finally {
       _isFetching = false;
+      notifyListeners();
     }
   }
 
@@ -57,7 +59,7 @@ class CategoryService with ChangeNotifier {
     try {
       final response = await http
           .get(Uri.parse('$baseApi/category'))
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final decoded = jsonDecode(response.body);

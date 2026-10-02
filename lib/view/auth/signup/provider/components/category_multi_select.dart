@@ -39,6 +39,7 @@ class _CategoryMultiSelectState extends State<CategoryMultiSelect> {
         return Consumer<CategoryService>(
           builder: (context, catService, child) {
             final categories = catService.categoriesDropdownList;
+            final bool isLoading = catService.isFetching || (catService.categories == null && categories.isEmpty);
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,9 +73,9 @@ class _CategoryMultiSelectState extends State<CategoryMultiSelect> {
                   style: const TextStyle(color: FMColors.textMuted, fontSize: 11),
                 ),
                 const SizedBox(height: 10),
-                if (catService.isFetching && (categories.isEmpty)) ...[
+                if (isLoading) ...[
                   const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
+                    padding: EdgeInsets.symmetric(vertical: 20),
                     child: Center(
                       child: CircularProgressIndicator(color: FMColors.cyan, strokeWidth: 2),
                     ),

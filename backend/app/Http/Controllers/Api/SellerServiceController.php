@@ -92,6 +92,47 @@ class SellerServiceController extends Controller
         return response()->success(['msg' => $msg]);
     }
 
+    public function allowedCategories()
+    {
+        $user = Auth::guard('sanctum')->user();
+        if (!$user) {
+            return response()->error(['message' => __('Unauthenticated')]);
+        }
+
+        $categories = $user->registeredCategories()
+            ->select('categories.id', 'categories.name', 'categories.name_ar', 'categories.slug', 'categories.icon', 'categories.mobile_icon')
+            ->where('categories.status', 1)
+            ->orderBy('categories.sort_order', 'asc')
+            ->orderBy('categories.id', 'asc')
+            ->get()
+            ->transform(function ($item) {
+                $mobile_icon = get_attachment_image_by_id($item->mobile_icon);
+                $item->mobile_icon = !empty($mobile_icon) ? $mobile_icon['img_url'] : null;
+                return $item;
+            });
+
+        $isLegacy = false;
+        if ($categories->isEmpty() && !$user->registeredCategories()->exists()) {
+            $isLegacy = true;
+            $categories = Category::select('id', 'name', 'name_ar', 'slug', 'icon', 'mobile_icon')
+                ->where('status', 1)
+                ->orderBy('sort_order', 'asc')
+                ->orderBy('id', 'asc')
+                ->get()
+                ->transform(function ($item) {
+                    $mobile_icon = get_attachment_image_by_id($item->mobile_icon);
+                    $item->mobile_icon = !empty($mobile_icon) ? $mobile_icon['img_url'] : null;
+                    return $item;
+                });
+        }
+
+        return response()->success([
+            'categories' => $categories,
+            'category' => $categories,
+            'is_legacy' => $isLegacy,
+        ]);
+    }
+
     public function addService(Request $request)
     {
         if ($request->isMethod('post')) {
@@ -100,8 +141,6 @@ class SellerServiceController extends Controller
             if (empty($city_id) || !\App\ServiceCity::where('id', $city_id)->exists()) {
                 $defaultCity = \App\ServiceCity::where('status', 1)->first() ?: \App\ServiceCity::first();
                 $city_id = $defaultCity ? $defaultCity->id : null;
-            }
-            if (empty($city_id)) {
                 return response()->json([
                     'message' => __('Please complete your service city/location in your profile settings before creating a service.'),
                     'errors' => [
@@ -111,11 +150,55 @@ class SellerServiceController extends Controller
             }
 
             $request->validate([
-                'category_id' => 'required',
+                'category_id' => 'required|integer|exists:categories,id',
                 'title' => 'required|max:191',
                 'description' => 'required|min:10',
                 'price' => 'required|numeric|min:0',
             ]);
+
+            // Scope Authorization Check
+            if ($user->registeredCategories()->exists()) {
+                $allowedIds = $user->registeredCategories()->pluck('categories.id')->map(function ($id) {
+                    return (int) $id;
+                })->all();
+
+                if (!in_array((int) $request->category_id, $allowedIds, true)) {
+                    return response()->json([
+                        'message' => __('You are not authorized to create services in this category. It is outside your registered provider scope.'),
+                        'errors' => [
+                            'category_id' => [__('You are not authorized to create services in this category. It is outside your registered provider scope.')]
+                        ]
+                    ], 422);
+                }
+            }
+
+            // Descendant consistency checks
+            if ($request->filled('subcategory_id')) {
+                $subValid = Subcategory::where('id', $request->subcategory_id)->where('category_id', $request->category_id)->exists();
+                if (!$subValid) {
+                    return response()->json([
+                        'message' => __('Selected subcategory does not belong to the selected category.'),
+                        'errors' => [
+                            'subcategory_id' => [__('Selected subcategory does not belong to the selected category.')]
+                        ]
+                    ], 422);
+                }
+            }
+
+            if ($request->filled('child_category_id')) {
+                $childQuery = ChildCategory::where('id', $request->child_category_id)->where('category_id', $request->category_id);
+                if ($request->filled('subcategory_id')) {
+                    $childQuery->where('sub_category_id', $request->subcategory_id);
+                }
+                if (!$childQuery->exists()) {
+                    return response()->json([
+                        'message' => __('Selected child category does not belong to the selected category/subcategory.'),
+                        'errors' => [
+                            'child_category_id' => [__('Invalid child category.')]
+                        ]
+                    ], 422);
+                }
+            }
             
             $seller_country_id = $user->country_id;
             $country_tax = $seller_country_id ? Tax::select('tax')->where('country_id', $seller_country_id)->first() : null;
@@ -249,11 +332,59 @@ class SellerServiceController extends Controller
             }
 
             $request->validate([
-                'category_id' => 'nullable',
+                'category_id' => 'nullable|integer|exists:categories,id',
                 'title' => 'required|max:191',
                 'description' => 'required|min:10',
                 'price' => 'nullable|numeric|min:0',
             ]);
+
+            $user = Auth::guard('sanctum')->user();
+            if ($request->filled('category_id')) {
+                if ($user && $user->registeredCategories()->exists()) {
+                    $allowedIds = $user->registeredCategories()->pluck('categories.id')->map(function ($id) {
+                        return (int) $id;
+                    })->all();
+
+                    if (!in_array((int) $request->category_id, $allowedIds, true)) {
+                        return response()->json([
+                            'message' => __('You are not authorized to update services to this category. It is outside your registered provider scope.'),
+                            'errors' => [
+                                'category_id' => [__('You are not authorized to update services to this category. It is outside your registered provider scope.')]
+                            ]
+                        ], 422);
+                    }
+                }
+            }
+
+            // Descendant consistency checks on update
+            $targetCatId = $request->filled('category_id') ? (int) $request->category_id : (int) $service->category_id;
+            if ($request->filled('subcategory_id')) {
+                $subValid = Subcategory::where('id', $request->subcategory_id)->where('category_id', $targetCatId)->exists();
+                if (!$subValid) {
+                    return response()->json([
+                        'message' => __('Selected subcategory does not belong to the selected category.'),
+                        'errors' => [
+                            'subcategory_id' => [__('Selected subcategory does not belong to the selected category.')]
+                        ]
+                    ], 422);
+                }
+            }
+
+            if ($request->filled('child_category_id')) {
+                $childQuery = ChildCategory::where('id', $request->child_category_id)->where('category_id', $targetCatId);
+                $targetSubId = $request->filled('subcategory_id') ? (int) $request->subcategory_id : (int) $service->subcategory_id;
+                if ($targetSubId) {
+                    $childQuery->where('sub_category_id', $targetSubId);
+                }
+                if (!$childQuery->exists()) {
+                    return response()->json([
+                        'message' => __('Selected child category does not belong to the selected category/subcategory.'),
+                        'errors' => [
+                            'child_category_id' => [__('Invalid child category.')]
+                        ]
+                    ], 422);
+                }
+            }
 
             $image_id = $service->image;
             if($request->file('image')){

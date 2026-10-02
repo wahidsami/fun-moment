@@ -8,6 +8,7 @@ import 'package:funmoments/helper/extension/string_extension.dart';
 import 'package:funmoments/service/common_service.dart';
 import 'package:funmoments/service/pay_services/stripe_service.dart';
 import 'package:funmoments/service/profile_service.dart';
+import 'package:funmoments/service/provider_service_management_service.dart';
 import 'package:funmoments/service/push_notification_service.dart';
 import 'package:funmoments/view/home/landing_page.dart';
 import 'package:funmoments/view/utils/constant_colors.dart';
@@ -111,6 +112,9 @@ class LoginService with ChangeNotifier {
             .fetchPusherCredential(context: context);
 
         await Provider.of<ProfileService>(context, listen: false).fetchData();
+        try {
+          Provider.of<ProviderServiceManagementService>(context, listen: false).resetState();
+        } catch (_) {}
         //start stripe
         //============>
 

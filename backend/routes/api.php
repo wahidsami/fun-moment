@@ -236,6 +236,8 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         Route::post('schedule/create', [SellerController::class,'scheduleCreate']);
         Route::post('schedule/update', [SellerController::class,'scheduleUpdate']);
         Route::post('schedule/delete', [SellerController::class,'scheduleDelete']);
+        Route::get('allowed-categories', [SellerServiceController::class, 'allowedCategories']);
+        Route::get('service/allowed-categories', [SellerServiceController::class, 'allowedCategories']);
 
         if(moduleExists("Wallet")) {
             Route::group(['prefix' => 'wallet'], function () {

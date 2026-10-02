@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:funmoments/model/categoryModel.dart';
 import 'package:funmoments/service/common_service.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:http/http.dart' as http;
@@ -90,6 +91,8 @@ class ProviderDashboardData {
 
 class ProviderServiceManagementService with ChangeNotifier {
   List<ProviderServiceItem> services = [];
+  List<Category> allowedCategories = [];
+  bool isLoadingAllowedCategories = false;
   bool isLoading = false;
   bool isCreating = false;
   bool isUpdating = false;
@@ -103,12 +106,53 @@ class ProviderServiceManagementService with ChangeNotifier {
 
   void resetState() {
     services = [];
+    allowedCategories = [];
+    isLoadingAllowedCategories = false;
     isLoading = false;
     isCreating = false;
     isUpdating = false;
     isToggling = false;
     dashboardData = null;
     notifyListeners();
+  }
+
+  void clearSessionData() => resetState();
+
+  Future<void> fetchAllowedCategories({bool isRefresh = false}) async {
+    if (!isRefresh && allowedCategories.isNotEmpty) {
+      return;
+    }
+
+    final token = await _getToken();
+    if (token == null) return;
+
+    isLoadingAllowedCategories = true;
+    notifyListeners();
+
+    try {
+      final url = Uri.parse('$baseApi/seller/allowed-categories');
+      final res = await http.get(url, headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      }).timeout(const Duration(seconds: 12));
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final body = jsonDecode(res.body);
+        if (body is Map && (body['categories'] != null || body['category'] != null)) {
+          final catList = body['categories'] ?? body['category'];
+          if (catList is List) {
+            allowedCategories = catList
+                .map((x) => Category.fromJson(x as Map<String, dynamic>))
+                .toList();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchAllowedCategories error: $e');
+    } finally {
+      isLoadingAllowedCategories = false;
+      notifyListeners();
+    }
   }
 
   Future<String?> _getToken() async {

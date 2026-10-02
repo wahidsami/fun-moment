@@ -37,7 +37,7 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<CategoryService>(context, listen: false).fetchCategory();
+      Provider.of<ProviderServiceManagementService>(context, listen: false).fetchAllowedCategories();
     });
   }
 
@@ -450,31 +450,55 @@ class _ProviderAddServicePageState extends State<ProviderAddServicePage> {
                   color: FMColors.surfaceDark,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    isExpanded: true,
-                    dropdownColor: FMColors.surfaceDark,
-                    hint: Text(
-                      lnProvider.getString('Select Category'),
-                      style: const TextStyle(color: FMColors.textMuted),
-                    ),
-                    value: _selectedCategoryId,
-                    items: catService.categoriesDropdownList.map<DropdownMenuItem<int>>((item) {
-                      return DropdownMenuItem<int>(
-                        value: item.id,
-                        child: Text(
-                          item.name ?? '',
-                          style: const TextStyle(color: Colors.white),
+                child: providerService.isLoadingAllowedCategories && providerService.allowedCategories.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: FMColors.magenta,
+                            ),
+                          ),
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setState(() {
-                        _selectedCategoryId = val;
-                      });
-                    },
-                  ),
-                ),
+                      )
+                    : DropdownButtonHideUnderline(
+                        child: DropdownButton<int>(
+                          isExpanded: true,
+                          dropdownColor: FMColors.surfaceDark,
+                          hint: Text(
+                            lnProvider.getString('Select Category'),
+                            style: const TextStyle(color: FMColors.textMuted),
+                          ),
+                          value: providerService.allowedCategories.any((item) {
+                            final itemId = item.id is int ? item.id : int.tryParse(item.id?.toString() ?? '');
+                            return itemId == _selectedCategoryId;
+                          })
+                              ? _selectedCategoryId
+                              : null,
+                          items: providerService.allowedCategories.map<DropdownMenuItem<int>>((item) {
+                            final isArabic = rtl.langSlug.startsWith('ar');
+                            final displayName = (isArabic && item.nameAr != null && item.nameAr!.isNotEmpty)
+                                ? item.nameAr!
+                                : (item.name ?? '');
+                            final itemId = item.id is int ? item.id as int : int.tryParse(item.id?.toString() ?? '') ?? 0;
+                            return DropdownMenuItem<int>(
+                              value: itemId,
+                              child: Text(
+                                displayName,
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedCategoryId = val;
+                            });
+                          },
+                        ),
+                      ),
               ),
               const SizedBox(height: 20),
 
