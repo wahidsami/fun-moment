@@ -1,5 +1,5 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -108,10 +108,22 @@ runAtstart(BuildContext context) async {
 
 final http.Client commonHttpClient = http.Client();
 bool _isHomeBootstrapActive = false;
+bool _hasQueuedRefresh = false;
 
-runAtHome(BuildContext context, {bool isRefresh = false}) async {
-  if (_isHomeBootstrapActive && !isRefresh) {
-    debugPrint('[runAtHome] Bootstrap already active; skipping redundant invocation');
+@visibleForTesting
+void resetHomeBootstrapState() {
+  _isHomeBootstrapActive = false;
+  _hasQueuedRefresh = false;
+}
+
+Future<void> runAtHome(BuildContext context, {bool isRefresh = false}) async {
+  if (_isHomeBootstrapActive) {
+    if (isRefresh) {
+      debugPrint('[runAtHome] Bootstrap already active; queuing single refresh for post-completion');
+      _hasQueuedRefresh = true;
+    } else {
+      debugPrint('[runAtHome] Bootstrap already active; skipping redundant invocation');
+    }
     return;
   }
   _isHomeBootstrapActive = true;
@@ -129,11 +141,14 @@ runAtHome(BuildContext context, {bool isRefresh = false}) async {
     final sliderFuture = Provider.of<SliderService>(context, listen: false)
         .loadSlider(isRefresh: isRefresh, client: commonHttpClient);
 
-    // Give Stage 1 an uncontended dispatch window before triggering secondary endpoints
-    await Future.any([
-      Future.wait([categoryFuture, sliderFuture]),
-      Future.delayed(const Duration(milliseconds: 350)),
-    ]);
+    // Allow Category + Slider priority access to server workers.
+    // Wait for both to complete, or until bounded timeout (5s) expires.
+    await Future.wait([categoryFuture, sliderFuture])
+        .timeout(const Duration(seconds: 5), onTimeout: () {
+      debugPrint(
+          '[runAtHome] Critical stage (Category & Slider) reached 5s boundary; proceeding to Stage 2');
+      return [];
+    });
 
     // ----------------------------------------------------
     // STAGE 2: SECONDARY HOME SERVICES (Bounded Batches)
@@ -158,6 +173,7 @@ runAtHome(BuildContext context, {bool isRefresh = false}) async {
 
     // Small delay between batches to stagger TCP connections
     await Future.delayed(const Duration(milliseconds: 200));
+    if (!context.mounted) return;
 
     // Batch 2B: Jobs & Background services
     try {
@@ -201,5 +217,16 @@ runAtHome(BuildContext context, {bool isRefresh = false}) async {
   } finally {
     _isHomeBootstrapActive = false;
     debugPrint('[runAtHome] Staged home bootstrap complete');
+    if (_hasQueuedRefresh) {
+      _hasQueuedRefresh = false;
+      debugPrint('[runAtHome] Executing queued refresh post-completion');
+      Future.microtask(() {
+        try {
+          if (context.mounted) {
+            runAtHome(context, isRefresh: true);
+          }
+        } catch (_) {}
+      });
+    }
   }
 }

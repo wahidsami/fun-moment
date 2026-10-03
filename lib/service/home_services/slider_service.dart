@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:http/http.dart' as http;
 import 'package:funmoments/model/slider_model.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
@@ -13,13 +14,26 @@ class SliderService with ChangeNotifier {
   bool isLoaded = false;
   bool hasError = false;
 
+  void _safeNotifyListeners() {
+    try {
+      final binding = WidgetsBinding.instance;
+      if (binding.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+        binding.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+        return;
+      }
+    } catch (_) {}
+    notifyListeners();
+  }
+
   void resetState() {
     sliderDetailsList = [];
     sliderImageList = [];
     isLoading = false;
     isLoaded = false;
     hasError = false;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   Future<void> loadSlider({bool isRefresh = false, http.Client? client}) async {
@@ -29,7 +43,7 @@ class SliderService with ChangeNotifier {
 
     isLoading = true;
     hasError = false;
-    notifyListeners();
+    _safeNotifyListeners();
 
     final sw = Stopwatch()..start();
     final uri = Uri.parse('$baseApi/slider');
@@ -97,7 +111,9 @@ class SliderService with ChangeNotifier {
         httpClient.close();
       }
       isLoading = false;
-      notifyListeners();
+      debugPrint(
+          '[SliderService] Terminal state reached: isLoaded=$isLoaded, isLoading=$isLoading, hasError=$hasError, images=${sliderImageList.length}');
+      _safeNotifyListeners();
     }
   }
 }

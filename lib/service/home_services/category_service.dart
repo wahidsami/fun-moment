@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:funmoments/model/categoryModel.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,11 +13,24 @@ class CategoryService with ChangeNotifier {
 
   bool get isFetching => _isFetching;
 
+  void _safeNotifyListeners() {
+    try {
+      final binding = WidgetsBinding.instance;
+      if (binding.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+        binding.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+        return;
+      }
+    } catch (_) {}
+    notifyListeners();
+  }
+
   void resetState() {
     categories = null;
     categoriesDropdownList = [];
     _isFetching = false;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   Future<void> fetchCategory({bool isRefresh = false, http.Client? client}) async {
@@ -26,7 +40,7 @@ class CategoryService with ChangeNotifier {
     }
 
     _isFetching = true;
-    notifyListeners();
+    _safeNotifyListeners();
 
     // Fast-path: on cold launch, immediately restore from local cache if memory state is empty
     if (categories == null || categories == 'error') {
@@ -41,7 +55,7 @@ class CategoryService with ChangeNotifier {
             categoriesDropdownList = model.category;
             debugPrint(
                 '[CategoryService] Fast-path: restored ${model.category.length} categories from SharedPreferences cache');
-            notifyListeners();
+            _safeNotifyListeners();
           }
         }
       } catch (e) {
@@ -67,7 +81,7 @@ class CategoryService with ChangeNotifier {
         debugPrint(
             '[CategoryService] Network failed with no cache present; transitioning to error state');
         categories = 'error';
-        notifyListeners();
+        _safeNotifyListeners();
       } else {
         debugPrint(
             '[CategoryService] Terminal state reached with active categories (cached or remote)');
@@ -77,7 +91,7 @@ class CategoryService with ChangeNotifier {
         httpClient.close();
       }
       _isFetching = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -99,7 +113,7 @@ class CategoryService with ChangeNotifier {
         final model = CategoryModel.fromJson(decoded);
         categories = model;
         categoriesDropdownList = model.category;
-        notifyListeners();
+        _safeNotifyListeners();
 
         // Persist fresh data to local cache
         try {

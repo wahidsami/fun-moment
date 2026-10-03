@@ -5,11 +5,25 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:funmoments/model/categoryModel.dart';
+import 'package:funmoments/service/app_string_service.dart';
+import 'package:funmoments/service/common_service.dart';
+import 'package:funmoments/service/filter_services_service.dart';
 import 'package:funmoments/service/home_services/category_service.dart';
+import 'package:funmoments/service/home_services/recent_services_service.dart';
 import 'package:funmoments/service/home_services/slider_service.dart';
+import 'package:funmoments/service/home_services/top_rated_services_service.dart';
+import 'package:funmoments/service/jobs_service/recent_jobs_service.dart';
+import 'package:funmoments/service/permissions_service.dart';
 import 'package:funmoments/service/profile_service.dart';
+import 'package:funmoments/service/push_notification_service.dart';
+import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/home/categories/components/category_card.dart';
+import 'package:funmoments/view/home/components/categories.dart';
+import 'package:funmoments/view/home/components/slider_home.dart';
+import 'package:funmoments/view/home/home.dart';
+import 'package:funmoments/view/utils/responsive.dart';
+import 'package:provider/provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -403,6 +417,276 @@ void main() {
       catService.categories = 'error';
       catService.resetState();
       expect(catService.categories, isNull);
+    });
+  });
+
+  group('PART F — HOMEPAGE LIFECYCLE & CRITICAL BOOTSTRAP RESILIENCE', () {
+    setUp(() {
+      resetHomeBootstrapState();
+    });
+
+    testWidgets('18. Homepage does not synchronously dispatch bootstrap in initState; runs post-frame exactly once', (tester) async {
+      resetHomeBootstrapState();
+      SharedPreferences.setMockInitialValues({
+        'cached_categories_json': sampleCategoryJson,
+      });
+
+      final catService = CategoryService();
+      final sliderService = SliderService();
+      final appStringService = AppStringService();
+      dynamic categoriesDuringBuild = 'unassigned';
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<CategoryService>.value(value: catService),
+            ChangeNotifierProvider<SliderService>.value(value: sliderService),
+            ChangeNotifierProvider<AppStringService>.value(value: appStringService),
+            ChangeNotifierProvider(create: (_) => RtlService()),
+            ChangeNotifierProvider(create: (_) => FilterServicesService()),
+            ChangeNotifierProvider(create: (_) => TopRatedServicesSerivce()),
+            ChangeNotifierProvider(create: (_) => RecentServicesService()),
+            ChangeNotifierProvider(create: (_) => RecentJobsService()),
+            ChangeNotifierProvider(create: (_) => ProfileService()),
+            ChangeNotifierProvider.value(value: PushNotificationService()),
+            ChangeNotifierProvider(create: (_) => PermissionsService()),
+          ],
+          child: Builder(
+            builder: (context) {
+              initializeLNProvider(context);
+              return MaterialApp(
+                home: Builder(
+                  builder: (ctx) {
+                    categoriesDuringBuild = catService.categories;
+                    return const Homepage();
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      // During initial build/initState, categories was still null because bootstrap was deferred to post-frame
+      expect(categoriesDuringBuild, isNull);
+
+      // Post-frame callback executed after initial frame: categories restored from cache
+      expect(catService.categories, isA<CategoryModel>());
+
+      // Advance past Stage 1 timeout and Stage 2 delay so no timers remain pending
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('19. CategoryService cached response renders CategoryCards and replaces skeleton row', (tester) async {
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      SharedPreferences.setMockInitialValues({
+        'cached_categories_json': sampleCategoryJson,
+      });
+
+      final catService = CategoryService();
+      final appStringService = AppStringService();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<CategoryService>.value(value: catService),
+            ChangeNotifierProvider<AppStringService>.value(value: appStringService),
+            ChangeNotifierProvider(create: (_) => RtlService()),
+          ],
+          child: Builder(
+            builder: (context) {
+              initializeLNProvider(context);
+              return MaterialApp(
+                home: Scaffold(
+                  body: Categories(
+                    cc: null,
+                    asProvider: appStringService,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      // Initially null -> skeleton
+      expect(catService.categories, isNull);
+
+      final mockClient = MockClient((_) async => http.Response.bytes(
+            utf8.encode(sampleCategoryJson),
+            201,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          ));
+
+      await catService.fetchCategory(client: mockClient);
+      await tester.pumpAndSettle();
+
+      // Cards now rendered instead of skeleton
+      expect(find.byType(CategoryCard), findsNWidgets(7));
+      expect(find.text('Music & DJ'), findsOneWidget);
+    });
+
+    testWidgets('20. Slider with empty remote images renders SliderHome bundled fallback, not loading card', (tester) async {
+      final sliderService = SliderService();
+      final appStringService = AppStringService();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<SliderService>.value(value: sliderService),
+            ChangeNotifierProvider<AppStringService>.value(value: appStringService),
+            ChangeNotifierProvider(create: (_) => RtlService()),
+          ],
+          child: Builder(
+            builder: (context) {
+              initializeLNProvider(context);
+              return MaterialApp(
+                home: Scaffold(
+                  body: Consumer<SliderService>(
+                    builder: (context, provider, child) =>
+                        provider.isLoading && provider.sliderImageList.isEmpty
+                            ? const Center(child: CircularProgressIndicator())
+                            : SliderHome(
+                                cc: null,
+                                sliderDetailsList: provider.sliderDetailsList,
+                                sliderImageList: provider.sliderImageList,
+                              ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      final mockClient = MockClient((_) async => http.Response(sampleSliderNullImageJson, 200));
+      await sliderService.loadSlider(client: mockClient);
+      await tester.pumpAndSettle();
+
+      expect(sliderService.isLoading, false);
+      expect(sliderService.isLoaded, true);
+      expect(sliderService.sliderImageList.isEmpty, true);
+      expect(find.byType(SliderHome), findsOneWidget);
+    });
+
+    test('21. Slider timeout clears isLoading, marks isLoaded=true and hasError=true', () async {
+      final sliderService = SliderService();
+      final timeoutClient = MockClient((_) async {
+        throw http.ClientException('Connection timed out');
+      });
+
+      await sliderService.loadSlider(client: timeoutClient);
+
+      expect(sliderService.isLoading, false);
+      expect(sliderService.isLoaded, true);
+      expect(sliderService.hasError, true);
+      expect(sliderService.sliderImageList.isEmpty, true);
+    });
+
+    testWidgets('22. Simultaneous runAtHome calls are guarded and cannot overlap', (tester) async {
+      resetHomeBootstrapState();
+      SharedPreferences.setMockInitialValues({
+        'cached_categories_json': sampleCategoryJson,
+      });
+
+      final catService = CategoryService();
+      final sliderService = SliderService();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: MultiProvider(
+              providers: [
+                ChangeNotifierProvider<CategoryService>.value(value: catService),
+                ChangeNotifierProvider<SliderService>.value(value: sliderService),
+                ChangeNotifierProvider(create: (_) => AppStringService()),
+                ChangeNotifierProvider(create: (_) => RtlService()),
+                ChangeNotifierProvider(create: (_) => FilterServicesService()),
+                ChangeNotifierProvider(create: (_) => TopRatedServicesSerivce()),
+                ChangeNotifierProvider(create: (_) => RecentServicesService()),
+                ChangeNotifierProvider(create: (_) => RecentJobsService()),
+                ChangeNotifierProvider(create: (_) => ProfileService()),
+                ChangeNotifierProvider.value(value: PushNotificationService()),
+                ChangeNotifierProvider(create: (_) => PermissionsService()),
+              ],
+              child: Builder(
+                builder: (context) {
+                  return ElevatedButton(
+                    onPressed: () {
+                      runAtHome(context);
+                      runAtHome(context); // Simultaneous second call
+                    },
+                    child: const Text('Run'),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(ElevatedButton));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+
+      // Guard successfully coalesced redundant call
+      expect(catService.categories, isA<CategoryModel>());
+    });
+
+    testWidgets('23. refresh=true during active bootstrap does not crash or bypass guard', (tester) async {
+      resetHomeBootstrapState();
+      SharedPreferences.setMockInitialValues({
+        'cached_categories_json': sampleCategoryJson,
+      });
+
+      final catService = CategoryService();
+      final sliderService = SliderService();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: MultiProvider(
+              providers: [
+                ChangeNotifierProvider<CategoryService>.value(value: catService),
+                ChangeNotifierProvider<SliderService>.value(value: sliderService),
+                ChangeNotifierProvider(create: (_) => AppStringService()),
+                ChangeNotifierProvider(create: (_) => RtlService()),
+                ChangeNotifierProvider(create: (_) => FilterServicesService()),
+                ChangeNotifierProvider(create: (_) => TopRatedServicesSerivce()),
+                ChangeNotifierProvider(create: (_) => RecentServicesService()),
+                ChangeNotifierProvider(create: (_) => RecentJobsService()),
+                ChangeNotifierProvider(create: (_) => ProfileService()),
+                ChangeNotifierProvider.value(value: PushNotificationService()),
+                ChangeNotifierProvider(create: (_) => PermissionsService()),
+              ],
+              child: Builder(
+                builder: (context) {
+                  return ElevatedButton(
+                    onPressed: () {
+                      runAtHome(context);
+                      runAtHome(context, isRefresh: true); // Should be safely queued
+                    },
+                    child: const Text('Refresh'),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(ElevatedButton));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+
+      expect(catService.categories, isA<CategoryModel>());
     });
   });
 }

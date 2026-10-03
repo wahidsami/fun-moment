@@ -33,7 +33,10 @@ class _HomepageState extends State<Homepage> {
   void initState() {
     super.initState();
     setChatSellerId(null);
-    runAtHome(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      runAtHome(context);
+    });
   }
 
   @override
