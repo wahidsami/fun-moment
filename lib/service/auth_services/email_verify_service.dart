@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
@@ -15,10 +17,23 @@ import 'package:http/http.dart' as http;
 
 import '../push_notification_service.dart';
 
+enum OtpSendStatus {
+  none,
+  sent,
+  timeout,
+  networkError,
+  serverError,
+  validationError,
+}
+
 class EmailVerifyService with ChangeNotifier {
   bool isloading = false;
 
   bool verifyOtpLoading = false;
+
+  OtpSendStatus lastOtpStatus = OtpSendStatus.none;
+  String lastOtpMessage = '';
+  String? lastOtpCode;
 
   setLoadingTrue() {
     isloading = true;
@@ -30,46 +45,164 @@ class EmailVerifyService with ChangeNotifier {
     notifyListeners();
   }
 
+  void resetOtpState() {
+    lastOtpStatus = OtpSendStatus.none;
+    lastOtpMessage = '';
+    lastOtpCode = null;
+    notifyListeners();
+  }
+
   Future<bool> sendOtpForEmailValidation(
-      email, BuildContext context, token) async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.none) {
-      OthersHelper()
-          .showToast("Please turn on your internet connection", Colors.black);
-      return false;
-    } else {
-      var header = {
-        //if header type is application/json then the data should be in jsonEncode method
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-      };
-      var data = jsonEncode({
-        'email': email,
-      });
+    dynamic email,
+    BuildContext? context,
+    dynamic token, {
+    http.Client? client,
+    Duration timeoutDuration = const Duration(seconds: 15),
+  }) async {
+    lastOtpStatus = OtpSendStatus.none;
+    lastOtpMessage = '';
+    lastOtpCode = null;
 
-      var response = await http.post(Uri.parse('$baseApi/send-otp-in-mail'),
-          headers: header, body: data);
-      if (response.statusCode == 201) {
-        var otpNumber = jsonDecode(response.body)['otp'];
-        Provider.of<ResetPasswordService>(context, listen: false)
-            .setOtp(otpNumber);
-
-        debugPrint('otp is $otpNumber');
+    try {
+      final connectivityResult = await (Connectivity().checkConnectivity());
+      if (connectivityResult == ConnectivityResult.none) {
+        lastOtpStatus = OtpSendStatus.networkError;
+        lastOtpMessage = "Please turn on your internet connection";
+        OthersHelper().showToast(lastOtpMessage, Colors.black);
         notifyListeners();
-
-        return true;
-      } else {
-        print(response.body);
-        try {
-          final res = jsonDecode(response.body);
-          final msg = res['message'] ?? res['msg'] ?? 'Failed to send OTP code';
-          OthersHelper().showToast(msg.toString(), Colors.black);
-        } catch (_) {
-          OthersHelper().showToast('Failed to send OTP code (${response.statusCode})', Colors.black);
-        }
-
         return false;
       }
+    } catch (e) {
+      // If connectivity check is unavailable (e.g. in tests), continue with HTTP
+      debugPrint('Connectivity check note: $e');
+    }
+
+    final header = {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+    };
+    final data = jsonEncode({
+      'email': email,
+    });
+
+    final httpClient = client ?? http.Client();
+    final shouldCloseClient = client == null;
+
+    try {
+      final response = await httpClient
+          .post(
+            Uri.parse('$baseApi/send-otp-in-mail'),
+            headers: header,
+            body: data,
+          )
+          .timeout(timeoutDuration);
+
+      if (response.statusCode == 201) {
+        final decoded = jsonDecode(response.body);
+        final otpNumber = decoded['otp']?.toString() ?? '';
+        lastOtpCode = otpNumber;
+
+        if (context != null) {
+          try {
+            Provider.of<ResetPasswordService>(context, listen: false)
+                .setOtp(otpNumber);
+          } catch (e) {
+            debugPrint('ResetPasswordService context note: $e');
+          }
+        }
+
+        debugPrint('otp is $otpNumber');
+        lastOtpStatus = OtpSendStatus.sent;
+        lastOtpMessage = 'OTP sent successfully';
+        notifyListeners();
+        return true;
+      } else if (response.statusCode == 422) {
+        lastOtpStatus = OtpSendStatus.validationError;
+        lastOtpMessage = _extractErrorMessage(
+          response.body,
+          'Validation error sending verification code',
+        );
+        OthersHelper().showToast(lastOtpMessage, Colors.black);
+        notifyListeners();
+        return false;
+      } else if (response.statusCode >= 500) {
+        lastOtpStatus = OtpSendStatus.serverError;
+        lastOtpMessage = _extractErrorMessage(
+          response.body,
+          'Server error sending verification code (${response.statusCode})',
+        );
+        OthersHelper().showToast(lastOtpMessage, Colors.black);
+        notifyListeners();
+        return false;
+      } else {
+        lastOtpStatus = OtpSendStatus.serverError;
+        lastOtpMessage = _extractErrorMessage(
+          response.body,
+          'Failed to send OTP code (${response.statusCode})',
+        );
+        OthersHelper().showToast(lastOtpMessage, Colors.black);
+        notifyListeners();
+        return false;
+      }
+    } on TimeoutException catch (e) {
+      debugPrint('TimeoutException in sendOtpForEmailValidation: $e');
+      lastOtpStatus = OtpSendStatus.timeout;
+      lastOtpMessage = 'Connection timed out while sending verification code';
+      OthersHelper().showToast(lastOtpMessage, Colors.black);
+      notifyListeners();
+      return false;
+    } on SocketException catch (e) {
+      debugPrint('SocketException in sendOtpForEmailValidation: $e');
+      lastOtpStatus = OtpSendStatus.networkError;
+      lastOtpMessage = 'Network error: Unable to reach email service';
+      OthersHelper().showToast(lastOtpMessage, Colors.black);
+      notifyListeners();
+      return false;
+    } on http.ClientException catch (e) {
+      debugPrint('ClientException in sendOtpForEmailValidation: $e');
+      lastOtpStatus = OtpSendStatus.networkError;
+      lastOtpMessage = 'Network error: Connection failed';
+      OthersHelper().showToast(lastOtpMessage, Colors.black);
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('Unexpected error in sendOtpForEmailValidation: $e');
+      lastOtpStatus = OtpSendStatus.networkError;
+      lastOtpMessage = 'Failed to send verification code';
+      OthersHelper().showToast(lastOtpMessage, Colors.black);
+      notifyListeners();
+      return false;
+    } finally {
+      if (shouldCloseClient) {
+        httpClient.close();
+      }
+    }
+  }
+
+  String _extractErrorMessage(String body, String defaultMsg) {
+    try {
+      final res = jsonDecode(body);
+      if (res is Map) {
+        if (res['message'] != null && res['message'].toString().trim().isNotEmpty) {
+          return res['message'].toString();
+        }
+        if (res['msg'] != null && res['msg'].toString().trim().isNotEmpty) {
+          return res['msg'].toString();
+        }
+        if (res['errors'] is Map) {
+          final errors = res['errors'] as Map;
+          if (errors.isNotEmpty) {
+            final firstVal = errors.values.first;
+            if (firstVal is List && firstVal.isNotEmpty) {
+              return firstVal.first.toString();
+            }
+            return firstVal.toString();
+          }
+        }
+      }
+      return defaultMsg;
+    } catch (_) {
+      return defaultMsg;
     }
   }
 
@@ -117,7 +250,7 @@ class EmailVerifyService with ChangeNotifier {
             (route) => false,
           );
         } else {
-          print(response.body);
+          debugPrint('Verify OTP response: ${response.body}');
           OthersHelper().showToast(
               'Your entered the otp correctly but something went wrong. Please try again later',
               Colors.black);

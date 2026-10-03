@@ -1,16 +1,37 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:funmoments/model/provider_registration_model.dart';
+import 'package:funmoments/service/app_string_service.dart';
+import 'package:funmoments/service/auth_services/email_verify_service.dart';
 import 'package:funmoments/service/auth_services/provider_registration_service.dart';
+import 'package:funmoments/service/auth_services/reset_password_service.dart';
+import 'package:funmoments/service/rtl_service.dart';
+import 'package:funmoments/view/auth/signup/components/email_verify_page.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
+import 'package:funmoments/view/utils/responsive.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    lnProvider = AppStringService();
+    rtlProvider = RtlService();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('PonnamKarthik/fluttertoast'),
+            (call) async => null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('dev.fluttercommunity.plus/connectivity'),
+            (call) async => 'wifi');
   });
 
   group('Phase 4A-3: Provider Registration Unit & Contract Tests', () {
@@ -145,7 +166,7 @@ void main() {
       expect(service.model.categoryIds.contains(29), isTrue);
 
       // Duplicate addition is prevented by Set semantics
-      service.setCategoryIds(Set.from([9, 29, 9, 29]));
+      service.setCategoryIds({9, 29});
       expect(service.model.categoryIds.length, equals(2));
 
       // Toggle off
@@ -324,4 +345,589 @@ void main() {
       expect(service.isLoading, isTrue);
     });
   });
+
+  // --------------------------------------------------------------------------
+  // Group 8: Decoupled Provider Registration & Bounded Email OTP Resilience
+  // --------------------------------------------------------------------------
+  group('Phase 4B: Decoupled Provider Registration & Bounded Email OTP Resilience Tests', () {
+    testWidgets('T-FIX-01: Provider registration HTTP 201 is treated as registration success', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'mock-auth-token-123',
+              'users': {
+                'id': 77,
+                'state': '1',
+                'country_id': '166',
+                'seller_type': 1,
+              }
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({'otp': '5432'}))),
+            201,
+          );
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(result, isTrue);
+      expect(prs.isRegistered, isTrue);
+      expect(prs.isLoading, isFalse);
+      expect(prs.registeredEmail, equals('provider_test@funmoment.sa'));
+      expect(prs.registeredToken, equals('mock-auth-token-123'));
+      expect(prs.registeredUserId, equals(77));
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt('sellerType'), equals(1));
+    });
+
+    testWidgets('T-FIX-02: Successful registration stops registration loading before OTP dispatch completes', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      final otpCompleter = Completer<http.StreamedResponse>();
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'tok-456',
+              'users': {'id': 88, 'state': '1', 'country_id': '166', 'seller_type': 1}
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          return await otpCompleter.future;
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      // Trigger registration asynchronously
+      final futureResult = prs.registerProvider(testContext, client: client);
+
+      // Allow provider/register to return 201, while OTP request is blocked on otpCompleter
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // VERIFICATION: Registration loading MUST STOP before OTP completes!
+      expect(prs.isRegistered, isTrue, reason: 'Registration must be marked succeeded');
+      expect(prs.isLoading, isFalse, reason: 'Registration button loading MUST stop immediately upon 201');
+      expect(prs.isOtpSending, isTrue, reason: 'Separate OTP dispatch status must be active');
+
+      // Now complete OTP
+      otpCompleter.complete(http.StreamedResponse(
+        Stream.value(utf8.encode(jsonEncode({'otp': '9999'}))),
+        201,
+      ));
+
+      await futureResult;
+      await _pumpPageTransition(tester);
+
+      expect(prs.isOtpSending, isFalse);
+    });
+
+    testWidgets('T-FIX-03: OTP success continues to EmailVerifyPage', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'tok-abc',
+              'users': {'id': 99, 'state': '1', 'country_id': '166', 'seller_type': 1}
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({'otp': '1111'}))),
+            201,
+          );
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(find.byType(EmailVerifyPage), findsOneWidget);
+    });
+
+    testWidgets('T-FIX-04: OTP timeout does NOT become "Registration failed"', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'tok-timeout',
+              'users': {'id': 101, 'state': '1', 'country_id': '166', 'seller_type': 1}
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          throw TimeoutException('Connection timed out');
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      // Crucial: result is true because registration succeeded!
+      expect(result, isTrue);
+      expect(prs.isRegistered, isTrue);
+      expect(prs.isLoading, isFalse);
+      expect(evs.lastOtpStatus, equals(OtpSendStatus.timeout));
+      expect(evs.lastOtpMessage, contains('timed out'));
+
+      // User still navigated to EmailVerifyPage where they can tap "Send again"
+      expect(find.byType(EmailVerifyPage), findsOneWidget);
+    });
+
+    testWidgets('T-FIX-05: OTP network exception does NOT become "Registration failed"', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'tok-sock',
+              'users': {'id': 102, 'state': '1', 'country_id': '166', 'seller_type': 1}
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          throw const SocketException('OS Error: Connection refused');
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(result, isTrue);
+      expect(prs.isRegistered, isTrue);
+      expect(prs.isLoading, isFalse);
+      expect(evs.lastOtpStatus, equals(OtpSendStatus.networkError));
+      expect(find.byType(EmailVerifyPage), findsOneWidget);
+    });
+
+    testWidgets('T-FIX-06: OTP server error does NOT become "Registration failed"', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'tok-500',
+              'users': {'id': 103, 'state': '1', 'country_id': '166', 'seller_type': 1}
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'message': 'Mail delivery service unavailable',
+            }))),
+            500,
+          );
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(result, isTrue);
+      expect(prs.isRegistered, isTrue);
+      expect(prs.isLoading, isFalse);
+      expect(evs.lastOtpStatus, equals(OtpSendStatus.serverError));
+      expect(evs.lastOtpMessage, equals('Mail delivery service unavailable'));
+      expect(find.byType(EmailVerifyPage), findsOneWidget);
+    });
+
+    testWidgets('T-FIX-07: OTP failure keeps provider-registration success state intact and prevents double registration', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      int registerCallCount = 0;
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          registerCallCount++;
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'tok-intact',
+              'users': {'id': 104, 'state': '1', 'country_id': '166', 'seller_type': 1}
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          throw TimeoutException('Timed out');
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(registerCallCount, equals(1));
+      expect(prs.isRegistered, isTrue);
+
+      // Attempting to register again while isRegistered is true must NOT hit /provider/register again
+      final activeContext7 = tester.element(find.byType(EmailVerifyPage));
+      await prs.registerProvider(activeContext7, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(registerCallCount, equals(1), reason: 'Must not re-call /provider/register when already registered');
+    });
+
+    test('T-FIX-08: User receives an OTP-specific error message for validation or server failure', () async {
+      final evs = EmailVerifyService();
+
+      final client422 = MockRegistrationClient((request) async {
+        return http.StreamedResponse(
+          Stream.value(utf8.encode(jsonEncode({
+            'errors': {
+              'email': ['The email address domain is unroutable.']
+            }
+          }))),
+          422,
+        );
+      });
+
+      final result = await evs.sendOtpForEmailValidation(
+        'test@funmoment.test',
+        null,
+        'dummy-token',
+        client: client422,
+      );
+
+      expect(result, isFalse);
+      expect(evs.lastOtpStatus, equals(OtpSendStatus.validationError));
+      expect(evs.lastOtpMessage, equals('The email address domain is unroutable.'));
+    });
+
+    testWidgets('T-FIX-09: OTP resend/retry can be attempted without re-registering the provider', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      int registerCalls = 0;
+      int otpCalls = 0;
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          registerCalls++;
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'tok-resend',
+              'users': {'id': 105, 'state': '1', 'country_id': '166', 'seller_type': 1}
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          otpCalls++;
+          if (otpCalls == 1) {
+            // First call times out
+            throw TimeoutException('Timed out');
+          } else {
+            // Second call succeeds
+            return http.StreamedResponse(
+              Stream.value(utf8.encode(jsonEncode({'otp': '7890'}))),
+              201,
+            );
+          }
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      // Initial registration: OTP fails on first attempt
+      await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(registerCalls, equals(1));
+      expect(otpCalls, equals(1));
+      expect(prs.isRegistered, isTrue);
+
+      // Now retry OTP via resendRegistrationOtp:
+      final activeContext9 = tester.element(find.byType(EmailVerifyPage));
+      final resendSuccess = await prs.resendRegistrationOtp(activeContext9, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(resendSuccess, isTrue);
+      expect(registerCalls, equals(1), reason: '/provider/register must NEVER be called during OTP resend');
+      expect(otpCalls, equals(2));
+      expect(evs.lastOtpStatus, equals(OtpSendStatus.sent));
+    });
+
+    testWidgets('T-FIX-10: Existing customer signup OTP behavior remains unchanged', (tester) async {
+      final evs = EmailVerifyService();
+      final rps = ResetPasswordService();
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/send-otp-in-mail')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({'otp': '4321'}))),
+            201,
+          );
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        evs: evs,
+        rps: rps,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final success = await evs.sendOtpForEmailValidation(
+        'customer@funmoment.sa',
+        testContext,
+        'customer-token',
+        client: client,
+      );
+
+      expect(success, isTrue);
+      expect(evs.lastOtpStatus, equals(OtpSendStatus.sent));
+      expect(rps.otpNumber, equals('4321'), reason: 'Customer signup OTP must still populate ResetPasswordService.otpNumber');
+    });
+
+    testWidgets('T-FIX-11: Existing provider registration success path completes end-to-end', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel(sellerType: 2, email: 'company@funmoment.sa');
+      final evs = EmailVerifyService();
+      final rps = ResetPasswordService();
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'tok-company',
+              'users': {
+                'id': 200,
+                'state': '1',
+                'country_id': '166',
+                'seller_type': 2,
+              }
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({'otp': '6789'}))),
+            201,
+          );
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        rps: rps,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(result, isTrue);
+      expect(prs.isRegistered, isTrue);
+      expect(prs.isLoading, isFalse);
+      expect(evs.lastOtpStatus, equals(OtpSendStatus.sent));
+      expect(rps.otpNumber, equals('6789'));
+      expect(find.byType(EmailVerifyPage), findsOneWidget);
+    });
+  });
+}
+
+// ----------------------------------------------------------------------------
+// Test Harness Helpers
+// ----------------------------------------------------------------------------
+Future<void> _pumpPageTransition(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
+class MockRegistrationClient extends http.BaseClient {
+  final Future<http.StreamedResponse> Function(http.BaseRequest request) handler;
+
+  MockRegistrationClient(this.handler);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    return handler(request);
+  }
+}
+
+ProviderRegistrationModel _createValidProviderModel({
+  int sellerType = 1,
+  String email = 'provider_test@funmoment.sa',
+}) {
+  final model = ProviderRegistrationModel(
+    name: 'Fahad Al-Harbi',
+    email: email,
+    username: 'fahad_provider',
+    phone: '+966501234567',
+    password: 'Password123!',
+    repeatPassword: 'Password123!',
+    countryId: 166,
+    serviceCity: 1,
+    serviceArea: 1,
+    sellerType: sellerType,
+    categoryIds: {9},
+    termsAgree: true,
+  );
+  if (sellerType == 1) {
+    model.nationalIdNumber = '1023456789';
+    model.nationalIdDocumentPath = 'id.pdf';
+  } else {
+    model.companyName = 'Entertainment Co LLC';
+    model.crNumber = '1010998877';
+    model.crDocumentPath = 'cr.pdf';
+    model.contactPersonName = 'Ahmed Mansour';
+    model.contactPersonEmail = 'ahmed@entco.com.sa';
+    model.contactPersonPhone = '+966551234567';
+  }
+  return model;
+}
+
+Widget _buildTestApp({
+  required Widget child,
+  ProviderRegistrationService? prs,
+  EmailVerifyService? evs,
+  ResetPasswordService? rps,
+  NavigatorObserver? observer,
+}) {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider<ProviderRegistrationService>.value(
+        value: prs ?? ProviderRegistrationService(),
+      ),
+      ChangeNotifierProvider<EmailVerifyService>.value(
+        value: evs ?? EmailVerifyService(),
+      ),
+      ChangeNotifierProvider<ResetPasswordService>.value(
+        value: rps ?? ResetPasswordService(),
+      ),
+      ChangeNotifierProvider<AppStringService>.value(
+        value: lnProvider,
+      ),
+      ChangeNotifierProvider<RtlService>.value(
+        value: rtlProvider,
+      ),
+    ],
+    child: MaterialApp(
+      navigatorObservers: observer != null ? [observer] : [],
+      home: Scaffold(body: child),
+    ),
+  );
 }

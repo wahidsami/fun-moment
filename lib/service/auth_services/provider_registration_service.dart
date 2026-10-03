@@ -15,11 +15,26 @@ class ProviderRegistrationService with ChangeNotifier {
   ProviderRegistrationModel model = ProviderRegistrationModel();
 
   bool isLoading = false;
+  bool isRegistered = false;
+  bool isOtpSending = false;
+  String? registeredEmail;
+  String? registeredToken;
+  int? registeredUserId;
+  String? registeredState;
+  String? registeredCountryId;
+
   Map<String, String> fieldErrors = {};
 
   void reset() {
     model = ProviderRegistrationModel();
     isLoading = false;
+    isRegistered = false;
+    isOtpSending = false;
+    registeredEmail = null;
+    registeredToken = null;
+    registeredUserId = null;
+    registeredState = null;
+    registeredCountryId = null;
     fieldErrors = {};
     notifyListeners();
   }
@@ -209,7 +224,30 @@ class ProviderRegistrationService with ChangeNotifier {
   }
 
   /// Submit Provider Registration
-  Future<bool> registerProvider(BuildContext context) async {
+  Future<bool> registerProvider(BuildContext context, {http.Client? client}) async {
+    if (isRegistered) {
+      OthersHelper().showToast(
+        'Account already created. Please verify your email.',
+        ConstantColors().successColor,
+      );
+      if (context.mounted) {
+        Navigator.pushReplacement<void, void>(
+          context,
+          MaterialPageRoute<void>(
+            builder: (BuildContext context) => EmailVerifyPage(
+              email: registeredEmail ?? model.email.trim(),
+              token: registeredToken ?? '',
+              userId: registeredUserId ?? 0,
+              state: registeredState ?? '',
+              countryId: registeredCountryId ?? '',
+              userType: 0, // Provider
+            ),
+          ),
+        );
+      }
+      return true;
+    }
+
     if (isLoading) return false;
 
     final validationError = validateClientSide();
@@ -261,7 +299,9 @@ class ProviderRegistrationService with ChangeNotifier {
         }
       }
 
-      final streamedResponse = await request.send();
+      final streamedResponse = client != null
+          ? await client.send(request)
+          : await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
       debugPrint('Provider registration HTTP ${response.statusCode}: ${response.body}');
@@ -275,38 +315,88 @@ class ProviderRegistrationService with ChangeNotifier {
         final sellerType = int.tryParse(responseData['users']?['seller_type']?.toString() ?? '') ?? model.sellerType;
 
         // Cache sellerType in SharedPreferences for provider session
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setInt('sellerType', sellerType);
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('sellerType', sellerType);
+        } catch (e) {
+          debugPrint('Error caching sellerType: $e');
+        }
+
+        // 1. REGISTRATION SUCCEEDED:
+        // Immediately terminate registration button loading state
+        isLoading = false;
+        isRegistered = true;
+        registeredEmail = model.email.trim();
+        registeredToken = token;
+        registeredUserId = userId;
+        registeredState = state;
+        registeredCountryId = countryId;
+        notifyListeners();
 
         OthersHelper().showToast(
           'Registration successful. Please verify your email.',
           ConstantColors().successColor,
         );
 
-        // Send OTP
-        final emailVerifyService = Provider.of<EmailVerifyService>(context, listen: false);
-        final isOtpSent = await emailVerifyService.sendOtpForEmailValidation(
-          model.email.trim(),
-          context,
-          token,
-        );
+        // 2. SEPARATE OTP DISPATCH:
+        isOtpSending = true;
+        notifyListeners();
 
-        setLoading(false);
-
-        if (isOtpSent) {
-          Navigator.pushReplacement<void, void>(
+        bool isOtpSent = false;
+        try {
+          final emailVerifyService = Provider.of<EmailVerifyService>(context, listen: false);
+          isOtpSent = await emailVerifyService.sendOtpForEmailValidation(
+            model.email.trim(),
             context,
-            MaterialPageRoute<void>(
-              builder: (BuildContext context) => EmailVerifyPage(
-                email: model.email.trim(),
-                token: token,
-                userId: userId,
-                state: state,
-                countryId: countryId,
-                userType: 0, // Provider
-              ),
-            ),
+            token,
+            client: client,
           );
+        } catch (otpErr) {
+          debugPrint('Suppressed OTP dispatch exception in ProviderRegistrationService: $otpErr');
+          isOtpSent = false;
+        } finally {
+          isOtpSending = false;
+          notifyListeners();
+        }
+
+        if (context.mounted) {
+          if (isOtpSent) {
+            Navigator.pushReplacement<void, void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) => EmailVerifyPage(
+                  email: model.email.trim(),
+                  token: token,
+                  userId: userId,
+                  state: state,
+                  countryId: countryId,
+                  userType: 0, // Provider
+                ),
+              ),
+            );
+          } else {
+            // OTP failed or timed out:
+            // Provider registration REMAINS SUCCESSFUL!
+            // Give clear, OTP-specific guidance and navigate to EmailVerifyPage where user can tap "Send again"
+            OthersHelper().showToast(
+              "Your account was created successfully, but we couldn't send the verification code. Please tap 'Send again'.",
+              Colors.black,
+            );
+
+            Navigator.pushReplacement<void, void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) => EmailVerifyPage(
+                  email: model.email.trim(),
+                  token: token,
+                  userId: userId,
+                  state: state,
+                  countryId: countryId,
+                  userType: 0, // Provider
+                ),
+              ),
+            );
+          }
         }
 
         return true;
@@ -320,6 +410,38 @@ class ProviderRegistrationService with ChangeNotifier {
       OthersHelper().showToast('Registration failed: $e', Colors.black);
       setLoading(false);
       return false;
+    }
+  }
+
+  /// Resend OTP for the already registered provider without re-submitting registration
+  Future<bool> resendRegistrationOtp(BuildContext context, {http.Client? client}) async {
+    if (!isRegistered || registeredEmail == null || registeredToken == null) {
+      return false;
+    }
+    isOtpSending = true;
+    notifyListeners();
+    try {
+      EmailVerifyService? emailVerifyService;
+      if (context.mounted) {
+        try {
+          emailVerifyService = Provider.of<EmailVerifyService>(context, listen: false);
+        } catch (_) {}
+      }
+      emailVerifyService ??= EmailVerifyService();
+
+      final sent = await emailVerifyService.sendOtpForEmailValidation(
+        registeredEmail!,
+        context.mounted ? context : null,
+        registeredToken!,
+        client: client,
+      );
+      return sent;
+    } catch (e) {
+      debugPrint('Resend OTP error: $e');
+      return false;
+    } finally {
+      isOtpSending = false;
+      notifyListeners();
     }
   }
 
