@@ -12,10 +12,17 @@ class CategoryService with ChangeNotifier {
 
   bool get isFetching => _isFetching;
 
-  Future<void> fetchCategory({bool isRefresh = false}) async {
+  void resetState() {
+    categories = null;
+    categoriesDropdownList = [];
+    _isFetching = false;
+    notifyListeners();
+  }
+
+  Future<void> fetchCategory({bool isRefresh = false, http.Client? client}) async {
     if (_isFetching) return;
     if (categories != null && categories != 'error' && !isRefresh) {
-      return; // Already successfully loaded
+      return; // Already successfully loaded in memory
     }
 
     _isFetching = true;
@@ -32,34 +39,60 @@ class CategoryService with ChangeNotifier {
           if (model.category.isNotEmpty) {
             categories = model;
             categoriesDropdownList = model.category;
+            debugPrint(
+                '[CategoryService] Fast-path: restored ${model.category.length} categories from SharedPreferences cache');
             notifyListeners();
           }
         }
       } catch (e) {
-        debugPrint('CategoryService cache load non-fatal: $e');
+        debugPrint('[CategoryService] Cache load non-fatal: $e');
       }
     }
 
+    final httpClient = client ?? http.Client();
+    final bool disposeClient = client == null;
+
     try {
-      // 3-attempt resilient fetch to overcome port 80 cold-start SYN drop
-      for (int attempt = 1; attempt <= 3; attempt++) {
-        final success = await _fetchFromApi();
+      // Bounded 2-attempt fetch (max ~16s total) to overcome socket congestion without 37s stalls
+      for (int attempt = 1; attempt <= 2; attempt++) {
+        final success = await _fetchFromApi(httpClient, attempt: attempt);
         if (success) break;
-        if (attempt < 3) {
-          await Future.delayed(Duration(milliseconds: 500 * attempt));
+        if (attempt < 2) {
+          await Future.delayed(const Duration(milliseconds: 500));
         }
       }
+
+      // If all network attempts failed and there was no cached data, transition to error state
+      if (categories == null) {
+        debugPrint(
+            '[CategoryService] Network failed with no cache present; transitioning to error state');
+        categories = 'error';
+        notifyListeners();
+      } else {
+        debugPrint(
+            '[CategoryService] Terminal state reached with active categories (cached or remote)');
+      }
     } finally {
+      if (disposeClient) {
+        httpClient.close();
+      }
       _isFetching = false;
       notifyListeners();
     }
   }
 
-  Future<bool> _fetchFromApi() async {
+  Future<bool> _fetchFromApi(http.Client client, {int attempt = 1}) async {
+    final sw = Stopwatch()..start();
+    final uri = Uri.parse('$baseApi/category');
+    debugPrint('[CategoryService] GET $uri (attempt $attempt) started');
+
     try {
-      final response = await http
-          .get(Uri.parse('$baseApi/category'))
-          .timeout(const Duration(seconds: 12));
+      final response = await client
+          .get(uri)
+          .timeout(const Duration(seconds: 10));
+      sw.stop();
+      debugPrint(
+          '[CategoryService] GET $uri (attempt $attempt) returned ${response.statusCode} in ${sw.elapsedMilliseconds}ms');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final decoded = jsonDecode(response.body);
@@ -68,26 +101,24 @@ class CategoryService with ChangeNotifier {
         categoriesDropdownList = model.category;
         notifyListeners();
 
-        // Persist to local cache for instant cold start
+        // Persist fresh data to local cache
         try {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('cached_categories_json', response.body);
+          debugPrint(
+              '[CategoryService] Successfully cached fresh categories JSON');
         } catch (_) {}
 
         return true;
       } else {
-        if (categories == null) {
-          categories = 'error';
-          notifyListeners();
-        }
+        debugPrint(
+            '[CategoryService] GET $uri (attempt $attempt) non-200 status: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      debugPrint('CategoryService._fetchFromApi error: $e');
-      if (categories == null) {
-        categories = 'error';
-        notifyListeners();
-      }
+      sw.stop();
+      debugPrint(
+          '[CategoryService] GET $uri (attempt $attempt) error after ${sw.elapsedMilliseconds}ms: $e');
       return false;
     }
   }

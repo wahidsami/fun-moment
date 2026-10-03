@@ -13,6 +13,7 @@ import 'package:funmoments/service/profile_service.dart';
 import 'package:funmoments/service/push_notification_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
+import 'package:http/http.dart' as http;
 
 late bool isIos;
 
@@ -104,63 +105,101 @@ runAtstart(BuildContext context) async {
   }
 }
 
+
+final http.Client commonHttpClient = http.Client();
+bool _isHomeBootstrapActive = false;
+
 runAtHome(BuildContext context, {bool isRefresh = false}) async {
-  try {
-    Provider.of<PushNotificationService>(context, listen: false)
-        .fetchPusherCredential(context: context)
-        .timeout(const Duration(seconds: 4))
-        .catchError((e) {
-      debugPrint('runAtHome fetchPusherCredential non-fatal: $e');
-      return false;
-    });
-  } catch (e) {
-    debugPrint('runAtHome fetchPusherCredential dispatch error: $e');
+  if (_isHomeBootstrapActive && !isRefresh) {
+    debugPrint('[runAtHome] Bootstrap already active; skipping redundant invocation');
+    return;
   }
+  _isHomeBootstrapActive = true;
+  debugPrint('[runAtHome] Staged home bootstrap initiated (isRefresh: $isRefresh)');
 
   try {
-    Provider.of<SliderService>(context, listen: false).loadSlider();
-  } catch (e) {
-    debugPrint('runAtHome loadSlider non-fatal: $e');
-  }
+    // ----------------------------------------------------
+    // STAGE 1: CRITICAL HOME CONTENT (Category & Slider)
+    // ----------------------------------------------------
+    // Dispatched first with the shared HTTP client to claim
+    // server worker capacity without socket contention.
+    final categoryFuture = Provider.of<CategoryService>(context, listen: false)
+        .fetchCategory(isRefresh: isRefresh, client: commonHttpClient);
 
-  try {
-    Provider.of<CategoryService>(context, listen: false)
-        .fetchCategory(isRefresh: isRefresh);
-  } catch (e) {
-    debugPrint('runAtHome fetchCategory non-fatal: $e');
-  }
+    final sliderFuture = Provider.of<SliderService>(context, listen: false)
+        .loadSlider(isRefresh: isRefresh, client: commonHttpClient);
 
-  try {
-    Provider.of<TopRatedServicesSerivce>(context, listen: false)
-        .fetchTopService();
-  } catch (e) {
-    debugPrint('runAtHome fetchTopService non-fatal: $e');
-  }
+    // Give Stage 1 an uncontended dispatch window before triggering secondary endpoints
+    await Future.any([
+      Future.wait([categoryFuture, sliderFuture]),
+      Future.delayed(const Duration(milliseconds: 350)),
+    ]);
 
-  try {
-    Provider.of<RecentServicesService>(context, listen: false)
-        .fetchRecentService();
-  } catch (e) {
-    debugPrint('runAtHome fetchRecentService non-fatal: $e');
-  }
+    // ----------------------------------------------------
+    // STAGE 2: SECONDARY HOME SERVICES (Bounded Batches)
+    // ----------------------------------------------------
+    // Secondary services run asynchronously in small batches so they
+    // do not starve critical UI or delay category/slider rendering.
 
-  try {
-    Provider.of<RecentJobsService>(context, listen: false)
-        .fetchRecentJobs(context);
-  } catch (e) {
-    debugPrint('runAtHome fetchRecentJobs non-fatal: $e');
-  }
+    // Batch 2A: Service listings
+    try {
+      Provider.of<TopRatedServicesSerivce>(context, listen: false)
+          .fetchTopService();
+    } catch (e) {
+      debugPrint('[runAtHome] fetchTopService non-fatal: $e');
+    }
 
-  try {
-    Provider.of<ProfileService>(context, listen: false).getProfileDetails();
-  } catch (e) {
-    debugPrint('runAtHome getProfileDetails non-fatal: $e');
-  }
+    try {
+      Provider.of<RecentServicesService>(context, listen: false)
+          .fetchRecentService();
+    } catch (e) {
+      debugPrint('[runAtHome] fetchRecentService non-fatal: $e');
+    }
 
-  try {
-    Provider.of<PermissionsService>(context, listen: false)
-        .fetchUserPermissions(context);
-  } catch (e) {
-    debugPrint('runAtHome fetchUserPermissions non-fatal: $e');
+    // Small delay between batches to stagger TCP connections
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    // Batch 2B: Jobs & Background services
+    try {
+      Provider.of<RecentJobsService>(context, listen: false)
+          .fetchRecentJobs(context);
+    } catch (e) {
+      debugPrint('[runAtHome] fetchRecentJobs non-fatal: $e');
+    }
+
+    // Avoid duplicate profile request if already loaded or actively loading
+    try {
+      final profileService = Provider.of<ProfileService>(context, listen: false);
+      if (profileService.profileDetails == null && !profileService.isloading) {
+        profileService.getProfileDetails();
+      } else {
+        debugPrint(
+            '[runAtHome] Profile already loaded or in-flight; skipping duplicate fetch');
+      }
+    } catch (e) {
+      debugPrint('[runAtHome] getProfileDetails non-fatal: $e');
+    }
+
+    try {
+      Provider.of<PushNotificationService>(context, listen: false)
+          .fetchPusherCredential(context: context)
+          .timeout(const Duration(seconds: 4))
+          .catchError((e) {
+        debugPrint('[runAtHome] fetchPusherCredential non-fatal: $e');
+        return false;
+      });
+    } catch (e) {
+      debugPrint('[runAtHome] fetchPusherCredential dispatch error: $e');
+    }
+
+    try {
+      Provider.of<PermissionsService>(context, listen: false)
+          .fetchUserPermissions(context);
+    } catch (e) {
+      debugPrint('[runAtHome] fetchUserPermissions non-fatal: $e');
+    }
+  } finally {
+    _isHomeBootstrapActive = false;
+    debugPrint('[runAtHome] Staged home bootstrap complete');
   }
 }

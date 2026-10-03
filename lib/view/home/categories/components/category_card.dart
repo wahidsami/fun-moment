@@ -101,24 +101,35 @@ class CategoryCard extends StatelessWidget {
                   ],
                 ),
                 padding: const EdgeInsets.all(4),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: (imagelink != null &&
-                          imagelink.toString().isNotEmpty &&
-                          imagelink.toString() != placeHolderUrl)
-                      ? CachedNetworkImage(
-                          imageUrl: imagelink.toString(),
-                          memCacheWidth: 150,
-                          fit: BoxFit.contain,
-                          errorWidget: (context, url, error) => Image.asset(
-                            FMAssets.categoryFallbackForIndex(index),
-                            fit: BoxFit.contain,
-                          ),
-                        )
-                      : Image.asset(
-                          FMAssets.categoryFallbackForIndex(index),
-                          fit: BoxFit.contain,
-                        ),
+                child: Builder(
+                  builder: (context) {
+                    final rawUrl = imagelink?.toString().trim() ?? '';
+                    final hasValidRemoteUrl = rawUrl.isNotEmpty &&
+                        rawUrl != placeHolderUrl &&
+                        (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'));
+
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: hasValidRemoteUrl
+                          ? CachedNetworkImage(
+                              imageUrl: rawUrl,
+                              memCacheWidth: 150,
+                              fit: BoxFit.contain,
+                              placeholder: (context, url) => Image.asset(
+                                FMAssets.categoryFallbackForIndex(index),
+                                fit: BoxFit.contain,
+                              ),
+                              errorWidget: (context, url, error) => Image.asset(
+                                FMAssets.categoryFallbackForIndex(index),
+                                fit: BoxFit.contain,
+                              ),
+                            )
+                          : Image.asset(
+                              FMAssets.categoryFallbackForIndex(index),
+                              fit: BoxFit.contain,
+                            ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 10),
