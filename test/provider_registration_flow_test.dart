@@ -12,8 +12,21 @@ import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/auth_services/email_verify_service.dart';
 import 'package:funmoments/service/auth_services/provider_registration_service.dart';
 import 'package:funmoments/service/auth_services/reset_password_service.dart';
+import 'package:funmoments/service/profile_service.dart';
+import 'package:funmoments/service/push_notification_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
+import 'package:funmoments/service/all_services_service.dart';
+import 'package:funmoments/service/filter_services_service.dart';
+import 'package:funmoments/service/jobs_service/my_jobs_service.dart';
+import 'package:funmoments/service/orders_service.dart';
+import 'package:funmoments/service/provider_availability_service.dart';
+import 'package:funmoments/service/provider_service_management_service.dart';
+import 'package:funmoments/service/saved_items_service.dart';
+import 'package:funmoments/service/searchbar_with_dropdown_service.dart';
+import 'package:funmoments/service/seller_all_services_service.dart';
+import 'package:funmoments/service/wallet_service.dart';
 import 'package:funmoments/view/auth/signup/components/email_verify_page.dart';
+import 'package:funmoments/view/home/landing_page.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 
@@ -1139,11 +1152,287 @@ void main() {
       expect(prs.isRegistered, isTrue);
     });
   });
+
+  // --------------------------------------------------------------------------
+  // Group 10: OTP Verification Hardening & Resilience Tests
+  // --------------------------------------------------------------------------
+  group('Phase 4D: OTP Verification Hardening & Resilience Tests', () {
+    testWidgets('T-VERIFY-01: OTP verification success -> persists session with userType: 0 -> navigates to LandingPage', (tester) async {
+      final evs = EmailVerifyService();
+      final rps = ResetPasswordService();
+      rps.setOtp('4321');
+
+      int verifyNetworkCalls = 0;
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/user/send-otp-in-mail/success')) {
+          verifyNetworkCalls++;
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({'message': 'Email Verify Success'}))),
+            201,
+          );
+        } else if (request.url.path.contains('/user/profile')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'user_details': {'id': 999, 'user_type': 0, 'name': 'Provider Test'},
+              'pending_order': 0,
+              'active_order': 0,
+              'complete_order': 0,
+              'total_order': 0,
+              'profile_image': []
+            }))),
+            200,
+          );
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      final observer = TestNavigatorObserver();
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        evs: evs,
+        rps: rps,
+        observer: observer,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final success = await evs.verifyOtpAndLogin(
+        '4321',
+        testContext,
+        'provider@funmoment.sa',
+        'tok-provider-verify',
+        999,
+        '1',
+        '166',
+        userType: 0,
+        client: client,
+      );
+
+      expect(success, isTrue);
+      expect(verifyNetworkCalls, equals(1));
+      expect(evs.verifyOtpLoading, isFalse);
+      expect(observer.pushedRoute, isNotNull);
+      expect((observer.pushedRoute as MaterialPageRoute).builder(testContext), isA<LandingPage>());
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt('userType'), equals(0), reason: 'Provider session must have userType 0');
+      expect(prefs.getString('token'), equals('tok-provider-verify'));
+      expect(prefs.getString('email'), equals('provider@funmoment.sa'));
+    });
+
+    testWidgets('T-VERIFY-02: OTP verification timeout -> loading stops -> UI does not freeze -> error toast shown', (tester) async {
+      final evs = EmailVerifyService();
+      final rps = ResetPasswordService();
+      rps.setOtp('4321');
+
+      int verifyNetworkCalls = 0;
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/user/send-otp-in-mail/success')) {
+          verifyNetworkCalls++;
+          throw TimeoutException('Verification socket connection timeout');
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        evs: evs,
+        rps: rps,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await evs.verifyOtpAndLogin(
+        '4321',
+        testContext,
+        'provider@funmoment.sa',
+        'tok-provider-verify',
+        999,
+        '1',
+        '166',
+        userType: 0,
+        client: client,
+        timeoutDuration: const Duration(milliseconds: 50),
+      );
+      await _pumpPageTransition(tester);
+
+      expect(result, isFalse);
+      expect(verifyNetworkCalls, equals(1));
+      expect(evs.verifyOtpLoading, isFalse, reason: 'Loading must NEVER freeze on timeout');
+    });
+
+    testWidgets('T-VERIFY-03: OTP verification network/socket exception -> loading stops -> user can retry', (tester) async {
+      final evs = EmailVerifyService();
+      final rps = ResetPasswordService();
+      rps.setOtp('5555');
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/user/send-otp-in-mail/success')) {
+          throw const SocketException('OS Error: Connection refused');
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        evs: evs,
+        rps: rps,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await evs.verifyOtpAndLogin(
+        '5555',
+        testContext,
+        'provider@funmoment.sa',
+        'tok-provider-verify',
+        999,
+        '1',
+        '166',
+        userType: 0,
+        client: client,
+      );
+      await _pumpPageTransition(tester);
+
+      expect(result, isFalse);
+      expect(evs.verifyOtpLoading, isFalse, reason: 'Loading must stop on SocketException');
+    });
+
+    testWidgets('T-VERIFY-04: OTP verification server error (500) -> loading stops -> toast shown', (tester) async {
+      final evs = EmailVerifyService();
+      final rps = ResetPasswordService();
+      rps.setOtp('1111');
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/user/send-otp-in-mail/success')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({'message': 'Internal Server Error'}))),
+            500,
+          );
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        evs: evs,
+        rps: rps,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await evs.verifyOtpAndLogin(
+        '1111',
+        testContext,
+        'provider@funmoment.sa',
+        'tok-provider-verify',
+        999,
+        '1',
+        '166',
+        userType: 0,
+        client: client,
+      );
+      await _pumpPageTransition(tester);
+
+      expect(result, isFalse);
+      expect(evs.verifyOtpLoading, isFalse, reason: 'Loading must stop on server error');
+    });
+
+    testWidgets('T-VERIFY-05: Double submission guard rejects concurrent verifyOtpAndLogin requests', (tester) async {
+      final evs = EmailVerifyService();
+      final rps = ResetPasswordService();
+      rps.setOtp('8888');
+
+      int verifyNetworkCalls = 0;
+      final completer = Completer<http.StreamedResponse>();
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/user/send-otp-in-mail/success')) {
+          verifyNetworkCalls++;
+          return await completer.future;
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      final observer = TestNavigatorObserver();
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        evs: evs,
+        rps: rps,
+        observer: observer,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final firstCall = evs.verifyOtpAndLogin(
+        '8888',
+        testContext,
+        'provider@funmoment.sa',
+        'tok-provider-verify',
+        999,
+        '1',
+        '166',
+        userType: 0,
+        client: client,
+      );
+
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(evs.verifyOtpLoading, isTrue);
+
+      final secondCall = evs.verifyOtpAndLogin(
+        '8888',
+        testContext,
+        'provider@funmoment.sa',
+        'tok-provider-verify',
+        999,
+        '1',
+        '166',
+        userType: 0,
+        client: client,
+      );
+
+      final secondResult = await secondCall;
+      expect(secondResult, isFalse, reason: 'Concurrent verification request must be ignored');
+      expect(verifyNetworkCalls, equals(1));
+
+      completer.complete(http.StreamedResponse(
+        Stream.value(utf8.encode(jsonEncode({'message': 'Email Verify Success'}))),
+        201,
+      ));
+
+      final firstResult = await firstCall;
+
+      expect(firstResult, isTrue);
+      expect(verifyNetworkCalls, equals(1), reason: 'Only exactly ONE verification request must be made');
+      expect(observer.pushedRoute, isNotNull);
+      expect((observer.pushedRoute as MaterialPageRoute).builder(testContext), isA<LandingPage>());
+    });
+  });
 }
 
 // ----------------------------------------------------------------------------
 // Test Harness Helpers
 // ----------------------------------------------------------------------------
+class TestNavigatorObserver extends NavigatorObserver {
+  Route<dynamic>? pushedRoute;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    pushedRoute = route;
+    super.didPush(route, previousRoute);
+  }
+}
+
 Future<void> _pumpPageTransition(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
@@ -1197,6 +1486,8 @@ Widget _buildTestApp({
   ProviderRegistrationService? prs,
   EmailVerifyService? evs,
   ResetPasswordService? rps,
+  ProfileService? profileService,
+  PushNotificationService? pushNotificationService,
   NavigatorObserver? observer,
 }) {
   return MultiProvider(
@@ -1210,11 +1501,47 @@ Widget _buildTestApp({
       ChangeNotifierProvider<ResetPasswordService>.value(
         value: rps ?? ResetPasswordService(),
       ),
+      ChangeNotifierProvider<ProfileService>.value(
+        value: profileService ?? ProfileService(),
+      ),
+      ChangeNotifierProvider<PushNotificationService>.value(
+        value: pushNotificationService ?? PushNotificationService(),
+      ),
       ChangeNotifierProvider<AppStringService>.value(
         value: lnProvider,
       ),
       ChangeNotifierProvider<RtlService>.value(
         value: rtlProvider,
+      ),
+      ChangeNotifierProvider<ProviderServiceManagementService>(
+        create: (_) => ProviderServiceManagementService(),
+      ),
+      ChangeNotifierProvider<ProviderAvailabilityService>(
+        create: (_) => ProviderAvailabilityService(),
+      ),
+      ChangeNotifierProvider<MyJobsService>(
+        create: (_) => MyJobsService(),
+      ),
+      ChangeNotifierProvider<SellerAllServicesService>(
+        create: (_) => SellerAllServicesService(),
+      ),
+      ChangeNotifierProvider<OrdersService>(
+        create: (_) => OrdersService(),
+      ),
+      ChangeNotifierProvider<WalletService>(
+        create: (_) => WalletService(),
+      ),
+      ChangeNotifierProvider<AllServicesService>(
+        create: (_) => AllServicesService(),
+      ),
+      ChangeNotifierProvider<SavedItemService>(
+        create: (_) => SavedItemService(),
+      ),
+      ChangeNotifierProvider<FilterServicesService>(
+        create: (_) => FilterServicesService(),
+      ),
+      ChangeNotifierProvider<SearchBarWithDropdownService>(
+        create: (_) => SearchBarWithDropdownService(),
       ),
     ],
     child: MaterialApp(

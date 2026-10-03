@@ -6,6 +6,7 @@ import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/auth_services/email_verify_service.dart';
 import 'package:funmoments/service/auth_services/reset_password_service.dart';
+import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/common_helper.dart';
 import 'package:funmoments/view/utils/constant_colors.dart';
@@ -23,11 +24,11 @@ class EmailVerifyPage extends StatefulWidget {
       this.userType = 1})
       : super(key: key);
 
-  final email;
-  final token;
-  final userId;
-  final state;
-  final countryId;
+  final String? email;
+  final String? token;
+  final dynamic userId;
+  final dynamic state;
+  final dynamic countryId;
   final int userType;
 
   @override
@@ -131,18 +132,33 @@ class _EmailVerifyPageState extends State<EmailVerifyPage> {
                   ),
                 ),
 
-                //Loading bar
-                provider.verifyOtpLoading == true
-                    ? Container(
-                        margin: const EdgeInsets.only(top: 15, bottom: 5),
-                        alignment: Alignment.center,
-                        child: OthersHelper().showLoading(FMColors.magenta),
-                      )
-                    : Container(),
-
-                const SizedBox(
-                  height: 13,
+                const SizedBox(height: 22),
+                FMPrimaryButton(
+                  label: lnProvider.getString("Verify Code"),
+                  isLoading: provider.verifyOtpLoading,
+                  onPressed: provider.verifyOtpLoading
+                      ? null
+                      : () {
+                          if (textEditingController.text.trim().length == 4) {
+                            provider.verifyOtpAndLogin(
+                              textEditingController.text.trim(),
+                              context,
+                              widget.email,
+                              widget.token,
+                              widget.userId,
+                              widget.state,
+                              widget.countryId,
+                              userType: widget.userType,
+                            );
+                          } else {
+                            OthersHelper().showToast(
+                              lnProvider.getString("Please enter the 4 digit code"),
+                              Colors.black,
+                            );
+                          }
+                        },
                 ),
+                const SizedBox(height: 16),
                 Consumer<ResetPasswordService>(
                   builder: (context, provider, child) => Row(
                     mainAxisAlignment: MainAxisAlignment.center,

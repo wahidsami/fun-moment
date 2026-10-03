@@ -206,41 +206,125 @@ class EmailVerifyService with ChangeNotifier {
     }
   }
 
-  verifyOtpAndLogin(enteredOtp, BuildContext context, email, token, userId,
-      state, countryId, {int userType = 1}) async {
-    var otpNumber =
-        Provider.of<ResetPasswordService>(context, listen: false).otpNumber;
-    if (otpNumber != null) {
-      if (enteredOtp == otpNumber) {
-        //Set Loading true
-        verifyOtpLoading = true;
+  Future<bool> verifyOtpAndLogin(
+    dynamic enteredOtp,
+    BuildContext context,
+    dynamic email,
+    dynamic token,
+    dynamic userId,
+    dynamic state,
+    dynamic countryId, {
+    int userType = 1,
+    http.Client? client,
+    Duration timeoutDuration = const Duration(seconds: 15),
+  }) async {
+    if (verifyOtpLoading) {
+      debugPrint('[OtpVerification] verify ignored: already in flight');
+      return false;
+    }
+
+    debugPrint('[OtpVerification] verify started');
+
+    final rps = Provider.of<ResetPasswordService>(context, listen: false);
+    final expectedOtp = rps.otpNumber ?? lastOtpCode;
+
+    if (expectedOtp == null) {
+      debugPrint('[OtpVerification] OTP verification failed: expected OTP is null');
+      OthersHelper().showToast(
+        'Verification code is missing. Please tap "Send again".',
+        Colors.black,
+      );
+      return false;
+    }
+
+    if (enteredOtp.toString().trim() != expectedOtp.toString().trim()) {
+      debugPrint('[OtpVerification] OTP verification failed: code did not match');
+      OthersHelper().showToast("Otp didn't match", Colors.black);
+      return false;
+    }
+
+    // Set loading true
+    verifyOtpLoading = true;
+    notifyListeners();
+
+    try {
+      final connectivityResult = await (Connectivity().checkConnectivity());
+      if (connectivityResult == ConnectivityResult.none) {
+        verifyOtpLoading = false;
         notifyListeners();
+        OthersHelper().showToast(
+          "Please turn on your internet connection",
+          Colors.black,
+        );
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Connectivity check note: $e');
+    }
 
-        var header = {
-          //if header type is application/json then the data should be in jsonEncode method
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $token",
-        };
-        var data = jsonEncode({'user_id': userId, 'email_verified': 1});
+    final httpClient = client ?? http.Client();
+    final shouldCloseClient = client == null;
 
-        var response = await http.post(
+    debugPrint('[OtpVerification] /user/send-otp-in-mail/success request started');
+    try {
+      final header = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      };
+      final data = jsonEncode({'user_id': userId, 'email_verified': 1});
+
+      final response = await httpClient
+          .post(
             Uri.parse('$baseApi/user/send-otp-in-mail/success'),
             headers: header,
-            body: data);
+            body: data,
+          )
+          .timeout(timeoutDuration);
 
-        //Set loading false
+      debugPrint('[OtpVerification] verification response status: ${response.statusCode}');
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        debugPrint('[OtpVerification] verification succeeded');
+
+        debugPrint('[OtpVerification] session persistence started');
+        try {
+          await LoginService().saveDetails(
+            email,
+            token,
+            userId,
+            state,
+            countryId,
+            userType: userType,
+          );
+          debugPrint('[OtpVerification] session persistence completed (userType: $userType)');
+        } catch (saveErr) {
+          debugPrint('[OtpVerification] session persistence note: $saveErr');
+        }
+
+        // Non-blocking background sync
+        try {
+          if (context.mounted) {
+            await Provider.of<ProfileService>(context, listen: false).fetchData();
+          }
+        } catch (profileErr) {
+          debugPrint('[OtpVerification] profile fetch note: $profileErr');
+        }
+
+        try {
+          if (context.mounted) {
+            await Provider.of<PushNotificationService>(context, listen: false)
+                .fetchPusherCredential(context: context);
+          }
+        } catch (pushErr) {
+          debugPrint('[OtpVerification] push credentials note: $pushErr');
+        }
+
         verifyOtpLoading = false;
         notifyListeners();
 
-        if (response.statusCode == 201) {
-          //save the details for later login
-          LoginService().saveDetails(email, token, userId, state, countryId, userType: userType);
-          // );
-          await Provider.of<ProfileService>(context, listen: false).fetchData();
-          await Provider.of<PushNotificationService>(context, listen: false)
-              .fetchPusherCredential(context: context);
-
+        if (context.mounted) {
+          debugPrint('[OtpVerification] navigation started to LandingPage');
           HomepageHelper.tabIndex.value = 0;
           Navigator.pushAndRemoveUntil(
             context,
@@ -249,17 +333,57 @@ class EmailVerifyService with ChangeNotifier {
             ),
             (route) => false,
           );
-        } else {
-          debugPrint('Verify OTP response: ${response.body}');
-          OthersHelper().showToast(
-              'Your entered the otp correctly but something went wrong. Please try again later',
-              Colors.black);
+          debugPrint('[OtpVerification] navigation completed');
         }
+        return true;
       } else {
-        OthersHelper().showToast("Otp didn't match", Colors.black);
+        verifyOtpLoading = false;
+        notifyListeners();
+        debugPrint('[OtpVerification] verification response: ${response.body}');
+        final errorMsg = _extractErrorMessage(
+          response.body,
+          'Your entered the otp correctly but something went wrong. Please try again later',
+        );
+        OthersHelper().showToast(errorMsg, Colors.black);
+        return false;
       }
-    } else {
-      OthersHelper().showToast('Otp is null', Colors.black);
+    } on TimeoutException catch (e) {
+      debugPrint('[OtpVerification] verification request timed out: $e');
+      verifyOtpLoading = false;
+      notifyListeners();
+      OthersHelper().showToast(
+        'Verification timed out. Please try again.',
+        Colors.black,
+      );
+      return false;
+    } on SocketException catch (e) {
+      debugPrint('[OtpVerification] verification socket exception: $e');
+      verifyOtpLoading = false;
+      notifyListeners();
+      OthersHelper().showToast(
+        'Network connection failed. Please check your internet and try again.',
+        Colors.black,
+      );
+      return false;
+    } on http.ClientException catch (e) {
+      debugPrint('[OtpVerification] verification client exception: $e');
+      verifyOtpLoading = false;
+      notifyListeners();
+      OthersHelper().showToast(
+        'Connection error during verification. Please try again.',
+        Colors.black,
+      );
+      return false;
+    } catch (e) {
+      debugPrint('[OtpVerification] verification unexpected error: $e');
+      verifyOtpLoading = false;
+      notifyListeners();
+      OthersHelper().showToast('Verification failed: $e', Colors.black);
+      return false;
+    } finally {
+      if (shouldCloseClient) {
+        httpClient.close();
+      }
     }
   }
 }
