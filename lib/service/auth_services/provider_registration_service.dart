@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -12,7 +13,12 @@ import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
 
 class ProviderRegistrationService with ChangeNotifier {
+  static int _submitSequence = 0;
+
   ProviderRegistrationModel model = ProviderRegistrationModel();
+
+  bool _isSubmitting = false;
+  bool get isSubmitting => _isSubmitting;
 
   bool isLoading = false;
   bool isRegistered = false;
@@ -27,6 +33,7 @@ class ProviderRegistrationService with ChangeNotifier {
 
   void reset() {
     model = ProviderRegistrationModel();
+    _isSubmitting = false;
     isLoading = false;
     isRegistered = false;
     isOtpSending = false;
@@ -225,7 +232,18 @@ class ProviderRegistrationService with ChangeNotifier {
 
   /// Submit Provider Registration
   Future<bool> registerProvider(BuildContext context, {http.Client? client}) async {
+    final seq = ++_submitSequence;
+    debugPrint('[ProviderRegistration] submit #$seq invoked');
+
+    // 1. Guard against concurrent / duplicate submission:
+    if (_isSubmitting || isLoading) {
+      debugPrint('[ProviderRegistration] submit #$seq ignored: request already in flight (_isSubmitting=$_isSubmitting, isLoading=$isLoading)');
+      return false;
+    }
+
+    // 2. Guard against re-registering an already created account:
     if (isRegistered) {
+      debugPrint('[ProviderRegistration] submit #$seq ignored: provider already registered');
       OthersHelper().showToast(
         'Account already created. Please verify your email.',
         ConstantColors().successColor,
@@ -248,23 +266,31 @@ class ProviderRegistrationService with ChangeNotifier {
       return true;
     }
 
-    if (isLoading) return false;
-
+    // Synchronous client validation
     final validationError = validateClientSide();
     if (validationError != null) {
+      debugPrint('[ProviderRegistration] submit #$seq client validation failed: $validationError');
       OthersHelper().showToast(validationError, Colors.black);
       notifyListeners();
       return false;
     }
 
+    // IMMEDIATELY acquire synchronous in-flight lock and loading state BEFORE any await / async gap!
+    _isSubmitting = true;
+    isLoading = true;
+    notifyListeners();
+
     final hasConnection = await checkConnection();
     if (!hasConnection) {
+      debugPrint('[ProviderRegistration] submit #$seq no internet connection');
       OthersHelper().showToast('Please check your internet connection', Colors.black);
+      _isSubmitting = false;
+      isLoading = false;
+      notifyListeners();
       return false;
     }
 
-    setLoading(true);
-
+    debugPrint('[ProviderRegistration] /provider/register START #$seq');
     try {
       final uri = Uri.parse('$baseApi/provider/register');
       final request = http.MultipartRequest('POST', uri);
@@ -300,11 +326,11 @@ class ProviderRegistrationService with ChangeNotifier {
       }
 
       final streamedResponse = client != null
-          ? await client.send(request)
-          : await request.send();
+          ? await client.send(request).timeout(const Duration(seconds: 25))
+          : await request.send().timeout(const Duration(seconds: 25));
       final response = await http.Response.fromStream(streamedResponse);
 
-      debugPrint('Provider registration HTTP ${response.statusCode}: ${response.body}');
+      debugPrint('[ProviderRegistration] /provider/register END #$seq status=${response.statusCode}');
 
       if (response.statusCode == 201) {
         final responseData = jsonDecode(response.body);
@@ -322,8 +348,9 @@ class ProviderRegistrationService with ChangeNotifier {
           debugPrint('Error caching sellerType: $e');
         }
 
-        // 1. REGISTRATION SUCCEEDED:
-        // Immediately terminate registration button loading state
+        // 1. REGISTRATION PERMANENT SUCCESS:
+        // Immediately terminate registration button loading state and in-flight lock
+        _isSubmitting = false;
         isLoading = false;
         isRegistered = true;
         registeredEmail = model.email.trim();
@@ -331,6 +358,7 @@ class ProviderRegistrationService with ChangeNotifier {
         registeredUserId = userId;
         registeredState = state;
         registeredCountryId = countryId;
+        debugPrint('[ProviderRegistration] registration marked successful #$seq');
         notifyListeners();
 
         OthersHelper().showToast(
@@ -340,6 +368,7 @@ class ProviderRegistrationService with ChangeNotifier {
 
         // 2. SEPARATE OTP DISPATCH:
         isOtpSending = true;
+        debugPrint('[ProviderRegistration] OTP dispatch started #$seq');
         notifyListeners();
 
         bool isOtpSent = false;
@@ -352,63 +381,63 @@ class ProviderRegistrationService with ChangeNotifier {
             client: client,
           );
         } catch (otpErr) {
-          debugPrint('Suppressed OTP dispatch exception in ProviderRegistrationService: $otpErr');
+          debugPrint('[ProviderRegistration] Suppressed OTP dispatch exception: $otpErr');
           isOtpSent = false;
         } finally {
           isOtpSending = false;
+          debugPrint('[ProviderRegistration] OTP dispatch completed #$seq (sent=$isOtpSent)');
           notifyListeners();
         }
 
         if (context.mounted) {
-          if (isOtpSent) {
-            Navigator.pushReplacement<void, void>(
-              context,
-              MaterialPageRoute<void>(
-                builder: (BuildContext context) => EmailVerifyPage(
-                  email: model.email.trim(),
-                  token: token,
-                  userId: userId,
-                  state: state,
-                  countryId: countryId,
-                  userType: 0, // Provider
-                ),
-              ),
-            );
-          } else {
+          if (!isOtpSent) {
             // OTP failed or timed out:
             // Provider registration REMAINS SUCCESSFUL!
-            // Give clear, OTP-specific guidance and navigate to EmailVerifyPage where user can tap "Send again"
             OthersHelper().showToast(
-              "Your account was created successfully, but we couldn't send the verification code. Please tap 'Send again'.",
+              "Registration successful. We couldn't send the verification code right now. Please try Resend.",
               Colors.black,
             );
-
-            Navigator.pushReplacement<void, void>(
-              context,
-              MaterialPageRoute<void>(
-                builder: (BuildContext context) => EmailVerifyPage(
-                  email: model.email.trim(),
-                  token: token,
-                  userId: userId,
-                  state: state,
-                  countryId: countryId,
-                  userType: 0, // Provider
-                ),
-              ),
-            );
           }
+
+          debugPrint('[ProviderRegistration] navigating to EmailVerifyPage #$seq');
+          Navigator.pushReplacement<void, void>(
+            context,
+            MaterialPageRoute<void>(
+              builder: (BuildContext context) => EmailVerifyPage(
+                email: model.email.trim(),
+                token: token,
+                userId: userId,
+                state: state,
+                countryId: countryId,
+                userType: 0, // Provider
+              ),
+            ),
+          );
         }
 
         return true;
       } else {
+        _isSubmitting = false;
+        isLoading = false;
         _parseAndSurfaceErrors(response);
-        setLoading(false);
         return false;
       }
+    } on TimeoutException catch (e) {
+      debugPrint('[ProviderRegistration] /provider/register TIMEOUT #$seq: $e');
+      _isSubmitting = false;
+      isLoading = false;
+      OthersHelper().showToast(
+        'Registration request timed out. Please check your connection and try again.',
+        Colors.black,
+      );
+      notifyListeners();
+      return false;
     } catch (e) {
-      debugPrint('Provider registration exception: $e');
+      debugPrint('[ProviderRegistration] /provider/register EXCEPTION #$seq: $e');
+      _isSubmitting = false;
+      isLoading = false;
       OthersHelper().showToast('Registration failed: $e', Colors.black);
-      setLoading(false);
+      notifyListeners();
       return false;
     }
   }

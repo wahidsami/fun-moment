@@ -61,6 +61,7 @@ class _ProviderRegistrationPageState extends State<ProviderRegistrationPage> {
   bool _passVisible = false;
   bool _repeatPassVisible = false;
   String _countryISOCode = 'SA';
+  bool _isButtonTapped = false;
 
   @override
   void initState() {
@@ -70,7 +71,9 @@ class _ProviderRegistrationPageState extends State<ProviderRegistrationPage> {
     emailController = TextEditingController(text: widget.email ?? '');
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final prs = Provider.of<ProviderRegistrationService>(context, listen: false);
+      prs.reset();
       prs.model.name = fullNameController.text;
       prs.model.username = userNameController.text;
       prs.model.email = emailController.text;
@@ -142,6 +145,11 @@ class _ProviderRegistrationPageState extends State<ProviderRegistrationPage> {
     return Consumer<ProviderRegistrationService>(
       builder: (context, prs, child) {
         final isIndividual = prs.model.sellerType == 1;
+        final isLocked = prs.isLoading ||
+            prs.isSubmitting ||
+            prs.isRegistered ||
+            prs.isOtpSending ||
+            _isButtonTapped;
 
         return Scaffold(
           backgroundColor: FMColors.background,
@@ -478,12 +486,21 @@ class _ProviderRegistrationPageState extends State<ProviderRegistrationPage> {
                     FMPrimaryButton(
                       label: asProvider.getString("Submit Provider Application"),
                       isLoading: prs.isLoading,
-                      onPressed: () {
-                        if (_formKey.currentState?.validate() ?? false) {
-                          _syncControllersToModel(prs);
-                          prs.registerProvider(context);
-                        }
-                      },
+                      onPressed: isLocked
+                          ? null
+                          : () async {
+                              if (_formKey.currentState?.validate() ?? false) {
+                                setState(() => _isButtonTapped = true);
+                                _syncControllersToModel(prs);
+                                try {
+                                  await prs.registerProvider(context);
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _isButtonTapped = false);
+                                  }
+                                }
+                              }
+                            },
                     ),
                     const SizedBox(height: 16),
                     SignupHelper().haveAccount(context),

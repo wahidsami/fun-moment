@@ -847,6 +847,298 @@ void main() {
       expect(find.byType(EmailVerifyPage), findsOneWidget);
     });
   });
+
+  // --------------------------------------------------------------------------
+  // Group 9: Section 18 Explicit Acceptance Scenarios 1 - 6
+  // --------------------------------------------------------------------------
+  group('Phase 4C: User Request Section 18 Scenarios 1-6 Tests', () {
+    testWidgets('Scenario 1: Normal successful registration (201 -> success -> loading stops -> OTP sent -> EmailVerifyPage)', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      int registerCalls = 0;
+      int otpCalls = 0;
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          registerCalls++;
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'tok-sc1',
+              'users': {'id': 501, 'state': '1', 'country_id': '166', 'seller_type': 1}
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          otpCalls++;
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({'otp': '1234'}))),
+            201,
+          );
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(registerCalls, equals(1));
+      expect(otpCalls, equals(1));
+      expect(result, isTrue);
+      expect(prs.isRegistered, isTrue);
+      expect(prs.isLoading, isFalse);
+      expect(prs.isSubmitting, isFalse);
+      expect(find.byType(EmailVerifyPage), findsOneWidget);
+    });
+
+    testWidgets('Scenario 2: OTP timeout after successful registration (201 -> success -> OTP timeout -> EmailVerifyPage with Resend)', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      int registerCalls = 0;
+      int otpCalls = 0;
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          registerCalls++;
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'tok-sc2',
+              'users': {'id': 502, 'state': '1', 'country_id': '166', 'seller_type': 1}
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          otpCalls++;
+          throw TimeoutException('SMTP connection timeout');
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(result, isTrue, reason: 'Registration remains successful despite OTP timeout');
+      expect(registerCalls, equals(1));
+      expect(otpCalls, equals(1));
+      expect(prs.isRegistered, isTrue);
+      expect(prs.isLoading, isFalse);
+      expect(prs.isSubmitting, isFalse);
+      expect(evs.lastOtpStatus, equals(OtpSendStatus.timeout));
+      expect(find.byType(EmailVerifyPage), findsOneWidget);
+    });
+
+    testWidgets('Scenario 3: Registration validation error 422 (field errors surfaced, stop loading, no OTP, no navigation)', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      int otpCalls = 0;
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'message': 'The email has already been taken. (and 1 more error)',
+              'errors': {
+                'email': ['The email has already been taken.'],
+                'username': ['The username has already been taken.']
+              }
+            }))),
+            422,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          otpCalls++;
+          return http.StreamedResponse(Stream.value(utf8.encode('{}')), 201);
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(result, isFalse);
+      expect(prs.isLoading, isFalse);
+      expect(prs.isSubmitting, isFalse);
+      expect(prs.isRegistered, isFalse);
+      expect(prs.fieldErrors['email'], equals('The email has already been taken.'));
+      expect(prs.fieldErrors['username'], equals('The username has already been taken.'));
+      expect(otpCalls, equals(0), reason: 'OTP must NOT be dispatched on 422');
+      expect(find.byType(EmailVerifyPage), findsNothing, reason: 'Must not navigate to OTP screen on 422');
+    });
+
+    testWidgets('Scenario 4: Registration network timeout (stops loading, error surfaced, no OTP, no navigation)', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      int otpCalls = 0;
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          throw TimeoutException('Connection timed out');
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          otpCalls++;
+          return http.StreamedResponse(Stream.value(utf8.encode('{}')), 201);
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      final result = await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(result, isFalse);
+      expect(prs.isLoading, isFalse);
+      expect(prs.isSubmitting, isFalse);
+      expect(prs.isRegistered, isFalse);
+      expect(otpCalls, equals(0), reason: 'OTP must NOT be called if registration timed out');
+      expect(find.byType(EmailVerifyPage), findsNothing);
+    });
+
+    testWidgets('Scenario 5: Resend OTP calls /send-otp-in-mail ONLY and NEVER /provider/register', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      int registerCalls = 0;
+      int otpCalls = 0;
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          registerCalls++;
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({
+              'token': 'tok-resend-test',
+              'users': {'id': 400, 'state': '1', 'country_id': '166', 'seller_type': 1}
+            }))),
+            201,
+          );
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          otpCalls++;
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({'otp': '5566'}))),
+            201,
+          );
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      // Initial registration
+      await prs.registerProvider(testContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(registerCalls, equals(1));
+      expect(otpCalls, equals(1));
+      expect(prs.isRegistered, isTrue);
+
+      // Resend OTP
+      final activeContext = tester.element(find.byType(EmailVerifyPage));
+      final resendResult = await prs.resendRegistrationOtp(activeContext, client: client);
+      await _pumpPageTransition(tester);
+
+      expect(resendResult, isTrue);
+      expect(registerCalls, equals(1), reason: '/provider/register must NEVER be called again during resend');
+      expect(otpCalls, equals(2), reason: '/send-otp-in-mail must be called for resend');
+    });
+
+    testWidgets('Scenario 6: Double tap produces exactly ONE /provider/register request', (tester) async {
+      final prs = ProviderRegistrationService();
+      prs.model = _createValidProviderModel();
+      final evs = EmailVerifyService();
+
+      int registerNetworkCalls = 0;
+      final registerCompleter = Completer<http.StreamedResponse>();
+
+      final client = MockRegistrationClient((request) async {
+        if (request.url.path.contains('/provider/register')) {
+          registerNetworkCalls++;
+          return await registerCompleter.future;
+        } else if (request.url.path.contains('/send-otp-in-mail')) {
+          return http.StreamedResponse(Stream.value(utf8.encode(jsonEncode({'otp': '1234'}))), 201);
+        }
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 404);
+      });
+
+      late BuildContext testContext;
+      await tester.pumpWidget(_buildTestApp(
+        prs: prs,
+        evs: evs,
+        child: Builder(builder: (ctx) {
+          testContext = ctx;
+          return const SizedBox();
+        }),
+      ));
+
+      // Simulate rapid double tap: two calls fired concurrently before the first completes
+      final firstTap = prs.registerProvider(testContext, client: client);
+      final secondTap = prs.registerProvider(testContext, client: client);
+
+      // Now complete the first registration request
+      registerCompleter.complete(http.StreamedResponse(
+        Stream.value(utf8.encode(jsonEncode({
+          'token': 'tok-double-tap',
+          'users': {'id': 301, 'state': '1', 'country_id': '166', 'seller_type': 1}
+        }))),
+        201,
+      ));
+
+      final firstResult = await firstTap;
+      final secondResult = await secondTap;
+      await _pumpPageTransition(tester);
+
+      expect(firstResult, isTrue);
+      expect(secondResult, isFalse, reason: 'Second tap while in flight must be rejected immediately');
+      expect(registerNetworkCalls, equals(1), reason: 'Exactly ONE /provider/register request must be made');
+      expect(prs.isRegistered, isTrue);
+    });
+  });
 }
 
 // ----------------------------------------------------------------------------
