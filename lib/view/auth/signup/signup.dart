@@ -64,6 +64,11 @@ class _SignupPageState extends State<SignupPage> {
             appBar: AppBar(
               backgroundColor: Colors.transparent,
               surfaceTintColor: Colors.transparent,
+              centerTitle: true,
+              title: Text(
+                asProvider.getString('Registration'),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+              ),
               leading: IconButton(
                 onPressed: () {
                   if (provider.selectedPage == 0) {
@@ -76,7 +81,11 @@ class _SignupPageState extends State<SignupPage> {
                     );
                   }
                 },
-                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                icon: Icon(
+                  Directionality.of(context) == TextDirection.rtl
+                      ? Icons.arrow_forward_ios_rounded
+                      : Icons.arrow_back_ios_new_rounded,
+                ),
               ),
               actions: const [
                 Padding(

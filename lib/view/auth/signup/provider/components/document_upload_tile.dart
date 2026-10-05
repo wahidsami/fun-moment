@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:funmoments/model/provider_registration_model.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
+import 'package:funmoments/view/utils/responsive.dart';
 
 class DocumentUploadTile extends StatelessWidget {
   final String title;
@@ -66,7 +67,7 @@ class DocumentUploadTile extends StatelessWidget {
         Row(
           children: [
             Text(
-              title,
+              lnProvider.getString(title),
               style: const TextStyle(
                 color: FMColors.textPrimary,
                 fontSize: 13,
@@ -81,9 +82,9 @@ class DocumentUploadTile extends StatelessWidget {
               ),
             ] else ...[
               const SizedBox(width: 6),
-              const Text(
-                '(Optional)',
-                style: TextStyle(color: FMColors.textMuted, fontSize: 11),
+              Text(
+                lnProvider.getString('(Optional)'),
+                style: const TextStyle(color: FMColors.textMuted, fontSize: 11),
               ),
             ],
           ],
@@ -91,7 +92,7 @@ class DocumentUploadTile extends StatelessWidget {
         if (subtitle != null) ...[
           const SizedBox(height: 3),
           Text(
-            subtitle!,
+            lnProvider.getString(subtitle!),
             style: const TextStyle(color: FMColors.textMuted, fontSize: 11),
           ),
         ],
@@ -134,12 +135,12 @@ class DocumentUploadTile extends StatelessWidget {
                       ),
                       IconButton(
                         icon: const Icon(Icons.refresh_rounded, color: FMColors.textMuted, size: 20),
-                        tooltip: 'Replace',
+                        tooltip: lnProvider.getString('Replace'),
                         onPressed: () => _pickFile(context),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
-                        tooltip: 'Remove',
+                        tooltip: lnProvider.getString('Remove'),
                         onPressed: () => onFilePicked(null),
                       ),
                     ],
@@ -150,7 +151,7 @@ class DocumentUploadTile extends StatelessWidget {
                       const Icon(Icons.upload_file_rounded, color: FMColors.textMuted, size: 22),
                       const SizedBox(width: 8),
                       Text(
-                        'Upload document (PDF / JPG / PNG)',
+                        lnProvider.getString('Upload document (PDF / JPG / PNG)'),
                         style: TextStyle(
                           color: errorMessage != null ? FMColors.magenta : FMColors.textMuted,
                           fontSize: 12,
@@ -164,7 +165,7 @@ class DocumentUploadTile extends StatelessWidget {
         if (errorMessage != null) ...[
           const SizedBox(height: 4),
           Text(
-            errorMessage!,
+            lnProvider.getString(errorMessage!),
             style: const TextStyle(color: FMColors.magenta, fontSize: 11),
           ),
         ],

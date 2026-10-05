@@ -27,7 +27,9 @@ class StateDropdown extends StatelessWidget {
               });
         },
         child: dropdownPlaceholder(
-            hintText: p.selectedState ?? lnProvider.getString('Choose city'),
+            hintText: p.selectedState != null
+                ? lnProvider.getString(p.selectedState!)
+                : lnProvider.getString('Choose city'),
             textWidth: textWidth),
       ),
     );

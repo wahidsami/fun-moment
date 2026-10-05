@@ -37,7 +37,7 @@ class EmailNameFields extends StatelessWidget {
         const SizedBox(height: 18),
         FMTextField(
           controller: userNameController,
-          label: 'Username',
+          label: lnProvider.getString('Username'),
           hintText: lnProvider.getString("Enter your username"),
           textInputAction: TextInputAction.next,
           prefixIcon: const Icon(Icons.alternate_email_rounded),

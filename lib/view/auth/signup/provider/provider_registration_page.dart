@@ -158,7 +158,11 @@ class _ProviderRegistrationPageState extends State<ProviderRegistrationPage> {
             surfaceTintColor: Colors.transparent,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+              icon: Icon(
+                Directionality.of(context) == TextDirection.rtl
+                    ? Icons.arrow_forward_ios_rounded
+                    : Icons.arrow_back_ios_new_rounded,
+              ),
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(
@@ -256,6 +260,7 @@ class _ProviderRegistrationPageState extends State<ProviderRegistrationPage> {
                     const SizedBox(height: 8),
                     IntlPhoneField(
                       decoration: SignupHelper().phoneFieldDecoration(),
+                      searchText: asProvider.getString('Search country'),
                       initialCountryCode: 'SA',
                       disableLengthCheck: true,
                       textAlign: rtl.direction == 'ltr' ? TextAlign.left : TextAlign.right,

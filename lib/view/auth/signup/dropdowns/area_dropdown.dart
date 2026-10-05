@@ -26,7 +26,9 @@ class AreaDropdown extends StatelessWidget {
               });
         },
         child: dropdownPlaceholder(
-            hintText: p.selectedArea ?? lnProvider.getString('Choose area')),
+            hintText: p.selectedArea != null
+                ? lnProvider.getString(p.selectedArea!)
+                : lnProvider.getString('Choose area')),
       ),
     );
   }

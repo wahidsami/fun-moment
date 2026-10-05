@@ -80,7 +80,7 @@ dropdownPlaceholder({required String hintText, textWidth}) {
       SizedBox(
         width: textWidth,
         child: CommonHelper().paragraphCommon(lnProvider.getString(hintText),
-            textAlign: TextAlign.left),
+            textAlign: TextAlign.start),
       ),
       const Icon(Icons.keyboard_arrow_down)
     ]),

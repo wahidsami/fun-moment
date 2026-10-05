@@ -87,7 +87,7 @@ class _CountryStatesDropdownsState extends State<CountryStatesDropdowns> {
           children: [
             Expanded(
               child: Text(
-                hintText,
+                lnProvider.getString(hintText),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: FMColors.textPrimary,
                     ),
