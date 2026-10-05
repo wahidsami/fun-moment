@@ -8,11 +8,13 @@ import 'package:funmoments/model/dropdown_models/area_dropdown_model.dart';
 import 'package:funmoments/service/dropdowns_services/country_dropdown_service.dart';
 import 'package:funmoments/service/dropdowns_services/state_dropdown_services.dart';
 import 'package:funmoments/service/profile_service.dart';
+import 'package:funmoments/view/utils/app_strings.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
+import 'package:funmoments/view/utils/responsive.dart';
 
 class AreaDropdownService with ChangeNotifier {
   var areaDropdownList = ['Olaya'];
-  var areaDropdownIndexList = [2];
+  List<dynamic> areaDropdownIndexList = [2];
 
   final List<String> _allAreas = ['Olaya'];
   final List<dynamic> _allAreaIds = [2];
@@ -47,6 +49,16 @@ class AreaDropdownService with ChangeNotifier {
     hasError = false;
     errorMessage = null;
     currentPage = 1;
+    notifyListeners();
+  }
+
+  void setInitialAreas(List<String> names, List<dynamic> ids) {
+    areaDropdownList = List.from(names);
+    areaDropdownIndexList = List.from(ids);
+    _allAreas.clear();
+    _allAreas.addAll(names);
+    _allAreaIds.clear();
+    _allAreaIds.addAll(ids);
     notifyListeners();
   }
 
@@ -133,7 +145,7 @@ class AreaDropdownService with ChangeNotifier {
 
     try {
       final response = await http
-          .get(Uri.parse('$baseApi/country/service-city/service-area/$selectedCountryId/$selectedStateId?page=$currentPage'))
+          .get(Uri.parse('$baseApi/country/service-city/service-area/$selectedCountryId/$selectedStateId?per_page=500&page=$currentPage'))
           .timeout(const Duration(seconds: 12));
 
       setLoadingFalse();
@@ -169,39 +181,24 @@ class AreaDropdownService with ChangeNotifier {
       }
 
       // If no areas exist for this city
-      if (selectedStateId == 2 || selectedStateId == '2') {
-        // Riyadh fallback
-        selectedArea = 'Olaya';
-        selectedAreaId = 2;
-        areaDropdownList = ['Olaya'];
-        areaDropdownIndexList = [2];
-      } else {
-        selectedArea = null;
-        selectedAreaId = null;
-        areaDropdownList.clear();
-        areaDropdownIndexList.clear();
-        _allAreas.clear();
-        _allAreaIds.clear();
-      }
+      selectedArea = null;
+      selectedAreaId = null;
+      areaDropdownList.clear();
+      areaDropdownIndexList.clear();
+      _allAreas.clear();
+      _allAreaIds.clear();
       notifyListeners();
       return true;
     } catch (e) {
       setLoadingFalse();
       hasError = true;
       errorMessage = 'Could not load areas.';
-      if (selectedStateId == 2 || selectedStateId == '2') {
-        selectedArea = 'Olaya';
-        selectedAreaId = 2;
-        areaDropdownList = ['Olaya'];
-        areaDropdownIndexList = [2];
-      } else {
-        selectedArea = null;
-        selectedAreaId = null;
-        areaDropdownList.clear();
-        areaDropdownIndexList.clear();
-        _allAreas.clear();
-        _allAreaIds.clear();
-      }
+      selectedArea = null;
+      selectedAreaId = null;
+      areaDropdownList.clear();
+      areaDropdownIndexList.clear();
+      _allAreas.clear();
+      _allAreaIds.clear();
       notifyListeners();
       return false;
     }
@@ -217,14 +214,22 @@ class AreaDropdownService with ChangeNotifier {
       setAreaBasedOnUserProfile(context);
     } else {
       if (data != null && data.serviceAreas.data.isNotEmpty) {
-        int olayaIdx = data.serviceAreas.data
-            .indexWhere((a) => a.id == 2 || a.serviceArea.toLowerCase().contains('olaya'));
-        if (olayaIdx >= 0) {
-          selectedArea = data.serviceAreas.data[olayaIdx].serviceArea;
-          selectedAreaId = data.serviceAreas.data[olayaIdx].id;
+        // If current selectedAreaId is valid in the incoming dataset, preserve it
+        int currentIdx = data.serviceAreas.data
+            .indexWhere((a) => a.id == selectedAreaId);
+        if (currentIdx >= 0) {
+          selectedArea = data.serviceAreas.data[currentIdx].serviceArea;
+          selectedAreaId = data.serviceAreas.data[currentIdx].id;
         } else {
-          selectedArea = data.serviceAreas.data[0].serviceArea;
-          selectedAreaId = data.serviceAreas.data[0].id;
+          int olayaIdx = data.serviceAreas.data
+              .indexWhere((a) => a.id == 2 || a.serviceArea.toLowerCase().contains('olaya'));
+          if (olayaIdx >= 0) {
+            selectedArea = data.serviceAreas.data[olayaIdx].serviceArea;
+            selectedAreaId = data.serviceAreas.data[olayaIdx].id;
+          } else {
+            selectedArea = data.serviceAreas.data[0].serviceArea;
+            selectedAreaId = data.serviceAreas.data[0].id;
+          }
         }
       } else {
         selectedArea = null;
@@ -249,14 +254,19 @@ class AreaDropdownService with ChangeNotifier {
       return true;
     }
 
-    final isOlayaSearch = query.contains('عليا') || query.contains('olaya');
-
     List<String> matched = [];
-    List<int> matchedIds = [];
+    List<dynamic> matchedIds = [];
     for (int i = 0; i < _allAreas.length; i++) {
-      final name = _allAreas[i].toLowerCase();
-      if (name.contains(query) || (isOlayaSearch && name.contains('olaya'))) {
-        matched.add(_allAreas[i]);
+      final name = _allAreas[i];
+      final nameLower = name.toLowerCase();
+      String arName = '';
+      try {
+        arName = lnProvider.getString(name).toLowerCase();
+      } catch (_) {
+        arName = (translations[name] ?? '').toLowerCase();
+      }
+      if (nameLower.contains(query) || (arName.isNotEmpty && arName.contains(query))) {
+        matched.add(name);
         matchedIds.add(_allAreaIds[i]);
       }
     }
@@ -264,13 +274,6 @@ class AreaDropdownService with ChangeNotifier {
     if (matched.isNotEmpty) {
       areaDropdownList = matched;
       areaDropdownIndexList = matchedIds;
-      notifyListeners();
-      return true;
-    }
-
-    if (isOlayaSearch && _allAreas.contains('Olaya')) {
-      areaDropdownList = ['Olaya'];
-      areaDropdownIndexList = [2];
       notifyListeners();
       return true;
     }

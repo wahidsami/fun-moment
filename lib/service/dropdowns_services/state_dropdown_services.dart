@@ -6,11 +6,13 @@ import 'package:funmoments/model/dropdown_models/states_dropdown_model.dart';
 import 'package:funmoments/service/dropdowns_services/country_dropdown_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:funmoments/service/profile_service.dart';
+import 'package:funmoments/view/utils/app_strings.dart';
 import 'package:funmoments/view/utils/others_helper.dart';
+import 'package:funmoments/view/utils/responsive.dart';
 
 class StateDropdownService with ChangeNotifier {
   var statesDropdownList = ['Riyadh'];
-  var statesDropdownIndexList = [2];
+  List<dynamic> statesDropdownIndexList = [2];
 
   final List<String> _allStates = ['Riyadh'];
   final List<dynamic> _allStateIds = [2];
@@ -32,6 +34,16 @@ class StateDropdownService with ChangeNotifier {
 
   setTotalPage(newPageNumber) {
     totalPages = newPageNumber;
+    notifyListeners();
+  }
+
+  void setInitialStates(List<String> names, List<dynamic> ids) {
+    statesDropdownList = List.from(names);
+    statesDropdownIndexList = List.from(ids);
+    _allStates.clear();
+    _allStates.addAll(names);
+    _allStateIds.clear();
+    _allStateIds.addAll(ids);
     notifyListeners();
   }
 
@@ -89,7 +101,7 @@ class StateDropdownService with ChangeNotifier {
 
     try {
       final response = await http
-          .get(Uri.parse('$baseApi/country/service-city/$selectedCountryId?page=$currentPage'))
+          .get(Uri.parse('$baseApi/country/service-city/$selectedCountryId?per_page=300&page=$currentPage'))
           .timeout(const Duration(seconds: 12));
 
       setLoadingFalse();
@@ -177,15 +189,23 @@ class StateDropdownService with ChangeNotifier {
       setStateBasedOnUserProfile(context);
     } else {
       if (data != null && data.serviceCities.data.isNotEmpty) {
-        // Prioritize Riyadh if present or first
-        int riyadhIdx = data.serviceCities.data
-            .indexWhere((c) => c.id == 2 || c.serviceCity.toLowerCase().contains('riyadh'));
-        if (riyadhIdx >= 0) {
-          selectedState = data.serviceCities.data[riyadhIdx].serviceCity;
-          selectedStateId = data.serviceCities.data[riyadhIdx].id;
+        // If currently selected state exists in the incoming data, preserve it
+        int currentIdx = data.serviceCities.data
+            .indexWhere((c) => c.id == selectedStateId);
+        if (currentIdx >= 0) {
+          selectedState = data.serviceCities.data[currentIdx].serviceCity;
+          selectedStateId = data.serviceCities.data[currentIdx].id;
         } else {
-          selectedState = data.serviceCities.data[0].serviceCity;
-          selectedStateId = data.serviceCities.data[0].id;
+          // Prioritize Riyadh if present or first
+          int riyadhIdx = data.serviceCities.data
+              .indexWhere((c) => c.id == 2 || c.serviceCity.toLowerCase().contains('riyadh'));
+          if (riyadhIdx >= 0) {
+            selectedState = data.serviceCities.data[riyadhIdx].serviceCity;
+            selectedStateId = data.serviceCities.data[riyadhIdx].id;
+          } else {
+            selectedState = data.serviceCities.data[0].serviceCity;
+            selectedStateId = data.serviceCities.data[0].id;
+          }
         }
       } else {
         selectedState = 'Riyadh';
@@ -210,14 +230,19 @@ class StateDropdownService with ChangeNotifier {
       return true;
     }
 
-    final isRiyadhSearch = query.contains('رياض') || query.contains('riyadh');
-
     List<String> matched = [];
-    List<int> matchedIds = [];
+    List<dynamic> matchedIds = [];
     for (int i = 0; i < _allStates.length; i++) {
-      final name = _allStates[i].toLowerCase();
-      if (name.contains(query) || (isRiyadhSearch && name.contains('riyadh'))) {
-        matched.add(_allStates[i]);
+      final name = _allStates[i];
+      final nameLower = name.toLowerCase();
+      String arName = '';
+      try {
+        arName = lnProvider.getString(name).toLowerCase();
+      } catch (_) {
+        arName = (translations[name] ?? '').toLowerCase();
+      }
+      if (nameLower.contains(query) || (arName.isNotEmpty && arName.contains(query))) {
+        matched.add(name);
         matchedIds.add(_allStateIds[i]);
       }
     }
@@ -229,14 +254,7 @@ class StateDropdownService with ChangeNotifier {
       return true;
     }
 
-    if (isRiyadhSearch) {
-      statesDropdownList = ['Riyadh'];
-      statesDropdownIndexList = [2];
-      notifyListeners();
-      return true;
-    }
-
-    // Try backend search
+    // Try backend search if client filter had no results
     try {
       var response = await http
           .get(Uri.parse('$baseApi/city-search?q=$searchText'))

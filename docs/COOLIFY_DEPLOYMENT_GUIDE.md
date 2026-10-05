@@ -50,11 +50,11 @@ Create a new Application and set:
 - Build pack: `Nixpacks`
 - Base directory: `backend`
 - Port exposes: `80`
-- Public domain: `https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io`
+- Public domain: `https://bkfunmoments.unifinitylab.com`
 
 If Coolify asks for the application URL, use:
 
-- `https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io`
+- `https://bkfunmoments.unifinitylab.com`
 
 ## Step 2 - Add backend environment variables
 
@@ -63,7 +63,8 @@ Start from the client's existing `.env` and keep every current value unless it i
 Replace only these lines in Coolify:
 
 ```dotenv
-APP_URL=https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io
+APP_URL=https://bkfunmoments.unifinitylab.com
+SANCTUM_STATEFUL_DOMAINS=funmoments.unifinitylab.com,bkfunmoments.unifinitylab.com
 APP_KEY=base64:KURTu1uwFlb+pcmYFFIAFqEE0yrLgfJhsRDOaisj+9E=
 
 DB_CONNECTION=pgsql
@@ -192,9 +193,9 @@ php artisan view:cache
 
 Use these URLs for the Laravel deployment:
 
-- Website: `https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io`
-- Admin: `https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io/admin-home`
-- API: `https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io/api/v1`
+- Website: `https://bkfunmoments.unifinitylab.com`
+- Admin: `https://bkfunmoments.unifinitylab.com/admin-home` (or React admin `https://funmoments.unifinitylab.com`)
+- API: `https://bkfunmoments.unifinitylab.com/api/v1`
 
 ## Step 8 - Optional queue worker
 
@@ -236,7 +237,7 @@ The Flutter app is not hosted on Coolify.
 When you build it, point it to the new API:
 
 ```bash
-flutter build appbundle --release --dart-define=BASE_API=https://vks008w44skg0cs0gkc80cgo.141.140.0.90.sslip.io/api/v1
+flutter build appbundle --release --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1
 ```
 
 ## Troubleshooting

@@ -745,7 +745,7 @@ class ServiceController extends Controller
     // service city
     public function serviceCity()
     {
-        $service_city = ServiceCity::query()->select('id','service_city')->where('status',1)->get();
+        $service_city = ServiceCity::query()->select('id','service_city')->where('status',1)->orderBy('service_city', 'asc')->get();
         
         if($service_city){
             return response()->success([

@@ -341,11 +341,11 @@ class UserController extends Controller
 
     public function country(Request $request)
     {
+        $perPage = min(max(request()->integer('per_page', 20), 1), 500);
+        $countries_query = Country::query()->select('id', 'country')->where('status', 1);
 
-        $countries_query = Country::query()->select('id', 'country');
-
-        $countries = $countries_query->orderBy('country','asc')->paginate(20)->withQueryString();
-        if ($countries) {
+        $countries = $countries_query->orderBy('country','asc')->paginate($perPage)->withQueryString();
+        if ($countries && $countries->total() >= 1) {
             return response()->success([
                 'countries' => $countries,
             ]);
@@ -361,12 +361,14 @@ class UserController extends Controller
      // get city under country api
      public function serviceCity($id)
      {
+         $perPage = min(max(request()->integer('per_page', 20), 1), 500);
          $service_cities_query = ServiceCity::query()->select('id', 'service_city')
-             ->where('country_id', $id);
+             ->where('country_id', $id)
+             ->where('status', 1);
 
-         $service_cities = $service_cities_query->orderBy('service_city','asc')->paginate(20)->withQueryString();
+         $service_cities = $service_cities_query->orderBy('service_city','asc')->paginate($perPage)->withQueryString();
          
-         if ($service_cities->count() >= 1) {
+         if ($service_cities->total() >= 1) {
              return response()->json([
                  'service_cities' => $service_cities,
              ]);
@@ -381,13 +383,15 @@ class UserController extends Controller
     // get area under city and country api
     public function serviceArea($country_id, $city_id)
     {
+        $perPage = min(max(request()->integer('per_page', 20), 1), 500);
         $service_areas_query = ServiceArea::select('id', 'service_area')
             ->where('country_id', $country_id)
-            ->where('service_city_id', $city_id);
+            ->where('service_city_id', $city_id)
+            ->where('status', 1);
 
-        $service_areas = $service_areas_query->orderBy('service_area','asc')->paginate(20)->withQueryString();
+        $service_areas = $service_areas_query->orderBy('service_area','asc')->paginate($perPage)->withQueryString();
 
-        if ($service_areas->count() >= 1) {
+        if ($service_areas->total() >= 1) {
             return response()->json([
                 'service_areas' => $service_areas,
             ]);

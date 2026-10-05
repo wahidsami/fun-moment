@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:funmoments/service/dropdowns_services/area_dropdown_service.dart';
 import 'package:funmoments/service/dropdowns_services/country_dropdown_service.dart';
 import 'package:funmoments/service/dropdowns_services/state_dropdown_services.dart';
 import 'package:funmoments/service/searchbar_with_dropdown_service.dart';
@@ -106,6 +107,9 @@ class _CountryDropdownPopupState extends State<CountryDropdownPopup> {
                             Provider.of<StateDropdownService>(context,
                                     listen: false)
                                 .setStateDefault();
+                            Provider.of<AreaDropdownService>(context,
+                                    listen: false)
+                                .clearArea();
                             try {
                               Provider.of<SearchBarWithDropdownService>(context,
                                       listen: false)

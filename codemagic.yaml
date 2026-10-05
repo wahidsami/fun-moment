@@ -30,9 +30,9 @@ workflows:
       - name: Build Flutter iOS Application
         script: |
           if [ -n "$CERT_PASSWORD" ]; then
-            flutter build ipa --release --dart-define=BASE_API=https://bkfunmoments.testproject.cloud/api/v1
+            flutter build ipa --release --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1
           else
-            flutter build ios --release --no-codesign --dart-define=BASE_API=https://bkfunmoments.testproject.cloud/api/v1
+            flutter build ios --release --no-codesign --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1
           fi
     artifacts:
       - build/ios/ipa/*.ipa
@@ -55,6 +55,6 @@ workflows:
           flutter analyze --no-fatal-infos || true
       - name: Build Android Release APK
         script: |
-          flutter build apk --release --no-tree-shake-icons --dart-define=BASE_API=https://bkfunmoments.testproject.cloud/api/v1
+          flutter build apk --release --no-tree-shake-icons --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1
     artifacts:
       - build/app/outputs/flutter-apk/*.apk

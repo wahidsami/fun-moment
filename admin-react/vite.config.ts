@@ -19,19 +19,19 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         '/admin-home': {
-          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'http://127.0.0.1:8000',
+          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'https://bkfunmoments.unifinitylab.com',
           changeOrigin: true,
         },
         '/login': {
-          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'http://127.0.0.1:8000',
+          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'https://bkfunmoments.unifinitylab.com',
           changeOrigin: true,
         },
         '/logout': {
-          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'http://127.0.0.1:8000',
+          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'https://bkfunmoments.unifinitylab.com',
           changeOrigin: true,
         },
         '/sanctum/csrf-cookie': {
-          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'http://127.0.0.1:8000',
+          target: process.env.VITE_BACKEND_URL || process.env.BACKEND_UPSTREAM || 'https://bkfunmoments.unifinitylab.com',
           changeOrigin: true,
         },
       },

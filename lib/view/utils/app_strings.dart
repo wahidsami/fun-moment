@@ -1,3 +1,5 @@
+import 'package:funmoments/view/utils/saudi_locations_strings.dart';
+
 var appStrings = {
   "welcome": "welcome",
   "Browse categories": "Browse categories",
@@ -1225,6 +1227,7 @@ var translations = {
   "No services available yet in this category.": "لا توجد خدمات متاحة في هذه الفئة حالياً.",
   "There are no services available right now.": "لا توجد خدمات متاحة حالياً.",
   "We could not load services": "تعذر تحميل الخدمات",
-  "Please check your connection and try again.": "يرجى التحقق من اتصالك والمحاولة مرة أخرى."
+  "Please check your connection and try again.": "يرجى التحقق من اتصالك والمحاولة مرة أخرى.",
+  ...saudiLocationStrings,
 };
 
