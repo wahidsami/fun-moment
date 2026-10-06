@@ -22,8 +22,8 @@ workflows:
       - name: Install CocoaPods dependencies
         script: |
           cd ios
-          pod update Stripe --no-repo-update || pod update Stripe --repo-update
-          pod install --no-repo-update
+          rm -f Podfile.lock
+          pod install --repo-update
     artifacts:
       - ios/Podfile.lock
 
