@@ -3,21 +3,19 @@ workflows:
     name: iOS Production Build
     max_build_duration: 60
     instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: FUN MOMENT Codemagic
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.sa.funmoments
       flutter: stable
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Set up keychain and code signing if configured
+      - name: Set up code signing settings on Xcode project
         script: |
-          if [ -n "$CERT_PASSWORD" ]; then
-            keychain initialize
-            app-store-connect fetch-signing-files "$BUNDLE_ID" \
-              --type IOS_APP_STORE \
-              --create
-            keychain add-certificates
-            xcode-project use-profiles
-          fi
+          xcode-project use-profiles
       - name: Get Flutter dependencies
         script: |
           flutter pub get
@@ -29,15 +27,15 @@ workflows:
           flutter analyze --no-fatal-infos || true
       - name: Build Flutter iOS Application
         script: |
-          if [ -n "$CERT_PASSWORD" ]; then
-            flutter build ipa --release --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1
-          else
-            flutter build ios --release --no-codesign --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1
-          fi
+          flutter build ipa --release --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/iphoneos/Runner.app
       - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false
 
   android-release:
     name: Android Production Build
