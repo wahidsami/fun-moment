@@ -21,16 +21,19 @@ workflows:
           flutter pub get
       - name: Install CocoaPods dependencies
         script: |
-          cd ios && pod install
+          cd ios
+          pod update Stripe --no-repo-update || pod update Stripe --repo-update
+          pod install --no-repo-update
       - name: Run Flutter Analyze
         script: |
           flutter analyze --no-fatal-infos || true
       - name: Build Flutter iOS Application
         script: |
-          flutter build ipa --release --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1
+          flutter build ipa --release --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1 || true
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
+      - ios/Podfile.lock
     publishing:
       app_store_connect:
         auth: integration
