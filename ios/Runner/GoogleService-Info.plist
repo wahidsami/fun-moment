@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>985118071013-352aqrmm9233g6a0de50usi7jb356eh0.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.985118071013-352aqrmm9233g6a0de50usi7jb356eh0</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>985118071013-aogaj2l4g1e3bh0hipndkl0poco92ujn.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyCsH64P-uLJoH7dVVyO56YqXKh1VZdVv3c</string>
 	<key>GCM_SENDER_ID</key>
@@ -9,11 +15,11 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.sa.funmomments</string>
+	<string>com.sa.funmoments</string>
 	<key>PROJECT_ID</key>
 	<string>funmoments-project</string>
 	<key>STORAGE_BUCKET</key>
-	<string>funmoments-project.appspot.com</string>
+	<string>funmoments-project.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:985118071013:ios:4740b3d99eaf1bd1779c0c</string>
+	<string>1:985118071013:ios:23de863cb1843190779c0c</string>
 </dict>
 </plist>

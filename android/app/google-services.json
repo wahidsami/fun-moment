@@ -2,7 +2,7 @@
   "project_info": {
     "project_number": "985118071013",
     "project_id": "funmoments-project",
-    "storage_bucket": "funmoments-project.appspot.com"
+    "storage_bucket": "funmoments-project.firebasestorage.app"
   },
   "client": [
     {
@@ -12,7 +12,28 @@
           "package_name": "com.sa.funmomments"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "985118071013-aogaj2l4g1e3bh0hipndkl0poco92ujn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sa.funmomments",
+            "certificate_hash": "30a06d5b7db695bae46e802ba55c98cff7174e11"
+          }
+        },
+        {
+          "client_id": "985118071013-hua3b49uhahq1n82d0i6ut3vlegq72hf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sa.funmomments",
+            "certificate_hash": "607d2040edc93e5cf8871dbb29f0256bd947891a"
+          }
+        },
+        {
+          "client_id": "985118071013-upvi6f3nat9udts0bjqndt2i04jvme05.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBWtpgMPHD0FE_cqiA3Md9IwSjj6MZK6rM"
@@ -20,7 +41,20 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "985118071013-upvi6f3nat9udts0bjqndt2i04jvme05.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "985118071013-qd66tbo0iiohin9ne7m2ei6mc2dso5o5.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.sa.funmomments",
+                "app_store_id": "6680201269"
+              }
+            }
+          ]
         }
       }
     }

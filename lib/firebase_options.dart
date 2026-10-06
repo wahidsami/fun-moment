@@ -57,16 +57,16 @@ class DefaultFirebaseOptions {
     appId: '1:985118071013:android:4bc1cf8c1a2583e7779c0c',
     messagingSenderId: '985118071013',
     projectId: 'funmoments-project',
-    storageBucket: 'funmoments-project.appspot.com',
+    storageBucket: 'funmoments-project.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCsH64P-uLJoH7dVVyO56YqXKh1VZdVv3c',
-    appId: '1:985118071013:ios:4740b3d99eaf1bd1779c0c',
+    appId: '1:985118071013:ios:23de863cb1843190779c0c',
     messagingSenderId: '985118071013',
     projectId: 'funmoments-project',
-    storageBucket: 'funmoments-project.appspot.com',
-    iosBundleId: 'com.sa.funmomments',
+    storageBucket: 'funmoments-project.firebasestorage.app',
+    iosBundleId: 'com.sa.funmoments',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

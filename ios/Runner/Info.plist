@@ -77,9 +77,14 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.googleusercontent.apps.558820326347-bjjnntco637gsn072es36mammon1r306</string>
+          <string>com.googleusercontent.apps.985118071013-352aqrmm9233g6a0de50usi7jb356eh0</string>
         </array>
       </dict>
+    </array>
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>fetch</string>
+      <string>remote-notification</string>
     </array>
     <key>NSLocationTemporaryUsageDescriptionDictionary</key>
     <dict>
