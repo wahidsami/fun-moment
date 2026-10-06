@@ -22,10 +22,21 @@ workflows:
       - name: Install CocoaPods dependencies
         script: |
           cd ios
-          rm -f Podfile.lock
-          pod install --repo-update
+          pod install
+      - name: Run Flutter Analyze
+        script: |
+          flutter analyze --no-fatal-infos || true
+      - name: Build Flutter iOS Application
+        script: |
+          flutter build ipa --release --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1
     artifacts:
-      - ios/Podfile.lock
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false
 
   android-release:
     name: Android Production Build
