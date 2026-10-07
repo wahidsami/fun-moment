@@ -28,7 +28,9 @@ workflows:
           flutter analyze --no-fatal-infos || true
       - name: Build Flutter iOS Application
         script: |
-          flutter build ipa --release --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1
+          flutter build ipa --release \
+            --dart-define=BASE_API=https://bkfunmoments.unifinitylab.com/api/v1 \
+            --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
