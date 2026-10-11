@@ -264,6 +264,7 @@ export const translations: Record<Language, TranslationSchema> = {
           content: [
             "نحن لا نقوم ببيع أو تأجير بياناتك الشخصية لأي طرف ثالث.",
             "قد نشارك بياناتك في حدود ضيقة مع مزودي الخدمات التقنية الموثوقين (مثل خدمات استضافة الخوادم وإرسال رسائل التحقق) بالقدر اللازم لتشغيل الخدمة فقط، ومع الجهات النظامية المختصة إذا طُلب ذلك بموجب الأنظمة والقوانين المعمول بها.",
+            "معالجة نموذج الدعم والمساعدة: تُعالج رسائل واستفسارات الدعم المرسلة عبر النموذج الإلكتروني على هذا الموقع بواسطة خدمة Web3Forms كوسيط تقني لنقل الاستفسارات إلى البريد الإلكتروني المخصص لدعم FUN MOMENT (funmomentsproject@gmail.com). تخضع هذه المعالجة لسياسة خصوصية Web3Forms: https://web3forms.com/privacy",
           ],
         },
         {
@@ -488,6 +489,7 @@ export const translations: Record<Language, TranslationSchema> = {
           content: [
             "We do not sell, rent, or trade your personal data to third parties.",
             "Information may only be shared with trusted technical infrastructure providers (such as cloud hosting and verification SMS gateways) strictly necessary to operate the service, or with legal authorities if required by applicable laws.",
+            "Website Support Form Processing: Inquiries submitted through the website contact and support form are processed by Web3Forms as a technical service to relay messages to FUN MOMENT's support inbox (funmomentsproject@gmail.com). This processing is subject to the Web3Forms Privacy Policy: https://web3forms.com/privacy",
           ],
         },
         {

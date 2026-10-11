@@ -14,6 +14,10 @@ RUN bun install --frozen-lockfile
 # Copy website source and configuration
 COPY . .
 
+# Accept build-time environment variable for Vite client bundle
+ARG VITE_WEB3FORMS_ACCESS_KEY
+ENV VITE_WEB3FORMS_ACCESS_KEY=$VITE_WEB3FORMS_ACCESS_KEY
+
 # Compile production SPA bundle into dist/
 RUN bun run build
 

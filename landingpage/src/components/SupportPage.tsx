@@ -60,17 +60,43 @@ export const SupportPage: React.FC<SupportPageProps> = ({ lang, onBack }) => {
 
     if (!validate()) return;
 
+    const accessKey = (import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '').trim();
+
+    if (!accessKey) {
+      setServerError(
+        lang === 'ar'
+          ? 'خدمة إرسال النماذج قيد التهيئة حالياً. يرجى مراسلتنا مباشرة عبر البريد الإلكتروني.'
+          : 'The contact form is currently being configured. Please contact our support team directly via email.'
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const response = await fetch('/api/support', {
+      const topicLabel =
+        t.form.topics[formData.topic as keyof typeof t.form.topics] ||
+        formData.topic;
+
+      const payload = {
+        access_key: accessKey,
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim() || undefined,
+        topic: topicLabel,
+        message: formData.message.trim(),
+        subject: `[FUN MOMENT Support] ${topicLabel}`,
+        from_name: 'FUN MOMENT Website Support',
+        replyto: formData.email.trim(),
+        botcheck: honeypot || undefined,
+      };
+
+      const response = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json',
         },
-        body: JSON.stringify({
-          ...formData,
-          _hp: honeypot,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json().catch(() => ({}));
@@ -87,9 +113,11 @@ export const SupportPage: React.FC<SupportPageProps> = ({ lang, onBack }) => {
         setHoneypot('');
       } else {
         const errorMsg =
-          (lang === 'ar' ? data.errorAr : data.error) ||
-          data.error ||
-          t.form.errorMessage;
+          response.status === 429
+            ? (lang === 'ar'
+                ? 'تم إرسال عدد كبير من الطلبات. يرجى الانتظار والمحاولة لاحقاً.'
+                : 'Too many requests. Please wait a moment and try again.')
+            : (t.form.errorMessage || data.message || 'Failed to submit form.');
         setServerError(errorMsg);
       }
     } catch (err) {
@@ -233,7 +261,7 @@ export const SupportPage: React.FC<SupportPageProps> = ({ lang, onBack }) => {
                   </div>
                 )}
 
-                {/* Anti-spam Honeypot Field (invisible to genuine users) */}
+                {/* Anti-spam Honeypot Field (invisible to genuine users, captured by Web3Forms botcheck) */}
                 <div
                   style={{
                     position: 'absolute',
@@ -246,12 +274,12 @@ export const SupportPage: React.FC<SupportPageProps> = ({ lang, onBack }) => {
                   aria-hidden="true"
                 >
                   <input
-                    type="text"
-                    name="_hp"
+                    type="checkbox"
+                    name="botcheck"
                     tabIndex={-1}
                     autoComplete="off"
-                    value={honeypot}
-                    onChange={(e) => setHoneypot(e.target.value)}
+                    checked={Boolean(honeypot)}
+                    onChange={(e) => setHoneypot(e.target.checked ? 'true' : '')}
                   />
                 </div>
 

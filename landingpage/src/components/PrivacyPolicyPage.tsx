@@ -109,9 +109,32 @@ export const PrivacyPolicyPage: React.FC<PrivacyPolicyPageProps> = ({ lang, onBa
                 </h2>
 
                 <div className="space-y-3 text-sm text-slate-300 leading-relaxed">
-                  {section.content.map((paragraph, pIdx) => (
-                    <p key={pIdx}>{paragraph}</p>
-                  ))}
+                  {section.content.map((paragraph, pIdx) => {
+                    const urlRegex = /(https?:\/\/[^\s]+)/g;
+                    if (urlRegex.test(paragraph)) {
+                      const parts = paragraph.split(urlRegex);
+                      return (
+                        <p key={pIdx}>
+                          {parts.map((part, idx) =>
+                            urlRegex.test(part) ? (
+                              <a
+                                key={idx}
+                                href={part}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#00E5FF] underline hover:text-[#00E5FF]/80 transition-colors font-mono text-xs sm:text-sm"
+                              >
+                                {part}
+                              </a>
+                            ) : (
+                              part
+                            )
+                          )}
+                        </p>
+                      );
+                    }
+                    return <p key={pIdx}>{paragraph}</p>;
+                  })}
                 </div>
               </article>
             ))}
