@@ -31,6 +31,8 @@ use Xgenious\Paymentgateway\Facades\XgPaymentGateway;
 use App\Category;
 use App\ProviderCategory;
 use App\Services\ProviderVerificationDocumentService;
+use App\LegalTerm;
+use App\Services\LegalTermsAcceptanceService;
 use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
@@ -309,6 +311,13 @@ class UserController extends Controller
             }
         } else {
             // 2. Create new user defaulting to BUYER (user_type = 1)
+            $termsService = app(LegalTermsAcceptanceService::class);
+            $termsVersion = $termsService->validatePublishedTerms(
+                LegalTerm::ROLE_BUYER,
+                $request->input('terms_version_id'),
+                $request->input('terms_language')
+            );
+
             $usernamePrefix = $isApple ? 'ap_' : ($isGoogle ? 'gl_' : 'fb_');
             $baseUsername = $usernamePrefix . Str::slug($request->displayName ?: 'user');
             $username = $baseUsername;
@@ -318,18 +327,31 @@ class UserController extends Controller
                 $counter++;
             }
 
-            $user = User::create([
-                'name' => $request->displayName ?: $username,
-                'email' => $request->email,
-                'username' => $username,
-                'password' => Hash::make(Str::random(16)),
-                'user_type' => 1,
-                'terms_condition' => 1,
-                'email_verified' => 1,
-                'google_id' => $isGoogle ? $providerId : null,
-                'facebook_id' => (!$isGoogle && !$isApple) ? $providerId : null,
-                'apple_id' => $isApple ? $providerId : null,
-            ]);
+            $user = DB::transaction(function () use (
+                $request, $username, $isGoogle, $isApple, $providerId, $termsService, $termsVersion
+            ) {
+                $user = User::create([
+                    'name' => $request->displayName ?: $username,
+                    'email' => $request->email,
+                    'username' => $username,
+                    'password' => Hash::make(Str::random(16)),
+                    'user_type' => 1,
+                    'terms_condition' => 1,
+                    'email_verified' => 1,
+                    'google_id' => $isGoogle ? $providerId : null,
+                    'facebook_id' => (!$isGoogle && !$isApple) ? $providerId : null,
+                    'apple_id' => $isApple ? $providerId : null,
+                ]);
+
+                $termsService->recordAcceptance(
+                    $user,
+                    $termsVersion,
+                    LegalTerm::ROLE_BUYER,
+                    (string) $request->input('terms_language')
+                );
+
+                return $user;
+            });
         }
 
         $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
@@ -425,7 +447,9 @@ class UserController extends Controller
             'service_city' => 'required',
             'service_area' => 'required',
             'country_id' => 'required',
-            'terms_conditions' => 'required'
+            'terms_conditions' => 'required',
+            'terms_version_id' => 'required',
+            'terms_language' => 'required|string|in:ar,en',
         ]);
         if (!filter_var($request->email, FILTER_VALIDATE_EMAIL)) {
             return response()->error([
@@ -433,24 +457,43 @@ class UserController extends Controller
             ]);
         }
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'username' => $request->username,
-            'phone' => $request->phone,
-            'password' => Hash::make($request->password),
-            'service_city' => $request->service_city,
-            'state' => $request->service_city,
-            'service_area' => $request->service_area,
-            'country_code' => $request->country_code,
-            'country_id' => $request->country_id,
-            'user_type' => 1,
-            'seller_type' => User::SELLER_TYPE_NOT_APPLICABLE,
-            'user_status' => 1,
-            'terms_condition' => 1,
-            'address' => $request->address,
-            'post_code' => $request->post_code,
-        ]);
+        $termsService = app(LegalTermsAcceptanceService::class);
+        $termsVersion = $termsService->validatePublishedTerms(
+            LegalTerm::ROLE_BUYER,
+            $request->input('terms_version_id'),
+            $request->input('terms_language')
+        );
+
+        $user = DB::transaction(function () use ($request, $termsService, $termsVersion) {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'username' => $request->username,
+                'phone' => $request->phone,
+                'password' => Hash::make($request->password),
+                'service_city' => $request->service_city,
+                'state' => $request->service_city,
+                'service_area' => $request->service_area,
+                'country_code' => $request->country_code,
+                'country_id' => $request->country_id,
+                'user_type' => 1,
+                'seller_type' => User::SELLER_TYPE_NOT_APPLICABLE,
+                'user_status' => 1,
+                'terms_condition' => 1,
+                'address' => $request->address,
+                'post_code' => $request->post_code,
+            ]);
+
+            $termsService->recordAcceptance(
+                $user,
+                $termsVersion,
+                LegalTerm::ROLE_BUYER,
+                (string) $request->input('terms_language')
+            );
+
+            return $user;
+        });
+
         if (!is_null($user)) {
             $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
             return response()->success([
@@ -485,6 +528,8 @@ class UserController extends Controller
             'service_area' => 'required',
             'country_id' => 'required',
             'terms_conditions' => 'required',
+            'terms_version_id' => 'required',
+            'terms_language' => 'required|string|in:ar,en',
             'seller_type' => 'required|in:1,2',
             'category_ids' => 'required',
         ];
@@ -566,6 +611,13 @@ class UserController extends Controller
             $user = DB::transaction(function () use (
                 $request, $sellerType, $nationalIdDocName, $licenseDocName, $crDocName, $validCategoryIds
             ) {
+                $termsService = app(LegalTermsAcceptanceService::class);
+                $termsVersion = $termsService->validatePublishedTerms(
+                    LegalTerm::ROLE_SELLER,
+                    $request->input('terms_version_id'),
+                    $request->input('terms_language')
+                );
+
                 $userData = [
                     'name' => $request->name,
                     'email' => $request->email,
@@ -591,6 +643,13 @@ class UserController extends Controller
                 }
 
                 $user = User::create($userData);
+
+                $termsService->recordAcceptance(
+                    $user,
+                    $termsVersion,
+                    LegalTerm::ROLE_SELLER,
+                    (string) $request->input('terms_language')
+                );
 
                 $verifyData = [
                     'seller_id' => $user->id,

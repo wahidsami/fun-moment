@@ -16,6 +16,8 @@ import {
   DashboardActivityLog,
   DashboardSummaryPayload,
   SellerVerificationDetail,
+  LegalTerm,
+  LegalTermVersion,
 } from './types';
 
 export interface DashboardSettings {
@@ -1637,5 +1639,154 @@ export const LaravelAPI = {
     }
 
     return response.json();
+  },
+
+  // Legal & Terms API methods
+  async getLegalTerms(): Promise<LegalTerm[]> {
+    const response = await fetch('/admin-home/legal-terms', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load legal terms (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload?.data ?? [];
+  },
+
+  async saveLegalTermDraft(id: number, draft: { draft_title: string | null; draft_content: string }): Promise<any> {
+    const response = await fetchWithCsrf(`/admin-home/legal-terms/${id}/draft`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(draft),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to save draft (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload?.data;
+  },
+
+  async publishLegalTerm(id: number): Promise<{ term: any; version: LegalTermVersion }> {
+    const response = await fetchWithCsrf(`/admin-home/legal-terms/${id}/publish`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to publish terms (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload?.data;
+  },
+
+  async getLegalTermHistory(id: number): Promise<LegalTermVersion[]> {
+    const response = await fetch(`/admin-home/legal-terms/${id}/history`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load version history (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return payload?.data ?? [];
   }
 };
+
+// CSRF Token Management for authenticated administrative requests
+let cachedCsrfToken: string | null = null;
+
+export const setCsrfToken = (token: string | null) => {
+  cachedCsrfToken = token;
+};
+
+export const getCsrfToken = async (): Promise<string | null> => {
+  if (cachedCsrfToken) {
+    return cachedCsrfToken;
+  }
+
+  // 1. Check if token is available in document.cookie (when same-origin or reverse-proxied)
+  if (typeof document !== 'undefined' && document.cookie) {
+    const match = document.cookie.match(/(?:^|;\s*)(?:XSRF-TOKEN|csrf_token)=([^;]+)/);
+    if (match) {
+      try {
+        cachedCsrfToken = decodeURIComponent(match[1]);
+        return cachedCsrfToken;
+      } catch (_) {}
+    }
+  }
+
+  // 2. Fetch fresh token from authenticated session endpoint
+  try {
+    const res = await fetch('/admin-home/csrf-token', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.csrf_token) {
+        cachedCsrfToken = data.csrf_token;
+        return cachedCsrfToken;
+      }
+    }
+  } catch (_) {}
+
+  return null;
+};
+
+async function fetchWithCsrf(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = await getCsrfToken();
+  const headers = new Headers(options.headers || {});
+  headers.set('Accept', 'application/json');
+  if (token && !headers.has('X-CSRF-TOKEN')) {
+    headers.set('X-CSRF-TOKEN', token);
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include',
+  });
+
+  // If 419 (TokenMismatchException / CSRF token expired or mismatch), refresh once and retry
+  if (response.status === 419) {
+    cachedCsrfToken = null;
+    try {
+      const tokenRes = await fetch('/admin-home/csrf-token', {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        credentials: 'include',
+      });
+      if (tokenRes.ok) {
+        const tokenData = await tokenRes.json();
+        if (tokenData?.csrf_token) {
+          cachedCsrfToken = tokenData.csrf_token;
+          headers.set('X-CSRF-TOKEN', tokenData.csrf_token);
+          return fetch(url, {
+            ...options,
+            headers,
+            credentials: 'include',
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  return response;
+}

@@ -10,6 +10,7 @@ Route::middleware(['setlang'])->group(function(){
 ----------------------------------------------------------------------------------------------------------------------------*/
     Route::get('/', 'AdminDashboardController@adminIndex')->name('admin.home');
     Route::get('/auth-check', 'AdminDashboardController@authCheck')->name('admin.auth.check');
+    Route::get('/csrf-token', 'AdminDashboardController@csrfToken')->name('admin.csrf.token');
     Route::get('/dashboard-summary', 'AdminDashboardController@dashboardSummary')->name('admin.dashboard.summary');
     Route::get('/settings-json', 'AdminDashboardController@settingsJson')->name('admin.settings.json');
     Route::post('/settings-json', 'AdminDashboardController@updateSettingsJson')->name('admin.settings.json.update');
@@ -98,6 +99,12 @@ Route::middleware(['setlang'])->group(function(){
     Route::post('/cms-media/upload', 'AdminCmsController@apiUploadMedia')->name('admin.cms.media.upload.api');
     Route::post('/cms-media/{id}/delete', 'AdminCmsController@apiDeleteMedia')->name('admin.cms.media.delete.api');
     Route::post('/cms-media/{id}/alt', 'AdminCmsController@apiUpdateMediaAlt')->name('admin.cms.media.alt.api');
+
+    // Legal & Terms API routes for React Admin
+    Route::get('/legal-terms', 'AdminLegalTermsController@index')->name('admin.legal.terms.index');
+    Route::post('/legal-terms/{id}/draft', 'AdminLegalTermsController@updateDraft')->name('admin.legal.terms.draft');
+    Route::post('/legal-terms/{id}/publish', 'AdminLegalTermsController@publish')->name('admin.legal.terms.publish');
+    Route::get('/legal-terms/{id}/history', 'AdminLegalTermsController@history')->name('admin.legal.terms.history');
   
     Route::get('/media-upload/page','MediaUploadController@all_upload_media_images_for_page')->name('admin.upload.media.images.page');
     Route::post('/media-upload/delete','MediaUploadController@delete_upload_media_file')->name('admin.upload.media.file.delete');

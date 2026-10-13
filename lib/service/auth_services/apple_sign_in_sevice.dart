@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import '../../view/auth/signup/components/terms_conditions_modal.dart';
 import '../../view/utils/others_helper.dart';
 import '../common_service.dart';
 import 'package:http/http.dart' as http;
@@ -64,19 +65,28 @@ class AppleSignInService with ChangeNotifier {
 
   Future<bool> socialLogin(
       email, username, id, appleId, userToken, BuildContext context, autoLogin,
-      {bool isAppleLogin = true}) async {
+      {bool isAppleLogin = true,
+      int? termsVersionId,
+      String? termsLanguage,
+      http.Client? client}) async {
     var connection = await checkConnection();
     if (connection) {
       if (isAppleLogin == true) {
         setLoadingTrue();
       }
-      String data;
-      data = jsonEncode({
+      final Map<String, dynamic> payload = {
         'email': email,
         'displayName': username,
         'id': id,
         'isApple': 1,
-      });
+      };
+      if (termsVersionId != null) {
+        payload['terms_version_id'] = termsVersionId;
+      }
+      if (termsLanguage != null && termsLanguage.isNotEmpty) {
+        payload['terms_language'] = termsLanguage;
+      }
+      String data = jsonEncode(payload);
 
       var header = {
         "Accept": "application/json",
@@ -84,9 +94,13 @@ class AppleSignInService with ChangeNotifier {
       };
       debugPrint(data.toString());
 
-      var response = await http.post(Uri.parse('$baseApi/social/login'),
-          body: data, headers: header);
-      print(response.statusCode);
+      final httpClient = client ?? http.Client();
+      final shouldClose = client == null;
+
+      try {
+        var response = await httpClient.post(Uri.parse('$baseApi/social/login'),
+            body: data, headers: header);
+        print(response.statusCode);
 
       if (response.statusCode == 200) {
         print(response.body);
@@ -106,6 +120,47 @@ class AppleSignInService with ChangeNotifier {
         print(response.body);
         context.popFalse;
         return true;
+      } else if (response.statusCode == 422) {
+        debugPrint(response.body);
+        try {
+          final res = jsonDecode(response.body);
+          if (res is Map && res['errors'] is Map && res['errors'].containsKey('terms_version_id')) {
+            // First-time Apple account creation requires buyer terms acceptance
+            setLoadingFalse();
+            final acceptedTerms = await showTermsConditionsModal(
+              context,
+              role: 'buyer',
+            );
+
+            if (acceptedTerms == null) {
+              debugPrint('[AppleSignIn] Terms acceptance declined for new Apple account.');
+              return false;
+            }
+
+            // Retry social login with accepted immutable version metadata
+            return await socialLogin(
+              email,
+              username,
+              id,
+              appleId,
+              userToken,
+              context,
+              autoLogin,
+              isAppleLogin: isAppleLogin,
+              termsVersionId: acceptedTerms.versionId,
+              termsLanguage: acceptedTerms.language,
+              client: client,
+            );
+          } else {
+            final msg = res['message'] ?? res['msg'] ?? 'Something went wrong';
+            OthersHelper().showToast(msg.toString(), Colors.black);
+          }
+        } catch (_) {
+          OthersHelper().showToast('Something went wrong (${response.statusCode})', Colors.black);
+        }
+
+        setLoadingFalse();
+        return false;
       } else if (response.body.contains('deleted')) {
         setLoadingFalse();
         return false;
@@ -119,14 +174,16 @@ class AppleSignInService with ChangeNotifier {
           OthersHelper().showToast('Something went wrong', Colors.black);
         }
         debugPrint(response.body);
-        //Login unsuccessful ==========>
-        // OthersHelper().showToast(jsonDecode(response.body)['message'],
-        //     ConstantColors().warningColor);
 
         setLoadingFalse();
         return false;
       }
-    } else {
+    } finally {
+      if (shouldClose) {
+        httpClient.close();
+      }
+    }
+  } else {
       //internet off
       return false;
     }

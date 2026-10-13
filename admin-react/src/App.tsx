@@ -15,6 +15,7 @@ import OrdersView from './components/OrdersView';
 import PaymentsView from './components/PaymentsView';
 import SupportView from './components/SupportView';
 import CMSView from './components/CMSView';
+import LegalTermsView from './components/LegalTermsView';
 import LocalizationView from './components/LocalizationView';
 import SettingsView from './components/SettingsView';
 import AddonLockedView from './components/AddonLockedView';
@@ -25,6 +26,7 @@ import JobsView from './components/JobsView';
 import SubscriptionsView from './components/SubscriptionsView';
 import AdminLoginScreen from './components/AdminLoginScreen';
 import { AddonsService } from './services/api';
+import { setCsrfToken } from './api';
 import { checkPermission, saveAuditLog, ROLE_NAMES } from './utils/auditLogger';
 import { Lock } from 'lucide-react';
 
@@ -116,6 +118,10 @@ export default function App() {
         if (response.ok && contentType.includes('application/json')) {
           const payload = await response.json();
           if (!cancelled && payload?.success && payload?.data?.authenticated) {
+            const token = payload?.data?.csrf_token || payload?.csrf_token;
+            if (token) {
+              setCsrfToken(token);
+            }
             setAuthState('authenticated');
             return;
           }
@@ -201,6 +207,10 @@ export default function App() {
         if (response.ok && contentType.includes('application/json')) {
           const payload = await response.json();
           if (payload?.success && payload?.data?.authenticated) {
+            const token = payload?.data?.csrf_token || payload?.csrf_token;
+            if (token) {
+              setCsrfToken(token);
+            }
             setAuthState('authenticated');
             return;
           }
@@ -220,6 +230,7 @@ export default function App() {
     } catch {
       // We still clear the local UI state even if the network call fails.
     } finally {
+      setCsrfToken(null);
       setCurrentView('dashboard');
       setAuthState('unauthenticated');
     }
@@ -238,6 +249,7 @@ export default function App() {
     subscription: 'manage_payments',
     support: 'manage_support',
     cms: 'manage_cms',
+    'legal-terms': 'manage_cms',
     localization: 'manage_cms', // CMS control or translation key control
     settings: 'manage_settings',
   };
@@ -267,6 +279,8 @@ export default function App() {
         return <SupportView language={language} activeRole={activeRole} />;
       case 'cms':
         return <CMSView language={language} activeRole={activeRole} />;
+      case 'legal-terms':
+        return <LegalTermsView language={language} activeRole={activeRole} />;
       case 'localization':
         return <LocalizationView language={language} />;
       case 'settings':

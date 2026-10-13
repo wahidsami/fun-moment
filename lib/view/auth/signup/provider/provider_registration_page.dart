@@ -11,6 +11,7 @@ import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/auth/signup/components/country_states_dropdowns.dart';
+import 'package:funmoments/view/auth/signup/components/terms_conditions_modal.dart';
 import 'package:funmoments/view/auth/signup/provider/components/category_multi_select.dart';
 import 'package:funmoments/view/auth/signup/provider/components/document_upload_tile.dart';
 import 'package:funmoments/view/auth/signup/provider/components/provider_subtype_selector.dart';
@@ -137,13 +138,41 @@ class _ProviderRegistrationPageState extends State<ProviderRegistrationPage> {
     }
   }
 
+  Future<void> _openSellerTermsModal(ProviderRegistrationService prs) async {
+    final result = await showTermsConditionsModal(
+      context,
+      role: 'seller',
+    );
+
+    if (!mounted) return;
+    if (result != null) {
+      final rtl = Provider.of<RtlService>(context, listen: false);
+      final currentLang = rtl.isArabic ? 'ar' : 'en';
+      prs.setTermsAcceptance(
+        true,
+        versionId: result.versionId,
+        language: result.language.isNotEmpty ? result.language : currentLang,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final asProvider = Provider.of<AppStringService>(context);
     final rtl = Provider.of<RtlService>(context);
+    final currentLang = rtl.isArabic ? 'ar' : 'en';
 
     return Consumer<ProviderRegistrationService>(
       builder: (context, prs, child) {
+        // Clear terms acceptance if user switched app language after agreeing
+        if (prs.model.termsLanguage != null && prs.model.termsLanguage != currentLang) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && prs.model.termsAgree) {
+              prs.setTermsAcceptance(false);
+            }
+          });
+        }
+
         final isIndividual = prs.model.sellerType == 1;
         final isLocked = prs.isLoading ||
             prs.isSubmitting ||
@@ -477,12 +506,27 @@ class _ProviderRegistrationPageState extends State<ProviderRegistrationPage> {
                       checkColor: Colors.white,
                       activeColor: FMColors.cyan,
                       contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        asProvider.getString("I agree with the terms and conditions and provider policies"),
-                        style: Theme.of(context).textTheme.bodyMedium,
+                      title: InkWell(
+                        onTap: () => _openSellerTermsModal(prs),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            asProvider.getString("I agree with the terms and conditions and provider policies"),
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: prs.model.termsAgree ? FMColors.cyan : null,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
                       ),
                       value: prs.model.termsAgree,
-                      onChanged: (val) => prs.setTermsAgree(val ?? false),
+                      onChanged: (val) {
+                        if (prs.model.termsAgree) {
+                          prs.setTermsAcceptance(false);
+                        } else {
+                          _openSellerTermsModal(prs);
+                        }
+                      },
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     const SizedBox(height: 20),
@@ -498,7 +542,15 @@ class _ProviderRegistrationPageState extends State<ProviderRegistrationPage> {
                                 setState(() => _isButtonTapped = true);
                                 _syncControllersToModel(prs);
                                 try {
-                                  await prs.registerProvider(context);
+                                  await prs.registerProvider(
+                                    context,
+                                    onStaleTerms: () {
+                                      if (mounted) {
+                                        prs.setTermsAcceptance(false);
+                                        _openSellerTermsModal(prs);
+                                      }
+                                    },
+                                  );
                                 } finally {
                                   if (mounted) {
                                     setState(() => _isButtonTapped = false);

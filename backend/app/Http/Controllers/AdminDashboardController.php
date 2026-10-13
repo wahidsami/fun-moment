@@ -160,20 +160,31 @@ class AdminDashboardController extends Controller
     public function authCheck(): JsonResponse
     {
         $admin = Auth::guard('admin')->user();
+        $token = csrf_token();
 
         return response()->json([
             'success' => true,
             'message_en' => 'Admin session is active.',
             'message_ar' => 'جلسة المدير نشطة.',
+            'csrf_token' => $token,
             'data' => [
                 'authenticated' => true,
+                'csrf_token' => $token,
                 'admin' => [
                     'id' => $admin?->id,
                     'name' => $admin?->name,
                     'email' => $admin?->email,
-                    'role' => method_exists($admin, 'getRoleNames') ? $admin->getRoleNames()->first() : null,
+                    'role' => ($admin && method_exists($admin, 'getRoleNames')) ? $admin->getRoleNames()->first() : null,
                 ],
             ],
+        ]);
+    }
+
+    public function csrfToken(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'csrf_token' => csrf_token(),
         ]);
     }
 

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:pusher_beams/pusher_beams.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../view/auth/signup/components/terms_conditions_modal.dart';
 import '../../view/home/landing_page.dart';
 import '../../view/utils/others_helper.dart';
 import '../common_service.dart';
@@ -65,18 +66,28 @@ class GoogleSignInService with ChangeNotifier {
 
   Future<bool> socialLogin(
       email, username, id, int isGoogle, BuildContext context,
-      {bool isGoogleLogin = true}) async {
+      {bool isGoogleLogin = true,
+      int? termsVersionId,
+      String? termsLanguage,
+      http.Client? client}) async {
     var connection = await checkConnection();
     if (connection) {
       if (isGoogleLogin == true) {
         setLoadingTrue();
       }
-      var data = jsonEncode({
+      final Map<String, dynamic> payload = {
         'email': email,
         'displayName': username,
         'id': id,
         'isGoogle': isGoogle
-      });
+      };
+      if (termsVersionId != null) {
+        payload['terms_version_id'] = termsVersionId;
+      }
+      if (termsLanguage != null && termsLanguage.isNotEmpty) {
+        payload['terms_language'] = termsLanguage;
+      }
+      var data = jsonEncode(payload);
       log(data.toString());
       var header = {
         //if header type is application/json then the data should be in jsonEncode method
@@ -84,8 +95,12 @@ class GoogleSignInService with ChangeNotifier {
         "Content-Type": "application/json"
       };
 
-      var response = await http.post(Uri.parse('$baseApi/social/login'),
-          body: data, headers: header);
+      final httpClient = client ?? http.Client();
+      final shouldClose = client == null;
+
+      try {
+        var response = await httpClient.post(Uri.parse('$baseApi/social/login'),
+            body: data, headers: header);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         setLoadingFalse();
@@ -123,6 +138,45 @@ class GoogleSignInService with ChangeNotifier {
         );
 
         return true;
+      } else if (response.statusCode == 422) {
+        debugPrint(response.body);
+        try {
+          final res = jsonDecode(response.body);
+          if (res is Map && res['errors'] is Map && res['errors'].containsKey('terms_version_id')) {
+            // First-time social account creation requires buyer terms acceptance
+            setLoadingFalse();
+            final acceptedTerms = await showTermsConditionsModal(
+              context,
+              role: 'buyer',
+            );
+
+            if (acceptedTerms == null) {
+              debugPrint('[GoogleSignIn] Terms acceptance declined for new social account.');
+              return false;
+            }
+
+            // Retry social login with accepted immutable version metadata
+            return await socialLogin(
+              email,
+              username,
+              id,
+              isGoogle,
+              context,
+              isGoogleLogin: isGoogleLogin,
+              termsVersionId: acceptedTerms.versionId,
+              termsLanguage: acceptedTerms.language,
+              client: client,
+            );
+          } else {
+            final msg = res['message'] ?? res['msg'] ?? 'Social login failed';
+            OthersHelper().showToast(msg.toString(), Colors.black);
+          }
+        } catch (_) {
+          OthersHelper().showToast('Social login failed (${response.statusCode})', Colors.black);
+        }
+
+        setLoadingFalse();
+        return false;
       } else {
         debugPrint(response.body);
         try {
@@ -136,7 +190,12 @@ class GoogleSignInService with ChangeNotifier {
         setLoadingFalse();
         return false;
       }
-    } else {
+    } finally {
+      if (shouldClose) {
+        httpClient.close();
+      }
+    }
+  } else {
       //internet off
       return false;
     }

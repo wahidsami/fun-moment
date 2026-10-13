@@ -72,13 +72,17 @@ class SignupService with ChangeNotifier {
     String email,
     String userName,
     String password,
-    BuildContext context,
-  ) async {
+    BuildContext context, {
+    int? termsVersionId,
+    String? termsLanguage,
+    VoidCallback? onStaleTerms,
+    http.Client? client,
+  }) async {
     var connection = await checkConnection();
 
     if (connection) {
       setLoadingTrue();
-      var data = jsonEncode({
+      final Map<String, dynamic> payload = {
         'name': fullName,
         'email': email,
         'username': userName,
@@ -94,78 +98,100 @@ class SignupService with ChangeNotifier {
                 .selectedCountryId,
         'terms_conditions': 1,
         'country_code': countryCode,
-        'user_type': selectedUserType
-      });
+        'user_type': selectedUserType,
+      };
+
+      if (termsVersionId != null) {
+        payload['terms_version_id'] = termsVersionId;
+      }
+      if (termsLanguage != null && termsLanguage.isNotEmpty) {
+        payload['terms_language'] = termsLanguage;
+      }
+
+      var data = jsonEncode(payload);
       var header = {
-        //if header type is application/json then the data should be in jsonEncode method
         "Accept": "application/json",
         "Content-Type": "application/json"
       };
 
-      var response = await http.post(Uri.parse('$baseApi/register'),
-          body: data, headers: header);
+      final httpClient = client ?? http.Client();
+      final shouldClose = client == null;
 
-      if (response.statusCode == 201) {
-        OthersHelper().showToast(
-            "Registration successful", ConstantColors().successColor);
-        print(response.body);
+      try {
+        var response = await httpClient.post(
+          Uri.parse('$baseApi/register'),
+          body: data,
+          headers: header,
+        );
 
-        // Navigator.pushReplacement<void, void>(
-        //   context,
-        //   MaterialPageRoute<void>(
-        //     builder: (BuildContext context) => const LandingPage(),
-        //   ),
-        // );
+        if (response.statusCode == 201) {
+          OthersHelper().showToast(
+              "Registration successful", ConstantColors().successColor);
+          print(response.body);
 
-        var responseData = jsonDecode(response.body);
-        String token = responseData['token']?.toString() ?? '';
-        int userId = int.tryParse(responseData['users']?['id']?.toString() ?? '') ?? 0;
-        String state = responseData['users']?['state']?.toString() ?? '';
-        String countryId =
-            responseData['users']?['country_id']?.toString() ?? '';
+          var responseData = jsonDecode(response.body);
+          String token = responseData['token']?.toString() ?? '';
+          int userId = int.tryParse(responseData['users']?['id']?.toString() ?? '') ?? 0;
+          String state = responseData['users']?['state']?.toString() ?? '';
+          String countryId =
+              responseData['users']?['country_id']?.toString() ?? '';
 
-        //Send otp
-        var isOtepSent =
-            await Provider.of<EmailVerifyService>(context, listen: false)
-                .sendOtpForEmailValidation(email, context, token);
-        setLoadingFalse();
-        if (isOtepSent) {
-          Navigator.pushReplacement<void, void>(
-            context,
-            MaterialPageRoute<void>(
-              builder: (BuildContext context) => EmailVerifyPage(
-                email: email,
-                token: token,
-                userId: userId,
-                state: state,
-                countryId: countryId,
-                userType: selectedUserType,
+          //Send otp
+          var isOtepSent =
+              await Provider.of<EmailVerifyService>(context, listen: false)
+                  .sendOtpForEmailValidation(email, context, token);
+          setLoadingFalse();
+          if (isOtepSent) {
+            Navigator.pushReplacement<void, void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) => EmailVerifyPage(
+                  email: email,
+                  token: token,
+                  userId: userId,
+                  state: state,
+                  countryId: countryId,
+                  userType: selectedUserType,
+                ),
               ),
-            ),
-          );
-        } else {
-          // Backend error toast was already shown by sendOtpForEmailValidation
-        }
-
-        return true;
-      } else {
-        //Sign up unsuccessful ==========>
-        print('sign up failed ${response.body}');
-        try {
-          var errBody = jsonDecode(response.body);
-          if (errBody is Map && errBody.containsKey('errors')) {
-            showError(errBody['errors']);
-          } else if (errBody is Map && errBody.containsKey('message')) {
-            OthersHelper().showToast(errBody['message']?.toString() ?? 'Registration failed', Colors.black);
-          } else {
-            OthersHelper().showToast('Registration failed', Colors.black);
+            );
           }
-        } catch (_) {
-          OthersHelper().showToast('Registration failed (${response.statusCode})', Colors.black);
-        }
 
-        setLoadingFalse();
-        return false;
+          return true;
+        } else {
+          //Sign up unsuccessful ==========>
+          print('sign up failed ${response.body}');
+          try {
+            var errBody = jsonDecode(response.body);
+            if (errBody is Map && errBody.containsKey('errors')) {
+              final errMap = errBody['errors'];
+              if (errMap is Map && errMap.containsKey('terms_version_id')) {
+                final msg = errMap['terms_version_id'] is List && errMap['terms_version_id'].isNotEmpty
+                    ? errMap['terms_version_id'][0].toString()
+                    : errMap['terms_version_id'].toString();
+                OthersHelper().showToast(msg, Colors.black);
+                if (onStaleTerms != null) {
+                  onStaleTerms();
+                }
+              } else {
+                showError(errMap);
+              }
+            } else if (errBody is Map && errBody.containsKey('message')) {
+              OthersHelper().showToast(errBody['message']?.toString() ?? 'Registration failed', Colors.black);
+            } else {
+              OthersHelper().showToast('Registration failed', Colors.black);
+            }
+          } catch (_) {
+            OthersHelper().showToast('Registration failed (${response.statusCode})', Colors.black);
+          }
+
+          setLoadingFalse();
+          return false;
+        }
+      } finally {
+        if (shouldClose) {
+          httpClient.close();
+        }
       }
     } else {
       //internet connection off
@@ -174,7 +200,17 @@ class SignupService with ChangeNotifier {
   }
 
   showError(error) {
-    if (error.containsKey('email')) {
+    if (error is! Map) {
+      OthersHelper().showToast('Something went wrong', Colors.black);
+      return;
+    }
+    if (error.containsKey('terms_version_id')) {
+      final val = error['terms_version_id'];
+      OthersHelper().showToast(val is List && val.isNotEmpty ? val[0].toString() : val.toString(), Colors.black);
+    } else if (error.containsKey('terms_language')) {
+      final val = error['terms_language'];
+      OthersHelper().showToast(val is List && val.isNotEmpty ? val[0].toString() : val.toString(), Colors.black);
+    } else if (error.containsKey('email')) {
       OthersHelper().showToast(error['email'][0], Colors.black);
     } else if (error.containsKey('username')) {
       OthersHelper().showToast(error['username'][0], Colors.black);

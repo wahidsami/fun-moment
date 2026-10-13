@@ -25,6 +25,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Banknote,
+  Scale,
   X
 } from 'lucide-react';
 import logo from '../../thelogo.png';
@@ -87,6 +88,7 @@ export default function Sidebar({
   // Platform & Configuration
   const platformItems = [
     { view: 'cms', label: t.nav_cms, icon: FileText },
+    { view: 'legal-terms', label: t.nav_legal_terms || (isRtl ? 'الشروط والأحكام' : 'Legal & Terms'), icon: Scale },
     { view: 'localization', label: t.nav_localization, icon: Languages },
     { view: 'settings', label: t.nav_settings, icon: Settings2 },
     { view: 'audit', label: isRtl ? 'الأمان وسجل التدقيق' : 'Security & Audit Logs', icon: ShieldCheck },

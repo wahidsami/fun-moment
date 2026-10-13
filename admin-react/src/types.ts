@@ -669,5 +669,32 @@ export interface SubscriptionSummary {
   total_revenue: number;
 }
 
+export interface LegalTermVersion {
+  id: number;
+  legal_term_id: number;
+  version_number: number;
+  title: string;
+  content: string;
+  content_hash: string;
+  published_by: number | null;
+  publisher_name: string | null;
+  published_at: string | null;
+  created_at?: string;
+  is_current?: boolean;
+}
+
+export interface LegalTerm {
+  id: number;
+  role: 'buyer' | 'seller';
+  language: 'ar' | 'en';
+  title: string;
+  draft_title: string | null;
+  draft_content: string | null;
+  current_version_id: number | null;
+  current_version?: LegalTermVersion | null;
+  versions_count?: number;
+  updated_at?: string | null;
+}
+
 
 

@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\OrderReportController;
 use App\Http\Controllers\Api\SellerServiceController;
 use App\Http\Controllers\Api\PayTabsApiController;
 use App\Http\Controllers\Api\NotificationApiController;
+use App\Http\Controllers\Api\LegalTermsApiController;
 
 Route::middleware('auth:api')->get('/user', function (Request $request) {
     return $request->user();
@@ -55,8 +56,10 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
      Route::get('/country-search',[UserController::class,'countrySearch']);
      Route::get('/city-search',[UserController::class,'citySearch']);
      Route::get('/area-search',[UserController::class,'areaSearch']);
-    
-    Route::post('/register',[UserController::class,'register']);
+     // Public Terms & Conditions current published version query
+     Route::get('/terms/current', [LegalTermsApiController::class, 'current']);
+
+     Route::post('/register',[UserController::class,'register']);
     Route::post('/provider/register',[UserController::class,'registerProvider']);
     Route::post('/login',[UserController::class,'login']);
     Route::post('social/login',[UserController::class,'socialLogin']);

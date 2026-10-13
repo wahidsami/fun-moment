@@ -115,9 +115,20 @@ class ProviderRegistrationService with ChangeNotifier {
     notifyListeners();
   }
 
-  void setTermsAgree(bool agree) {
+  void setTermsAcceptance(bool agree, {int? versionId, String? language}) {
     model.termsAgree = agree;
+    model.termsVersionId = agree ? versionId : null;
+    model.termsLanguage = agree ? language : null;
+    if (agree) {
+      fieldErrors.remove('terms_conditions');
+      fieldErrors.remove('terms_version_id');
+      fieldErrors.remove('terms_language');
+    }
     notifyListeners();
+  }
+
+  void setTermsAgree(bool agree) {
+    setTermsAcceptance(agree);
   }
 
   /// Client-side validation before dispatching to backend
@@ -223,7 +234,8 @@ class ProviderRegistrationService with ChangeNotifier {
       }
     }
 
-    if (!model.termsAgree) {
+    if (!model.termsAgree || model.termsVersionId == null || model.termsLanguage == null) {
+      fieldErrors['terms_conditions'] = 'You must agree to the terms and conditions';
       return 'You must agree to the terms and conditions';
     }
 
@@ -231,7 +243,7 @@ class ProviderRegistrationService with ChangeNotifier {
   }
 
   /// Submit Provider Registration
-  Future<bool> registerProvider(BuildContext context, {http.Client? client}) async {
+  Future<bool> registerProvider(BuildContext context, {http.Client? client, VoidCallback? onStaleTerms}) async {
     final seq = ++_submitSequence;
     debugPrint('[ProviderRegistration] submit #$seq invoked');
 
@@ -419,7 +431,7 @@ class ProviderRegistrationService with ChangeNotifier {
       } else {
         _isSubmitting = false;
         isLoading = false;
-        _parseAndSurfaceErrors(response);
+        _parseAndSurfaceErrors(response, onStaleTerms: onStaleTerms);
         return false;
       }
     } on TimeoutException catch (e) {
@@ -474,12 +486,16 @@ class ProviderRegistrationService with ChangeNotifier {
     }
   }
 
-  void _parseAndSurfaceErrors(http.Response response) {
+  void _parseAndSurfaceErrors(http.Response response, {VoidCallback? onStaleTerms}) {
     try {
       final decoded = jsonDecode(response.body);
       if (decoded is Map && decoded['errors'] is Map) {
         final errors = decoded['errors'] as Map;
         final List<String> errorMessages = [];
+
+        if (errors.containsKey('terms_version_id') && onStaleTerms != null) {
+          onStaleTerms();
+        }
 
         errors.forEach((key, val) {
           final fieldKey = key.toString();

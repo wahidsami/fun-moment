@@ -40,6 +40,8 @@ class ProviderRegistrationModel {
 
   // Terms & Conditions
   bool termsAgree;
+  int? termsVersionId;
+  String? termsLanguage;
 
   ProviderRegistrationModel({
     this.name = '',
@@ -70,6 +72,8 @@ class ProviderRegistrationModel {
     this.contactPersonEmail,
     this.contactPersonPhone,
     this.termsAgree = false,
+    this.termsVersionId,
+    this.termsLanguage,
   }) : categoryIds = categoryIds ?? <int>{};
 
   /// Validate document file extension against allowed types
@@ -95,6 +99,13 @@ class ProviderRegistrationModel {
       'seller_type': sellerType.toString(),
       'category_ids': categoryIds.join(','),
     };
+
+    if (termsVersionId != null) {
+      fields['terms_version_id'] = termsVersionId.toString();
+    }
+    if (termsLanguage != null && termsLanguage!.isNotEmpty) {
+      fields['terms_language'] = termsLanguage!;
+    }
 
     if (address != null && address!.trim().isNotEmpty) {
       fields['address'] = address!.trim();

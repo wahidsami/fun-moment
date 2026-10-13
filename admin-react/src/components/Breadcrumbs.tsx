@@ -59,6 +59,11 @@ export default function Breadcrumbs({ currentView, language }: BreadcrumbsProps)
           { label: isRtl ? 'إعدادات النظام' : 'System Config', active: false },
           { label: t.nav_cms, active: true }
         ];
+      case 'legal-terms':
+        return [
+          { label: isRtl ? 'إعدادات النظام' : 'System Config', active: false },
+          { label: t.nav_legal_terms || (isRtl ? 'الشروط والأحكام' : 'Legal & Terms'), active: true }
+        ];
       case 'localization':
         return [
           { label: isRtl ? 'إعدادات النظام' : 'System Config', active: false },
