@@ -70,8 +70,6 @@
     <string>This app uses Camera to help the user update their profile information.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>This app uses Photo library to help the user update their profile information and payment process.</string>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>The application does not use this feature.</string>
     <key>CFBundleURLTypes</key>
     <array>
       <dict>
