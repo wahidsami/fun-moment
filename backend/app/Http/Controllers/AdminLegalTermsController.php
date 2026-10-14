@@ -122,7 +122,6 @@ class AdminLegalTermsController extends Controller
 
             // Determine next monotonic version number for this document
             $latestVersion = (int) LegalTermVersion::where('legal_term_id', $term->id)
-                ->lockForUpdate()
                 ->max('version_number');
             $nextVersionNumber = $latestVersion + 1;
 

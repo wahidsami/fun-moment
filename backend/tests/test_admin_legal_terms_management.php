@@ -382,6 +382,50 @@ try {
         "Versions preserved: $finalVersionsCount == $initialVersionsCount"
     );
 
+    // ------------------------------------------------------------------------
+    // T15: PostgreSQL aggregate query compliance (no FOR UPDATE on max())
+    // ------------------------------------------------------------------------
+    $capturedSql = [];
+    DB::listen(function ($query) use (&$capturedSql) {
+        $capturedSql[] = $query->sql;
+    });
+
+    $testMax = (int) LegalTermVersion::where('legal_term_id', $buyerEn->id)->max('version_number');
+    $lastQuery = end($capturedSql);
+
+    $hasAggregateForUpdate = str_contains(strtolower($lastQuery), 'max(') && str_contains(strtolower($lastQuery), 'for update');
+
+    assertTest(
+        !$hasAggregateForUpdate && $testMax === 2,
+        "T15: Aggregate version calculation query avoids FOR UPDATE (PostgreSQL compliant)",
+        "Generated SQL: $lastQuery"
+    );
+
+    // ------------------------------------------------------------------------
+    // T16: Monotonic sequential version increment (Publishing Version 3)
+    // ------------------------------------------------------------------------
+    $v3Content = "<h3>Article 1: Platform Usage</h3><p>Version 3 terms with refined liability limitations.</p>";
+    $updateReq3 = Request::create('/admin-home/legal-terms/' . $buyerEn->id . '/draft', 'POST', [
+        'draft_title' => 'FUN MOMENT Buyer Terms & Conditions v3',
+        'draft_content' => $v3Content,
+    ]);
+    $controller->updateDraft($updateReq3, $buyerEn->id);
+
+    $publishReq3 = Request::create('/admin-home/legal-terms/' . $buyerEn->id . '/publish', 'POST');
+    $publishRes3 = $controller->publish($publishReq3, $buyerEn->id);
+    $publishData3 = $publishRes3->getData(true);
+
+    $v3 = LegalTermVersion::find($publishData3['data']['version']['id']);
+    $publishedBuyerEnV3 = LegalTerm::find($buyerEn->id);
+
+    assertTest(
+        $publishRes3->status() === 200
+            && $v3->version_number === 3
+            && (int) $publishedBuyerEnV3->current_version_id === (int) $v3->id,
+        "T16: Sequential publishing correctly increments version monotonically (Version 1 -> 2 -> 3)",
+        "Version number: {$v3->version_number}, current_version_id: {$publishedBuyerEnV3->current_version_id}"
+    );
+
 } catch (\Throwable $e) {
     echo " [FATAL ERROR]: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine() . PHP_EOL;
     echo $e->getTraceAsString() . PHP_EOL;
