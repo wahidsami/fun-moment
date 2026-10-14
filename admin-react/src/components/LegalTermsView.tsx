@@ -25,7 +25,9 @@ import {
   Building2,
   RefreshCw,
   Info,
+  Edit3,
 } from 'lucide-react';
+import { formatLegalDocumentToHtml } from '../utils/legalDocumentFormatter';
 
 interface LegalTermsViewProps {
   language: Language;
@@ -48,6 +50,7 @@ export default function LegalTermsView({ language, activeRole }: LegalTermsViewP
   // Active document being edited
   const [draftTitle, setDraftTitle] = useState<string>('');
   const [draftContent, setDraftContent] = useState<string>('');
+  const [editorViewMode, setEditorViewMode] = useState<'edit' | 'preview'>('edit');
 
   // Notifications
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -201,10 +204,9 @@ export default function LegalTermsView({ language, activeRole }: LegalTermsViewP
     setTimeout(() => setCopiedHash(null), 2500);
   };
 
-  // Quick formatting insert helpers for rich editing
-  const insertFormatting = (tag: string, placeholder: string) => {
-    const textToInsert = `<${tag}>${placeholder}</${tag}>\n`;
-    setDraftContent((prev) => prev + textToInsert);
+  // Quick formatting insert helpers for rich editing (Markdown & HTML supported)
+  const insertFormatting = (prefix: string, suffix: string, placeholder: string) => {
+    setDraftContent((prev) => prev + `${prefix}${placeholder}${suffix}\n`);
   };
 
   if (loading) {
@@ -448,79 +450,144 @@ export default function LegalTermsView({ language, activeRole }: LegalTermsViewP
             />
           </div>
 
-          {/* Formatting Helper Bar */}
-          <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200/60 flex-wrap">
+          {/* Formatting Helper & Mode Switcher Bar */}
+          <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex-wrap">
+            {/* Left: Mode Switcher Tabs */}
+            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-200/60 border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => setEditorViewMode('edit')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                  editorViewMode === 'edit'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                {isRtl ? 'تحرير المستند' : 'Edit Source'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditorViewMode('preview')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                  editorViewMode === 'preview'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {isRtl ? 'معاينة فورية' : 'Live Preview'}
+              </button>
+            </div>
+
+            {/* Middle: Quick Insert Formatting Buttons (Markdown & HTML) */}
             <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 flex-wrap">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider px-1">
                 {isRtl ? 'إدراج سريع:' : 'Insert:'}
               </span>
               <button
                 type="button"
-                onClick={() => insertFormatting('h3', isRtl ? 'عنوان قسم رئيسي' : 'Section Heading')}
+                onClick={() => insertFormatting('## ', '', isRtl ? 'عنوان قسم رئيسي' : 'Major Section')}
+                title={isRtl ? 'عنوان رئيسي (H2)' : 'Major Heading (H2)'}
+                className="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold transition-colors"
+              >
+                H2
+              </button>
+              <button
+                type="button"
+                onClick={() => insertFormatting('### ', '', isRtl ? 'بند فرعي' : 'Subsection')}
+                title={isRtl ? 'بند فرعي (H3)' : 'Subsection (H3)'}
                 className="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors"
               >
                 H3
               </button>
               <button
                 type="button"
-                onClick={() => insertFormatting('p', isRtl ? 'فقرة نصية جديدة توضح البند القانوني...' : 'New legal clause paragraph...')}
-                className="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors"
-              >
-                Paragraph
-              </button>
-              <button
-                type="button"
-                onClick={() => insertFormatting('strong', isRtl ? 'نص بارز ومهم' : 'Important Bold Text')}
+                onClick={() => insertFormatting('**', '**', isRtl ? 'نص بارز ومهم' : 'Important Bold Text')}
+                title={isRtl ? 'نص عريض' : 'Bold Text'}
                 className="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold transition-colors"
               >
                 Bold
               </button>
               <button
                 type="button"
-                onClick={() => setDraftContent((prev) => prev + `<ul>\n  <li>${isRtl ? 'بند 1' : 'Item 1'}</li>\n  <li>${isRtl ? 'بند 2' : 'Item 2'}</li>\n</ul>\n`)}
+                onClick={() => setDraftContent((prev) => prev + `- ${isRtl ? 'بند نقطي 1' : 'Bullet item 1'}\n- ${isRtl ? 'بند نقطي 2' : 'Bullet item 2'}\n`)}
+                title={isRtl ? 'قائمة نقطية' : 'Bullet List'}
                 className="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors"
               >
                 List
               </button>
               <button
                 type="button"
-                onClick={() => setDraftContent((prev) => prev + `<a href="https://funmoments.unifinitylab.com">${isRtl ? 'رابط الدعم' : 'Support Link'}</a>\n`)}
+                onClick={() => setDraftContent((prev) => prev + `1. ${isRtl ? 'البند الأول' : 'First item'}\n2. ${isRtl ? 'البند الثاني' : 'Second item'}\n`)}
+                title={isRtl ? 'قائمة رقمية' : 'Numbered List'}
+                className="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors"
+              >
+                1. 2.
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftContent((prev) => prev + `[${isRtl ? 'رابط الدعم' : 'Support Link'}](https://funmoments.unifinitylab.com)\n`)}
+                title={isRtl ? 'رابط إلكتروني' : 'Link'}
                 className="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors"
               >
                 Link
               </button>
             </div>
 
+            {/* Right: Character Count */}
             <div className="text-[10px] font-mono text-slate-400">
               {isRtl ? `${plainTextLength} حرف` : `${plainTextLength} characters`}
             </div>
           </div>
 
-          {/* Draft Content Textarea */}
+          {/* Draft Content: Editor or Live Preview */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-slate-700">
-                {isRtl ? 'محتوى نص الشروط والأحكام (HTML / نص منظم)' : 'Terms & Conditions Document Body (HTML / Structured Text)'}
+                {isRtl
+                  ? 'محتوى نص الشروط والأحكام (يدعم تنسيق Markdown و HTML)'
+                  : 'Terms & Conditions Document Body (Markdown & HTML Supported)'}
               </label>
               <span className="text-[10px] text-slate-400">
                 {isCurrentDocRtl ? 'اتجاه النص: من اليمين لليسار (RTL)' : 'Direction: Left-to-Right (LTR)'}
               </span>
             </div>
 
-            <textarea
-              value={draftContent}
-              onChange={(e) => setDraftContent(e.target.value)}
-              rows={16}
-              dir={isCurrentDocRtl ? 'rtl' : 'ltr'}
-              placeholder={
-                isCurrentDocRtl
-                  ? 'أدخل بنود الشروط والأحكام هنا...\n\nيمكنك استخدام وسوم HTML مثل <p> و <h3> و <ul> و <li> لتنظيم المواد والبنود القانونية.'
-                  : 'Enter terms and conditions text here...\n\nYou may use standard HTML tags such as <p>, <h3>, <ul>, and <li> to format clauses.'
-              }
-              className={`w-full text-xs font-mono p-4 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-hidden transition-all leading-relaxed ${
-                isCurrentDocRtl ? 'text-right' : 'text-left'
-              }`}
-            />
+            {editorViewMode === 'edit' ? (
+              <textarea
+                value={draftContent}
+                onChange={(e) => setDraftContent(e.target.value)}
+                rows={16}
+                dir={isCurrentDocRtl ? 'rtl' : 'ltr'}
+                placeholder={
+                  isCurrentDocRtl
+                    ? 'أدخل بنود الشروط والأحكام هنا...\n\nيدعم المحرر تنسيق Markdown (# للعناوين، **للخط العريض**، - للقوائم النقطية، 1. للقوائم الرقمية) بالإضافة إلى وسوم HTML القياسية.'
+                    : 'Enter terms and conditions text here...\n\nThe editor supports Markdown formatting (# for headings, **for bold**, - for bullet lists, 1. for numbered lists) as well as standard HTML tags.'
+                }
+                className={`w-full text-xs font-mono p-4 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-hidden transition-all leading-relaxed ${
+                  isCurrentDocRtl ? 'text-right' : 'text-left'
+                }`}
+              />
+            ) : (
+              <div
+                dir={isCurrentDocRtl ? 'rtl' : 'ltr'}
+                className={`w-full min-h-[380px] max-h-[500px] overflow-y-auto p-5 rounded-xl border border-slate-200 bg-white shadow-2xs font-sans ${
+                  isCurrentDocRtl ? 'text-right' : 'text-left'
+                }`}
+              >
+                {draftContent ? (
+                  <div
+                    className="prose prose-xs max-w-none text-slate-700"
+                    dangerouslySetInnerHTML={{ __html: formatLegalDocumentToHtml(draftContent) }}
+                  />
+                ) : (
+                  <div className="text-center py-20 text-slate-400">
+                    {isRtl ? 'لا يوجد محتوى في المسودة بعد للمعاينة.' : 'No draft content available to preview.'}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Safety Notice */}
@@ -568,7 +635,7 @@ export default function LegalTermsView({ language, activeRole }: LegalTermsViewP
               {draftContent ? (
                 <div
                   className="prose prose-xs max-w-none text-slate-700 space-y-3"
-                  dangerouslySetInnerHTML={{ __html: draftContent }}
+                  dangerouslySetInnerHTML={{ __html: formatLegalDocumentToHtml(draftContent) }}
                 />
               ) : (
                 <div className="text-center py-12 text-slate-400">
@@ -716,7 +783,7 @@ export default function LegalTermsView({ language, activeRole }: LegalTermsViewP
                   <div
                     dir={isCurrentDocRtl ? 'rtl' : 'ltr'}
                     className="p-5 rounded-xl border border-slate-200 bg-white max-h-80 overflow-y-auto text-xs leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: viewingHistoricalVersion.content }}
+                    dangerouslySetInnerHTML={{ __html: formatLegalDocumentToHtml(viewingHistoricalVersion.content) }}
                   />
                 </div>
               ) : (

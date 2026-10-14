@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/app_string_service.dart';
+import 'package:funmoments/service/legal_document_formatter.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/service/terms_service.dart';
 import 'package:funmoments/theme/fun_moment_components.dart';
@@ -451,17 +452,89 @@ class _TermsConditionsModalState extends State<TermsConditionsModal> {
       );
     }
 
+    final formattedHtml = LegalDocumentFormatter.formatToHtml(_terms!.content);
+    final isSeller = widget.role.toLowerCase() == 'seller';
+    final accentHex = isSeller ? '#2DE2FF' : '#FF4FB3';
+    final lightAccentHex = isSeller ? '#A6F4FF' : '#FFC1EA';
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: HtmlWidget(
-        _terms!.content,
+        formattedHtml,
         textStyle: TextStyle(
           color: FMColors.textSecondary,
           fontSize: 14.5,
-          height: 1.6,
+          height: 1.65,
           fontFamily: isArabic ? 'Cairo' : null,
         ),
+        customStylesBuilder: (element) {
+          switch (element.localName) {
+            case 'h1':
+              return {
+                'font-size': '20px',
+                'font-weight': 'bold',
+                'color': accentHex,
+                'margin': '14px 0 8px 0',
+                'line-height': '1.4',
+              };
+            case 'h2':
+              return {
+                'font-size': '17px',
+                'font-weight': 'bold',
+                'color': '#FFFFFF',
+                'margin': '14px 0 6px 0',
+                'line-height': '1.4',
+              };
+            case 'h3':
+              return {
+                'font-size': '15.5px',
+                'font-weight': 'bold',
+                'color': lightAccentHex,
+                'margin': '12px 0 4px 0',
+                'line-height': '1.4',
+              };
+            case 'h4':
+            case 'h5':
+            case 'h6':
+              return {
+                'font-size': '14.5px',
+                'font-weight': 'bold',
+                'color': '#E2E8F0',
+                'margin': '10px 0 4px 0',
+              };
+            case 'p':
+              return {
+                'margin': '6px 0 10px 0',
+                'line-height': '1.65',
+                'color': '#D3D7E3',
+              };
+            case 'ul':
+            case 'ol':
+              return {
+                'margin': '6px 0 10px 0',
+                'padding-inline-start': '20px',
+              };
+            case 'li':
+              return {
+                'margin': '3px 0',
+                'line-height': '1.6',
+                'color': '#D3D7E3',
+              };
+            case 'strong':
+            case 'b':
+              return {
+                'font-weight': 'bold',
+                'color': '#FFFFFF',
+              };
+            case 'a':
+              return {
+                'color': accentHex,
+                'text-decoration': 'underline',
+              };
+          }
+          return null;
+        },
         onErrorBuilder: (context, element, error) => Text(
           'Error loading formatted content: $error',
           style: const TextStyle(color: FMColors.error, fontSize: 12),
