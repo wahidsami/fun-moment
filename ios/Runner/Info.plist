@@ -84,10 +84,5 @@
       <string>fetch</string>
       <string>remote-notification</string>
     </array>
-    <key>NSLocationTemporaryUsageDescriptionDictionary</key>
-    <dict>
-      <key>TemporaryPreciseAccuracy</key>
-      <string>The example App requires temporary access to the device's precise location.</string>
-    </dict>
   </dict>
 </plist>

@@ -33,14 +33,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.0"
-  audio_session:
-    dependency: "direct overridden"
-    description:
-      name: audio_session
-      sha256: "768eadc8174b366b8b1b0b75e0518eea2bbd463d47a7938c54a2a0e6aa06946d"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.1.17"
   auto_size_text:
     dependency: "direct main"
     description:
@@ -105,14 +97,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.2"
-  chewie:
-    dependency: transitive
-    description:
-      name: chewie
-      sha256: e9da4898ee4859825404f507969f57113c04ca0060e152b95c9afd73934126ad
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.4.0"
   cli_util:
     dependency: transitive
     description:
@@ -541,16 +525,8 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_widget_from_html:
-    dependency: "direct main"
-    description:
-      name: flutter_widget_from_html
-      sha256: bc92fa62986a1d14bec92d26225bb7b37d581bd91efdad55158efa2eeb200b85
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.1"
   flutter_widget_from_html_core:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: flutter_widget_from_html_core
       sha256: "296485e685b44ad7c6883372aebc56038a28b84f75e7a668bcd8bf01de881739"
@@ -589,38 +565,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.4"
-  fwfh_cached_network_image:
-    dependency: transitive
-    description:
-      name: fwfh_cached_network_image
-      sha256: a9c0ec9606b2d5935162c69cdb65ad22f455e9cf705919d8ceff89251b7ac16f
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.7.0+4"
-  fwfh_chewie:
-    dependency: transitive
-    description:
-      name: fwfh_chewie
-      sha256: "2613881a1b1ffa09bb6c0a45510b832fde4a29d8aa70620f41b6e0587fffa7ab"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.7.1+1"
-  fwfh_just_audio:
-    dependency: transitive
-    description:
-      name: fwfh_just_audio
-      sha256: "237b93a4cb9f0495a4b51940f361adda2a5abd57231dd44f07459db00144a6cd"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.0+3"
-  fwfh_svg:
-    dependency: transitive
-    description:
-      name: fwfh_svg
-      sha256: "556df67faf76b98c76dba144daf9fa9b3e874670e35b0a02d918402f8b8e98f5"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.7.2+1"
   fwfh_text_style:
     dependency: transitive
     description:
@@ -629,22 +573,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.23.8"
-  fwfh_url_launcher:
-    dependency: transitive
-    description:
-      name: fwfh_url_launcher
-      sha256: b9f5d55a5ae2c2c07243ba33f7ba49ac9544bdb2f4c16d8139df9ccbebe3449c
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.1"
-  fwfh_webview:
-    dependency: transitive
-    description:
-      name: fwfh_webview
-      sha256: "7ebd3dff551d7281dd3fbb9f5523a8455592665ff75459ca84871ebbebe864a8"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.7.0+2"
   geolocator:
     dependency: "direct main"
     description:
@@ -925,30 +853,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.9.0"
-  just_audio:
-    dependency: transitive
-    description:
-      name: just_audio
-      sha256: "7a5057a4d05c8f88ee968cec6fdfe1015577d5184e591d5ac15ab16d8f5ecb17"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.31"
-  just_audio_platform_interface:
-    dependency: transitive
-    description:
-      name: just_audio_platform_interface
-      sha256: eff112d5138bea3ba544b6338b1e0537a32b5e1425e4d0dc38f732771cda7c84
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.2.0"
-  just_audio_web:
-    dependency: transitive
-    description:
-      name: just_audio_web
-      sha256: "89d8db6f19f3821bb6bf908c4bfb846079afb2ab575b783d781a6bf119e3abaf"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.4.7"
   leak_tracker:
     dependency: transitive
     description:
@@ -1642,14 +1546,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.4"
-  video_player:
-    dependency: transitive
-    description:
-      name: video_player
-      sha256: "59f7f31c919c59cbedd37c617317045f5f650dc0eeb568b0b0de9a36472bdb28"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.5.1"
   video_player_android:
     dependency: "direct overridden"
     description:
@@ -1658,14 +1554,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.5.1"
-  video_player_avfoundation:
-    dependency: transitive
-    description:
-      name: video_player_avfoundation
-      sha256: d9f7a46d6a77680adb03ec05a381025d6e890ebe636637c6c3014cc3926b97e9
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.3.8"
   video_player_platform_interface:
     dependency: transitive
     description:
@@ -1674,14 +1562,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.6.0"
-  video_player_web:
-    dependency: transitive
-    description:
-      name: video_player_web
-      sha256: b649b07b8f8f553bee4a97a0a53d0fe78a70b115eafaf0105b612b32b05ddb99
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.13"
   vm_service:
     dependency: transitive
     description:
