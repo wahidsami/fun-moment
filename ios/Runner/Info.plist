@@ -12,6 +12,11 @@
     </array>
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+      <string>en</string>
+      <string>ar</string>
+    </array>
     <key>CFBundleDisplayName</key>
     <string>Fun Moments</string>
     <key>CFBundleExecutable</key>
@@ -65,7 +70,7 @@
     </dict>
     <!-- for geo locator  -->
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>This app requires access to the device's location.</string>
+    <string>FUN MOMENT uses your location while you use the app to show your current position and help you find nearby services, for example when searching for service providers near you.</string>
     <key>NSCameraUsageDescription</key>
     <string>This app uses Camera to help the user update their profile information.</string>
     <key>NSPhotoLibraryUsageDescription</key>
