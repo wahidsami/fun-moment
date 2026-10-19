@@ -14,11 +14,11 @@ class MacroServiceProvider extends ServiceProvider
 
     public function boot()
     {
-        Response::macro('success',function ($data){
-            return response()->json($data,201);
+        Response::macro('success',function ($data, $status = 201){
+            return response()->json($data, $status);
         });
-        Response::macro('error',function ($data){
-            return response()->json($data,404);
+        Response::macro('error',function ($data, $status = 404){
+            return response()->json($data, $status);
         });
     }
 }

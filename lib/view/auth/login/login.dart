@@ -398,19 +398,23 @@ class _LoginPageState extends State<LoginPage> {
                                   onTap: () async {
                                     if (aProvider.isloading == false) {
                                       aProvider.setLoadingTrue();
-                                      await aProvider
-                                          .appleLogin(context, autoLogin: true)
-                                          .then((value) async {
-                                        if (value == true) {
+                                      try {
+                                        final success = await aProvider
+                                            .appleLogin(context, autoLogin: true);
+                                        if (success == true && context.mounted) {
                                           await Provider.of<ProfileService>(
                                                   context,
                                                   listen: false)
                                               .fetchData();
-                                          context.popTrue;
+                                          if (context.mounted) {
+                                            context.popTrue;
+                                          }
                                         }
-                                      }).onError((error, stackTrace) =>
-                                              aProvider.setLoadingFalse());
-                                      aProvider.setLoadingFalse();
+                                      } catch (e) {
+                                        debugPrint('Apple login error: $e');
+                                      } finally {
+                                        aProvider.setLoadingFalse();
+                                      }
                                     }
                                   },
                                 ),

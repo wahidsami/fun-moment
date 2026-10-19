@@ -61,7 +61,7 @@ class ProfileService with ChangeNotifier {
     }
   }
 
-  Future<bool> fetchData() async {
+  Future<bool> fetchData({http.Client? client}) async {
     var connection = await checkConnection();
     if (!connection) return false;
     //internet connection is on
@@ -84,8 +84,11 @@ class ProfileService with ChangeNotifier {
       "Authorization": "Bearer $token",
     };
 
+    final httpClient = client ?? http.Client();
+    final shouldClose = client == null;
+
     try {
-      var response = await http
+      var response = await httpClient
           .get(Uri.parse('$baseApi/user/profile'), headers: header)
           .timeout(const Duration(seconds: 3));
 
@@ -126,6 +129,10 @@ class ProfileService with ChangeNotifier {
       setLoadingFalse();
       notifyListeners();
       return false;
+    } finally {
+      if (shouldClose) {
+        httpClient.close();
+      }
     }
   }
 

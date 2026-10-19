@@ -1,7 +1,11 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:funmoments/service/auth_services/google_sign_service.dart';
 import 'package:funmoments/service/auth_services/login_service.dart';
+import 'package:funmoments/service/profile_service.dart';
+import 'package:funmoments/service/push_notification_service.dart';
 import 'package:funmoments/view/auth/login/login.dart';
 import 'package:funmoments/view/home/landing_page.dart';
 import 'package:funmoments/view/intro/introduction_page.dart';
@@ -12,15 +16,9 @@ class SplashService {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool? keepLogin = prefs.getBool('keepLoggedIn');
     String? email = prefs.getString('email');
-    // Navigator.pushReplacement<void, void>(
-    //   context,
-    //   MaterialPageRoute<void>(
-    //     builder: (BuildContext context) => HomeMapView(),
-    //   ),
-    // );
-    // return;
+
     if (keepLogin == null) {
-      //that means user is opening the app for the first time.. so , show the intro
+      // that means user is opening the app for the first time.. so, show the intro
       Future.delayed(const Duration(seconds: 2), () {
         Navigator.pushReplacement<void, void>(
           context,
@@ -39,12 +37,38 @@ class SplashService {
         );
       });
     } else {
-      //check if user logged in with the google or facebook
-      SharedPreferences prefs = await SharedPreferences.getInstance();
+      var appleLogin = prefs.getBool('appleLogin');
       var googleLogin = prefs.getBool('googleLogin');
       var fbLogin = prefs.getBool('fbLogin');
-      if (googleLogin == true || fbLogin == true) {
-        //if last time user logged in with google or facebook
+
+      if (appleLogin == true) {
+        debugPrint('trying to restore Apple authenticated session');
+        var token = prefs.getString('token');
+        if (token != null && token.isNotEmpty) {
+          // Validate actual session by fetching profile from backend
+          final isValid = await Provider.of<ProfileService>(context, listen: false).fetchData();
+          if (isValid) {
+            await Provider.of<PushNotificationService>(context, listen: false)
+                .fetchPusherCredential(context: context);
+            Navigator.pushReplacement<void, void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) => const LandingPage(),
+              ),
+            );
+            return;
+          }
+        }
+        // If token missing, expired, or invalid: safely route to LoginPage
+        debugPrint('Apple session invalid or expired; redirecting to login');
+        Navigator.pushReplacement<void, void>(
+          context,
+          MaterialPageRoute<void>(
+            builder: (BuildContext context) => const LoginPage(),
+          ),
+        );
+      } else if (googleLogin == true || fbLogin == true) {
+        // if last time user logged in with google or facebook
         debugPrint('trying to log in with the last time social login info');
         var email = prefs.getString('email');
         var userName = prefs.getString('userName');
@@ -54,8 +78,8 @@ class SplashService {
             email, userName, id, googleLogin == true ? 1 : 0, context,
             isGoogleLogin: false);
       } else {
-        //user logged in with his email and password. so,
-        //Try to login with the saved email and password
+        // user logged in with his email and password. so,
+        // Try to login with the saved email and password
         debugPrint('trying to log in with email pass');
         String? email = prefs.getString('email');
         String? pass = prefs.getString('pass');
@@ -63,7 +87,7 @@ class SplashService {
             .login(email, pass, context, true, isFromLoginPage: false);
 
         if (result == false) {
-          //if login failed
+          // if login failed
           Navigator.pushReplacement<void, void>(
             context,
             MaterialPageRoute<void>(

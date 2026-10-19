@@ -33,6 +33,7 @@ use App\ProviderCategory;
 use App\Services\ProviderVerificationDocumentService;
 use App\LegalTerm;
 use App\Services\LegalTermsAcceptanceService;
+use App\Services\Auth\AppleTokenVerificationService;
 use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
@@ -255,103 +256,215 @@ class UserController extends Controller
     //social login
     public function socialLogin(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-        ]);
-
-        if (!filter_var($request->email, FILTER_VALIDATE_EMAIL)) {
-            return response()->error([
-                'message' => __('invalid Email'),
-            ]);
-        }
-
-        $providerId = $request->id;
         $isGoogle = $request->isGoogle == 1;
         $isApple = $request->isApple == 1;
+        $providerId = $request->id;
 
-        // 1. Search for existing user by provider ID or email (no user_type filtering)
-        $user = null;
-        if (!empty($providerId)) {
-            if ($isGoogle) {
-                $user = User::where('google_id', $providerId)->first();
-            } elseif ($isApple) {
-                $user = User::where('apple_id', $providerId)->first();
-            } else {
-                $user = User::where('facebook_id', $providerId)->first();
-            }
-        }
+        if ($isApple) {
+            // Apple Sign-In Authentication Flow
+            $identityToken = $request->input('identity_token') ?: $request->input('token');
 
-        if (is_null($user)) {
-            $user = User::where('email', $request->email)->first();
-        }
-
-        if (!is_null($user)) {
-            // Check account deletion status
-            if ($user->account_status?->status === 1) {
+            if (empty($providerId) || empty($identityToken)) {
                 return response()->error([
-                    'message' => __('Your account has been deleted'),
-                    'status' => 'account-delete'
-                ]);
+                    'message' => __('Apple user identifier and identity token are required'),
+                ], 422);
             }
 
-            // Link missing provider ID on existing account
-            $dirty = false;
-            if ($isGoogle && empty($user->google_id) && !empty($providerId)) {
-                $user->google_id = $providerId;
-                $dirty = true;
-            } elseif ($isApple && empty($user->apple_id) && !empty($providerId)) {
-                $user->apple_id = $providerId;
-                $dirty = true;
-            } elseif (!$isGoogle && !$isApple && empty($user->facebook_id) && !empty($providerId)) {
-                $user->facebook_id = $providerId;
-                $dirty = true;
+            $appleService = app(AppleTokenVerificationService::class);
+            $verifiedPayload = $appleService->verifyToken((string) $identityToken, (string) $providerId);
+
+            if (!$verifiedPayload) {
+                return response()->error([
+                    'message' => __('Invalid or unverified Apple identity token'),
+                ], 401);
             }
-            if ($dirty) {
-                $user->save();
+
+            // 1. Check for returning user by verified Apple ID
+            $user = User::where('apple_id', $providerId)->first();
+
+            if (!is_null($user)) {
+                // Check account deletion status
+                if ($user->account_status?->status === 1) {
+                    return response()->error([
+                        'message' => __('Your account has been deleted'),
+                        'status' => 'account-delete'
+                    ]);
+                }
+            } else {
+                // 2. Not found by apple_id. Candidate email determination
+                $tokenEmail = isset($verifiedPayload->email) ? (string) $verifiedPayload->email : null;
+                $candidateEmail = $request->input('email') ?: $tokenEmail;
+
+                if (empty($candidateEmail) || !filter_var($candidateEmail, FILTER_VALIDATE_EMAIL)) {
+                    return response()->error([
+                        'message' => __('A valid email is required for new Apple account registration'),
+                    ], 422);
+                }
+
+                // Check for existing account by email
+                $existingUser = User::where('email', $candidateEmail)->first();
+
+                if (!is_null($existingUser)) {
+                    // Safe Account Linking: Require cryptographic verification of the email in Apple token
+                    $isEmailCryptographicallyVerified = !empty($tokenEmail)
+                        && strcasecmp($tokenEmail, $candidateEmail) === 0
+                        && (!isset($verifiedPayload->email_verified)
+                            || $verifiedPayload->email_verified === true
+                            || $verifiedPayload->email_verified === 'true'
+                            || $verifiedPayload->email_verified === 1);
+
+                    if (!$isEmailCryptographicallyVerified) {
+                        return response()->error([
+                            'message' => __('Cannot link Apple account without verified matching email address'),
+                        ], 403);
+                    }
+
+                    if ($existingUser->account_status?->status === 1) {
+                        return response()->error([
+                            'message' => __('Your account has been deleted'),
+                            'status' => 'account-delete'
+                        ]);
+                    }
+
+                    $existingUser->apple_id = $providerId;
+                    $existingUser->save();
+                    $user = $existingUser;
+                } else {
+                    // 3. Brand-new user: validate legal terms
+                    $termsService = app(LegalTermsAcceptanceService::class);
+                    $termsVersion = $termsService->validatePublishedTerms(
+                        LegalTerm::ROLE_BUYER,
+                        $request->input('terms_version_id'),
+                        $request->input('terms_language')
+                    );
+
+                    $usernamePrefix = 'ap_';
+                    $baseUsername = $usernamePrefix . Str::slug($request->displayName ?: 'user');
+                    $username = $baseUsername;
+                    $counter = 1;
+                    while (User::where('username', $username)->exists()) {
+                        $username = $baseUsername . '_' . $counter;
+                        $counter++;
+                    }
+
+                    $user = DB::transaction(function () use (
+                        $request, $username, $candidateEmail, $providerId, $termsService, $termsVersion
+                    ) {
+                        $user = User::create([
+                            'name' => $request->displayName ?: $username,
+                            'email' => $candidateEmail,
+                            'username' => $username,
+                            'password' => Hash::make(Str::random(16)),
+                            'user_type' => 1,
+                            'terms_condition' => 1,
+                            'email_verified' => 1,
+                            'google_id' => null,
+                            'facebook_id' => null,
+                            'apple_id' => $providerId,
+                        ]);
+
+                        $termsService->recordAcceptance(
+                            $user,
+                            $termsVersion,
+                            LegalTerm::ROLE_BUYER,
+                            (string) $request->input('terms_language')
+                        );
+
+                        return $user;
+                    });
+                }
             }
         } else {
-            // 2. Create new user defaulting to BUYER (user_type = 1)
-            $termsService = app(LegalTermsAcceptanceService::class);
-            $termsVersion = $termsService->validatePublishedTerms(
-                LegalTerm::ROLE_BUYER,
-                $request->input('terms_version_id'),
-                $request->input('terms_language')
-            );
+            // Google and other providers (preserve exact existing behavior)
+            $request->validate([
+                'email' => 'required|email',
+            ]);
 
-            $usernamePrefix = $isApple ? 'ap_' : ($isGoogle ? 'gl_' : 'fb_');
-            $baseUsername = $usernamePrefix . Str::slug($request->displayName ?: 'user');
-            $username = $baseUsername;
-            $counter = 1;
-            while (User::where('username', $username)->exists()) {
-                $username = $baseUsername . '_' . $counter;
-                $counter++;
+            if (!filter_var($request->email, FILTER_VALIDATE_EMAIL)) {
+                return response()->error([
+                    'message' => __('invalid Email'),
+                ]);
             }
 
-            $user = DB::transaction(function () use (
-                $request, $username, $isGoogle, $isApple, $providerId, $termsService, $termsVersion
-            ) {
-                $user = User::create([
-                    'name' => $request->displayName ?: $username,
-                    'email' => $request->email,
-                    'username' => $username,
-                    'password' => Hash::make(Str::random(16)),
-                    'user_type' => 1,
-                    'terms_condition' => 1,
-                    'email_verified' => 1,
-                    'google_id' => $isGoogle ? $providerId : null,
-                    'facebook_id' => (!$isGoogle && !$isApple) ? $providerId : null,
-                    'apple_id' => $isApple ? $providerId : null,
-                ]);
+            // 1. Search for existing user by provider ID or email (no user_type filtering)
+            $user = null;
+            if (!empty($providerId)) {
+                if ($isGoogle) {
+                    $user = User::where('google_id', $providerId)->first();
+                } else {
+                    $user = User::where('facebook_id', $providerId)->first();
+                }
+            }
 
-                $termsService->recordAcceptance(
-                    $user,
-                    $termsVersion,
+            if (is_null($user)) {
+                $user = User::where('email', $request->email)->first();
+            }
+
+            if (!is_null($user)) {
+                // Check account deletion status
+                if ($user->account_status?->status === 1) {
+                    return response()->error([
+                        'message' => __('Your account has been deleted'),
+                        'status' => 'account-delete'
+                    ]);
+                }
+
+                // Link missing provider ID on existing account
+                $dirty = false;
+                if ($isGoogle && empty($user->google_id) && !empty($providerId)) {
+                    $user->google_id = $providerId;
+                    $dirty = true;
+                } elseif (!$isGoogle && empty($user->facebook_id) && !empty($providerId)) {
+                    $user->facebook_id = $providerId;
+                    $dirty = true;
+                }
+                if ($dirty) {
+                    $user->save();
+                }
+            } else {
+                // 2. Create new user defaulting to BUYER (user_type = 1)
+                $termsService = app(LegalTermsAcceptanceService::class);
+                $termsVersion = $termsService->validatePublishedTerms(
                     LegalTerm::ROLE_BUYER,
-                    (string) $request->input('terms_language')
+                    $request->input('terms_version_id'),
+                    $request->input('terms_language')
                 );
 
-                return $user;
-            });
+                $usernamePrefix = $isGoogle ? 'gl_' : 'fb_';
+                $baseUsername = $usernamePrefix . Str::slug($request->displayName ?: 'user');
+                $username = $baseUsername;
+                $counter = 1;
+                while (User::where('username', $username)->exists()) {
+                    $username = $baseUsername . '_' . $counter;
+                    $counter++;
+                }
+
+                $user = DB::transaction(function () use (
+                    $request, $username, $isGoogle, $providerId, $termsService, $termsVersion
+                ) {
+                    $user = User::create([
+                        'name' => $request->displayName ?: $username,
+                        'email' => $request->email,
+                        'username' => $username,
+                        'password' => Hash::make(Str::random(16)),
+                        'user_type' => 1,
+                        'terms_condition' => 1,
+                        'email_verified' => 1,
+                        'google_id' => $isGoogle ? $providerId : null,
+                        'facebook_id' => (!$isGoogle) ? $providerId : null,
+                        'apple_id' => null,
+                    ]);
+
+                    $termsService->recordAcceptance(
+                        $user,
+                        $termsVersion,
+                        LegalTerm::ROLE_BUYER,
+                        (string) $request->input('terms_language')
+                    );
+
+                    return $user;
+                });
+            }
         }
 
         $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
