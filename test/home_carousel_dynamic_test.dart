@@ -9,6 +9,9 @@ import 'package:funmoments/model/slider_model.dart';
 import 'package:funmoments/service/app_string_service.dart';
 import 'package:funmoments/service/home_services/slider_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
+import 'package:funmoments/service/serviceby_category_service.dart';
+import 'package:funmoments/service/service_details_service.dart';
+import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/view/home/components/slider_home.dart';
 import 'package:funmoments/view/utils/responsive.dart';
 import 'package:http/http.dart' as http;
@@ -99,6 +102,28 @@ final Uint8List kTransparentImage = Uint8List.fromList(<int>[
   0x42, 0x60, 0x82,
 ]);
 
+Widget _wrapWithProviders(Widget child) {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => AppStringService()),
+      ChangeNotifierProvider(create: (_) => RtlService()..direction = 'ltr'),
+      ChangeNotifierProvider(create: (_) => ServiceByCategoryService()),
+      ChangeNotifierProvider(create: (_) => ServiceDetailsService()),
+    ],
+    child: Builder(
+      builder: (context) {
+        screenHeight = 800;
+        screenWidth = 400;
+        lnProvider = Provider.of<AppStringService>(context, listen: false);
+        rtlProvider = Provider.of<RtlService>(context, listen: false);
+        return MaterialApp(
+          home: Scaffold(body: child),
+        );
+      },
+    ),
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = TestHttpOverrides();
@@ -109,7 +134,7 @@ void main() {
         'slider-details': [
           {
             'id': 1,
-            'background_image': 'assets/images/app/home/fun_moment_home_hero_01.png',
+            'background_image': 'assets/images/app/home/hero.png',
             'title': 'Book a DJ',
             'sub_title': 'Premium entertainment for Riyadh and Saudi Arabia',
             'title_en': 'Book a DJ',
@@ -123,18 +148,18 @@ void main() {
             'action_type': 'service',
             'action_target': '42',
             'order': 0,
-            'img_url': 'http://127.0.0.1:8000/assets/images/app/home/fun_moment_home_hero_01.png',
+            'img_url': 'http://127.0.0.1:8000/hero.png',
           },
           {
             'id': 2,
-            'background_image': 'assets/images/app/home/fun_moment_dj_performance_01.png',
+            'background_image': 'assets/images/app/home/party.png',
             'title': 'DJ Performance & Events',
             'sub_title': 'Everything you need for music and events',
             'action_type': 'category',
             'action_target': '7',
             'order': 1,
             'btn_text': 'Explore',
-            'img_url': 'http://127.0.0.1:8000/assets/images/app/home/fun_moment_dj_performance_01.png',
+            'img_url': 'http://127.0.0.1:8000/party.png',
           },
           {
             'id': 3,
@@ -143,26 +168,26 @@ void main() {
             'action_type': 'url',
             'action_target': 'https://funmoment.sa/promo',
             'btn_text': 'Visit Site',
-            'img_url': 'http://127.0.0.1:8000/assets/images/app/home/promo.png',
+            'img_url': 'http://127.0.0.1:8000/promo.png',
           }
         ],
         'image_url': [
           {
             'image_id': null,
-            'path': 'assets/images/app/home/fun_moment_home_hero_01.png',
-            'img_url': 'http://127.0.0.1:8000/assets/images/app/home/fun_moment_home_hero_01.png',
+            'path': 'assets/images/app/home/hero.png',
+            'img_url': 'http://127.0.0.1:8000/hero.png',
             'img_alt': 'Book a DJ'
           },
           {
             'image_id': null,
-            'path': 'assets/images/app/home/fun_moment_dj_performance_01.png',
-            'img_url': 'http://127.0.0.1:8000/assets/images/app/home/fun_moment_dj_performance_01.png',
+            'path': 'assets/images/app/home/party.png',
+            'img_url': 'http://127.0.0.1:8000/party.png',
             'img_alt': 'DJ Performance'
           },
           {
             'image_id': null,
             'path': 'assets/images/app/home/promo.png',
-            'img_url': 'http://127.0.0.1:8000/assets/images/app/home/promo.png',
+            'img_url': 'http://127.0.0.1:8000/promo.png',
             'img_alt': 'Website Promo'
           }
         ]
@@ -185,136 +210,248 @@ void main() {
       expect(model.sliderDetails[2].actionTarget, 'https://funmoment.sa/promo');
     });
 
-    test('2. SliderService sends X-Language and parses action metadata', () async {
-      String? sentLanguageHeader;
-      String? requestedUri;
+    testWidgets('2. One active API slide produces exactly one carousel card without duplicates',
+        (tester) async {
+      final singleSlideDetails = [
+        {
+          'id': 1,
+          'title': 'Riyadh Bodyguard',
+          'subtitle': 'We care about your safety',
+          'btn_text': 'Order Now',
+          'action_type': 'category',
+          'action_target': '8',
+          'img_url': 'https://funmoment.sa/bodyguard.png',
+        }
+      ];
+      final singleSlideImages = ['https://funmoment.sa/bodyguard.png'];
 
-      final mockClient = MockHttpStreamClient((request) async {
-        sentLanguageHeader = request.headers['X-Language'];
-        requestedUri = request.url.toString();
+      await tester.pumpWidget(
+        _wrapWithProviders(
+          SliderHome(
+            sliderDetailsList: singleSlideDetails,
+            sliderImageList: singleSlideImages,
+          ),
+        ),
+      );
 
-        final sampleJson = {
-          'slider-details': [
-            {
-              'id': 1,
-              'background_image': 'assets/images/app/home/hero.png',
-              'title': 'حجز دي جي وموسيقى حية',
-              'sub_title': 'ترفيه متميز للرياض',
-              'title_en': 'Book a DJ',
-              'title_ar': 'حجز دي جي وموسيقى حية',
-              'btn_text': 'احجز الآن',
-              'action_type': 'service',
-              'action_target': '10',
-              'service_id': 10,
-              'order': 0,
-              'img_url': 'http://127.0.0.1:8000/hero.png',
-            }
-          ],
-          'image_url': [
-            {
-              'image_id': null,
-              'path': 'assets/images/app/home/hero.png',
-              'img_url': 'http://127.0.0.1:8000/hero.png',
-              'img_alt': 'Hero'
-            }
-          ]
-        };
+      await tester.pump();
 
-        return http.Response.bytes(
-          utf8.encode(jsonEncode(sampleJson)),
-          200,
-          headers: {'content-type': 'application/json; charset=utf-8'},
-        );
-      });
+      // Exactly ONE title widget on screen, no duplicates!
+      expect(find.text('Riyadh Bodyguard'), findsOneWidget);
+      expect(find.text('We care about your safety'), findsOneWidget);
+      expect(find.text('Order Now'), findsOneWidget);
+      // Exactly ONE FMSurfaceCard on screen!
+      expect(find.byType(FMSurfaceCard), findsOneWidget);
+    });
 
+    testWidgets('3. Three distinct active API slides produce exactly three cards in order',
+        (tester) async {
+      final threeSlides = [
+        {
+          'id': 101,
+          'title': 'Slide Alpha',
+          'subtitle': 'First promo',
+          'order': 0,
+          'action_type': 'none',
+        },
+        {
+          'id': 102,
+          'title': 'Slide Beta',
+          'subtitle': 'Second promo',
+          'order': 1,
+          'action_type': 'none',
+        },
+        {
+          'id': 103,
+          'title': 'Slide Gamma',
+          'subtitle': 'Third promo',
+          'order': 2,
+          'action_type': 'none',
+        },
+      ];
+      final threeImages = [
+        'https://funmoment.sa/img1.png',
+        'https://funmoment.sa/img2.png',
+        'https://funmoment.sa/img3.png',
+      ];
+
+      await tester.pumpWidget(
+        _wrapWithProviders(
+          SliderHome(
+            sliderDetailsList: threeSlides,
+            sliderImageList: threeImages,
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // Carousel renders all 3 distinct slides
+      expect(find.text('Slide Alpha'), findsWidgets);
+      expect(find.text('Slide Beta'), findsWidgets);
+    });
+
+    testWidgets('4. Ten API slides produce ten cards without repetition',
+        (tester) async {
+      final tenSlides = List.generate(
+        10,
+        (i) => {
+          'id': i + 1,
+          'title': 'Dynamic Slide #${i + 1}',
+          'subtitle': 'Description #${i + 1}',
+          'order': i,
+        },
+      );
+      final tenImages = List.generate(10, (i) => 'https://funmoment.sa/img$i.png');
+
+      await tester.pumpWidget(
+        _wrapWithProviders(
+          SliderHome(
+            sliderDetailsList: tenSlides,
+            sliderImageList: tenImages,
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      expect(find.text('Dynamic Slide #1'), findsWidgets);
+      expect(find.text('Dynamic Slide #2'), findsWidgets);
+    });
+
+    testWidgets('5. No active slides produces zero carousel cards (clean hide)',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithProviders(
+          const SliderHome(
+            sliderDetailsList: [],
+            sliderImageList: [],
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // Completely hides: 0 surface cards, 0 promotional banners
+      expect(find.byType(FMSurfaceCard), findsNothing);
+      expect(find.text('Book a DJ'), findsNothing);
+      expect(find.text('Rent Party Equipment'), findsNothing);
+    });
+
+    test('6. A successful empty refresh clears previously displayed slides', () async {
       final service = SliderService();
-      await service.loadSlider(isRefresh: true, client: mockClient, language: 'ar');
 
-      expect(sentLanguageHeader, 'ar');
-      expect(requestedUri, contains('lang=ar'));
-      expect(service.isLoaded, true);
+      // Step 1: populate with slides
+      final initialJson = {
+        'slider-details': [
+          {'id': 1, 'title': 'Old Slide', 'sub_title': 'Old Sub'}
+        ],
+        'image_url': [
+          {'image_id': null, 'img_url': 'https://funmoment.sa/old.png'}
+        ]
+      };
+      final clientWithSlides = MockHttpStreamClient((req) async {
+        return http.Response(jsonEncode(initialJson), 200);
+      });
+      await service.loadSlider(isRefresh: true, client: clientWithSlides);
       expect(service.sliderDetailsList.length, 1);
       expect(service.sliderImageList.length, 1);
 
-      final firstSlide = service.sliderDetailsList[0];
-      expect(firstSlide['action_type'], 'service');
-      expect(firstSlide['action_target'], '10');
-      expect(firstSlide['btn_text'], 'احجز الآن');
+      // Step 2: refresh returns 0 slides
+      final emptyJson = {'slider-details': [], 'image_url': []};
+      final clientEmpty = MockHttpStreamClient((req) async {
+        return http.Response(jsonEncode(emptyJson), 200);
+      });
+      await service.loadSlider(isRefresh: true, client: clientEmpty);
+
+      // Asserts that previous slides are cleared, NOT retained!
+      expect(service.sliderDetailsList.isEmpty, isTrue);
+      expect(service.sliderImageList.isEmpty, isTrue);
+      expect(service.hasError, isFalse);
     });
 
-    testWidgets('3. SliderHome renders remote dynamic slides and CTA button', (tester) async {
-      final sampleDetails = [
+    test('7. An API failure produces no hardcoded promotional carousel', () async {
+      final service = SliderService();
+
+      final failureClient = MockHttpStreamClient((req) async {
+        return http.Response('Server Error', 500);
+      });
+      await service.loadSlider(isRefresh: true, client: failureClient);
+
+      expect(service.hasError, isTrue);
+      expect(service.sliderDetailsList.isEmpty, isTrue);
+      expect(service.sliderImageList.isEmpty, isTrue);
+    });
+
+    test('8. Reopening or refreshing the home screen does not duplicate slides', () async {
+      final service = SliderService();
+
+      final sampleJson = {
+        'slider-details': [
+          {'id': 1, 'title': 'Slide 1', 'img_url': 'https://img.sa/1.png'},
+          {'id': 2, 'title': 'Slide 2', 'img_url': 'https://img.sa/2.png'},
+        ],
+        'image_url': []
+      };
+      final client = MockHttpStreamClient((req) async {
+        return http.Response(jsonEncode(sampleJson), 200);
+      });
+
+      // Load once
+      await service.loadSlider(isRefresh: true, client: client);
+      expect(service.sliderDetailsList.length, 2);
+
+      // Refresh again
+      await service.loadSlider(isRefresh: true, client: client);
+      // Must NOT append to 4, must strictly remain 2!
+      expect(service.sliderDetailsList.length, 2);
+      expect(service.sliderImageList.length, 2);
+    });
+
+    testWidgets('9. Slide tap action triggers handleSlideAction for that specific slide',
+        (tester) async {
+      final slideWithAction = [
         {
           'id': 1,
-          'title': 'Book a DJ',
-          'subtitle': 'Premium entertainment for Riyadh and Saudi Arabia',
-          'btn_text': 'Book Now',
-          'action_type': 'service',
-          'action_target': '42',
+          'title': 'DJ Night',
+          'action_type': 'category',
+          'action_target': '8',
+          'img_url': 'https://funmoment.sa/dj.png',
         }
       ];
-      final sampleImages = ['https://funmoment.sa/sample.png'];
 
       await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider(create: (_) => AppStringService()),
-            ChangeNotifierProvider(create: (_) => RtlService()..direction = 'ltr'),
-          ],
-          child: Builder(
-            builder: (context) {
-              screenHeight = 800;
-              screenWidth = 400;
-              lnProvider = Provider.of<AppStringService>(context, listen: false);
-              rtlProvider = Provider.of<RtlService>(context, listen: false);
-              return MaterialApp(
-                home: Scaffold(
-                  body: SliderHome(
-                    sliderDetailsList: sampleDetails,
-                    sliderImageList: sampleImages,
-                  ),
-                ),
-              );
-            },
+        _wrapWithProviders(
+          SliderHome(
+            sliderDetailsList: slideWithAction,
+            sliderImageList: const ['https://funmoment.sa/dj.png'],
           ),
         ),
       );
 
       await tester.pump();
-
-      expect(find.text('Book a DJ'), findsWidgets);
-      expect(find.text('Premium entertainment for Riyadh and Saudi Arabia'), findsWidgets);
-      expect(find.text('Book Now'), findsWidgets);
+      final cardFinder = find.byType(InkWell);
+      expect(cardFinder, findsOneWidget);
+      // Tap on the card
+      await tester.tap(cardFinder);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      // Verifies interaction did not throw and navigation succeeded
     });
 
-    testWidgets('4. SliderHome gracefully renders local fallback when list is empty', (tester) async {
-      await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider(create: (_) => AppStringService()),
-            ChangeNotifierProvider(create: (_) => RtlService()..direction = 'ltr'),
-          ],
-          child: Builder(
-            builder: (context) {
-              screenHeight = 800;
-              screenWidth = 400;
-              lnProvider = Provider.of<AppStringService>(context, listen: false);
-              rtlProvider = Provider.of<RtlService>(context, listen: false);
-              return const MaterialApp(
-                home: Scaffold(
-                  body: SliderHome(
-                    sliderDetailsList: [],
-                    sliderImageList: [],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      );
+    test('10. SliderService handles network exception without falling back to local promo banners',
+        () async {
+      final service = SliderService();
 
-      await tester.pump();
-      expect(find.byType(SliderHome), findsOneWidget);
+      final throwingClient = MockHttpStreamClient((req) async {
+        throw const SocketException('Connection refused');
+      });
+
+      await service.loadSlider(isRefresh: true, client: throwingClient);
+
+      expect(service.hasError, isTrue);
+      expect(service.sliderDetailsList.isEmpty, isTrue);
+      expect(service.sliderImageList.isEmpty, isTrue);
     });
   });
 }

@@ -10,6 +10,7 @@ import 'package:funmoments/service/dropdowns_services/state_dropdown_services.da
 import 'package:funmoments/service/home_services/slider_service.dart';
 import 'package:funmoments/service/profile_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
+import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/auth/signup/dropdowns/country_dropdown.dart';
 import 'package:funmoments/view/home/components/slider_home.dart';
@@ -67,7 +68,7 @@ void main() {
       expect(service.sliderImageList.isEmpty, isTrue);
     });
 
-    testWidgets('3. Local fallback appears in SliderHome when sliderImageList is empty',
+    testWidgets('3. SliderHome cleanly hides carousel without hardcoded fallbacks when list is empty',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         MultiProvider(
@@ -96,8 +97,10 @@ void main() {
 
       await tester.pump();
 
-      // Verify that SliderHome is rendered with fallback promotional copy
+      // Verify that SliderHome hides cleanly and renders no hardcoded promotional cards
       expect(find.byType(SliderHome), findsOneWidget);
+      expect(find.byType(FMSurfaceCard), findsNothing);
+      expect(find.text('Book a DJ'), findsNothing);
       expect(FMAssets.homePromoAssets.isNotEmpty, isTrue);
     });
 

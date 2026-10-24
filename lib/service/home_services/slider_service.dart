@@ -81,17 +81,38 @@ class SliderService with ChangeNotifier {
         final newDetails = <Map>[];
         final newImages = [];
 
+        final imageMap = <int, String>{};
+        for (final img in data.imageUrl) {
+          if (img.imageId != null && img.imgUrl != null && img.imgUrl!.trim().isNotEmpty) {
+            imageMap[img.imageId!] = img.imgUrl!.trim();
+          }
+        }
+
         for (int i = 0; i < data.sliderDetails.length; i++) {
           final detail = data.sliderDetails[i];
-          final fallbackImgUrl = i < data.imageUrl.length ? data.imageUrl[i].imgUrl : null;
-          final resolvedImg = (detail.imgUrl != null && detail.imgUrl!.trim().isNotEmpty)
+
+          String? resolvedImg = (detail.imgUrl != null && detail.imgUrl!.trim().isNotEmpty)
               ? detail.imgUrl!.trim()
-              : fallbackImgUrl?.trim();
+              : null;
+
+          if (resolvedImg == null && detail.backgroundImage != null) {
+            final bgId = int.tryParse(detail.backgroundImage!);
+            if (bgId != null && imageMap.containsKey(bgId)) {
+              resolvedImg = imageMap[bgId];
+            }
+          }
+
+          if (resolvedImg == null && i < data.imageUrl.length) {
+            final fb = data.imageUrl[i].imgUrl?.trim();
+            if (fb != null && fb.isNotEmpty) {
+              resolvedImg = fb;
+            }
+          }
 
           newDetails.add({
             'id': detail.id,
-            'title': detail.title,
-            'subtitle': detail.subTitle,
+            'title': detail.title ?? '',
+            'subtitle': detail.subTitle ?? '',
             'title_en': detail.titleEn,
             'title_ar': detail.titleAr,
             'sub_title_en': detail.subTitleEn,
@@ -103,33 +124,23 @@ class SliderService with ChangeNotifier {
             'action_type': detail.actionType ?? 'none',
             'action_target': detail.actionTarget,
             'order': detail.order ?? 0,
-            'img_url': resolvedImg,
+            'img_url': resolvedImg ?? '',
           });
 
-          if (resolvedImg != null &&
-              resolvedImg.isNotEmpty &&
-              resolvedImg != placeHolderUrl &&
-              !resolvedImg.contains('i.postimg.cc/rpsKNndW/New-Project.png')) {
-            newImages.add(resolvedImg);
-          }
+          newImages.add(resolvedImg ?? '');
         }
 
-        if (newImages.isNotEmpty) {
-          sliderDetailsList = newDetails;
-          sliderImageList = newImages;
-          debugPrint(
-              '[SliderService] Loaded ${newImages.length} remote slider image(s)');
-        } else {
-          sliderDetailsList = [];
-          sliderImageList = [];
-          debugPrint(
-              '[SliderService] Completed with 0 remote images; fallback carousel will activate');
-        }
+        sliderDetailsList = newDetails;
+        sliderImageList = newImages;
         isLoaded = true;
         hasError = false;
+        debugPrint(
+            '[SliderService] Loaded ${sliderDetailsList.length} remote slide(s)');
       } else {
         debugPrint(
             '[SliderService] GET $uri failed with status ${response.statusCode}');
+        sliderDetailsList = [];
+        sliderImageList = [];
         hasError = true;
         isLoaded = true;
       }
@@ -137,6 +148,8 @@ class SliderService with ChangeNotifier {
       sw.stop();
       debugPrint(
           '[SliderService] GET $uri failed after ${sw.elapsedMilliseconds}ms: $e');
+      sliderDetailsList = [];
+      sliderImageList = [];
       hasError = true;
       isLoaded = true;
     } finally {
@@ -145,7 +158,7 @@ class SliderService with ChangeNotifier {
       }
       isLoading = false;
       debugPrint(
-          '[SliderService] Terminal state reached: isLoaded=$isLoaded, isLoading=$isLoading, hasError=$hasError, images=${sliderImageList.length}');
+          '[SliderService] Terminal state reached: isLoaded=$isLoaded, isLoading=$isLoading, hasError=$hasError, slides=${sliderDetailsList.length}');
       _safeNotifyListeners();
     }
   }

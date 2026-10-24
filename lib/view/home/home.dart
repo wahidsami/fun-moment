@@ -148,18 +148,27 @@ class _HomepageState extends State<Homepage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
                 Consumer<SliderService>(
-                  builder: (context, provider, child) =>
-                      provider.isLoading && provider.sliderImageList.isEmpty
-                          ? const _DarkLoadingCard(height: 180)
-                          : SliderHome(
-                              cc: cc,
-                              sliderDetailsList: provider.sliderDetailsList,
-                              sliderImageList: provider.sliderImageList,
-                            ),
+                  builder: (context, provider, child) {
+                    if (provider.isLoading && provider.sliderDetailsList.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.only(top: 20, bottom: 22),
+                        child: _DarkLoadingCard(height: 180),
+                      );
+                    }
+                    if (provider.sliderDetailsList.isEmpty) {
+                      return const SizedBox(height: 16);
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 20, bottom: 22),
+                      child: SliderHome(
+                        cc: cc,
+                        sliderDetailsList: provider.sliderDetailsList,
+                        sliderImageList: provider.sliderImageList,
+                      ),
+                    );
+                  },
                 ),
-                const SizedBox(height: 22),
                 Consumer<AppStringService>(
                   builder: (context, asProvider, child) => Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
