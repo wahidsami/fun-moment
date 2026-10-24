@@ -695,6 +695,31 @@ export interface LegalTerm {
   versions_count?: number;
   updated_at?: string | null;
 }
-
-
+export interface SliderItem {
+  id: number;
+  background_image: string;
+  title: string;
+  title_en: string;
+  title_ar: string;
+  sub_title: string;
+  sub_title_en: string;
+  sub_title_ar: string;
+  btn_text?: string;
+  btn_text_en?: string;
+  btn_text_ar?: string;
+  service_id?: number | null;
+  action_type: 'none' | 'service' | 'category' | 'url';
+  action_target?: string | null;
+  order: number;
+  status: 0 | 1;
+  img_url?: string | null;
+  attachment?: {
+    image_id?: number | null;
+    path?: string | null;
+    img_url?: string | null;
+    img_alt?: string | null;
+  };
+  created_at?: string;
+  updated_at?: string;
+}
 

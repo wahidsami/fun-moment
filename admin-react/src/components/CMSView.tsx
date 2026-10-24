@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Language, UserRole } from '../types';
+import { Language, UserRole, SliderItem } from '../types';
 import { translations } from '../translations';
 import { LaravelAPI } from '../api';
 import {
@@ -137,13 +137,28 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
   const t = translations[language];
   const isRtl = language === 'ar';
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const sliderImageInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingSliderImage, setIsUploadingSliderImage] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<string>('blogs');
+  const [activeTab, setActiveTab] = useState<string>('sliders');
   const [successMsg, setSuccessMsg] = useState<string>('');
   const [editingLang, setEditingLang] = useState<'en' | 'ar'>('en');
 
   // Super admins & moderators have CMS permissions
   const hasPermission = activeRole === 'super_admin' || activeRole === 'moderator';
+
+  // 0. Home Carousel & Promotional Sliders State
+  const [sliders, setSliders] = useState<SliderItem[]>([]);
+  const [sliderLookups, setSliderLookups] = useState<{ services: any[]; categories: any[] }>({ services: [], categories: [] });
+  const [sliderCounts, setSliderCounts] = useState<{ total: number; active: number; inactive: number }>({ total: 0, active: 0, inactive: 0 });
+  const [isLoadingSliders, setIsLoadingSliders] = useState(false);
+  const [selectedSlider, setSelectedSlider] = useState<SliderItem | null>(null);
+  const [sliderForm, setSliderForm] = useState<Partial<SliderItem> | null>(null);
+  const [isSavingSlider, setIsSavingSlider] = useState(false);
+  const [sliderToDelete, setSliderToDelete] = useState<SliderItem | null>(null);
+  const [sliderFilter, setSliderFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [activePreviewSlideIndex, setActivePreviewSlideIndex] = useState(0);
+  const [sliderMediaPickerTab, setSliderMediaPickerTab] = useState<'vault' | 'upload' | 'url'>('vault');
 
   // 1. Blogs & Taxonomies State
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
@@ -345,11 +360,153 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
     };
 
     loadCmsInventory();
+    fetchSliders();
 
     return () => {
       mounted = false;
     };
   }, []);
+
+  const fetchSliders = async () => {
+    setIsLoadingSliders(true);
+    try {
+      const data = await LaravelAPI.getSliders();
+      const list = Array.isArray(data.sliders) ? data.sliders : [];
+      setSliders(list);
+      setSliderLookups({
+        services: Array.isArray(data.lookups?.services) ? data.lookups.services : [],
+        categories: Array.isArray(data.lookups?.categories) ? data.lookups.categories : [],
+      });
+      setSliderCounts({
+        total: data.counts?.total ?? list.length,
+        active: data.counts?.active ?? list.filter((s: SliderItem) => s.status === 1).length,
+        inactive: data.counts?.inactive ?? list.filter((s: SliderItem) => s.status === 0).length,
+      });
+      if (list.length > 0) {
+        setSelectedSlider(prev => prev || list[0]);
+      }
+    } catch (err) {
+      console.warn('Failed to load sliders', err);
+    } finally {
+      setIsLoadingSliders(false);
+    }
+  };
+
+  const handleUploadSliderFile = async (file?: File | null) => {
+    if (!hasPermission || !file) return;
+    setIsUploadingSliderImage(true);
+    try {
+      const item = await LaravelAPI.uploadMedia(file);
+      const normalized = {
+        id: item.id,
+        name: item.slug || item.title_en || `media-${item.id}`,
+        url: item.image ?? item.url ?? '',
+      };
+      setMediaGallery(current => [normalized, ...current]);
+      setSliderForm(prev => prev ? {
+        ...prev,
+        background_image: String(item.id),
+        img_url: item.image ?? item.url ?? '',
+      } : null);
+      triggerSuccess(language === 'en' ? 'Slider image uploaded successfully!' : 'تم رفع صورة السلايدر بنجاح!');
+    } catch (error: any) {
+      console.error(error);
+      alert(error?.message || (language === 'en' ? 'Upload failed' : 'فشل رفع الملف'));
+    } finally {
+      setIsUploadingSliderImage(false);
+    }
+  };
+
+  const handleSaveSlider = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sliderForm || !hasPermission) return;
+    if (!sliderForm.title?.trim() && !sliderForm.title_en?.trim() && !sliderForm.title_ar?.trim()) {
+      alert(language === 'ar' ? 'يرجى إدخال عنوان السلايدر' : 'Please provide a slide title');
+      return;
+    }
+    if (!sliderForm.background_image?.trim()) {
+      alert(language === 'ar' ? 'يرجى اختيار صورة خلفية للسلايدر' : 'Please provide a background image for the slide');
+      return;
+    }
+
+    setIsSavingSlider(true);
+    try {
+      const payload: Partial<SliderItem> = {
+        title: sliderForm.title_en || sliderForm.title || sliderForm.title_ar || '',
+        title_ar: sliderForm.title_ar || '',
+        title_en: sliderForm.title_en || sliderForm.title || '',
+        sub_title: sliderForm.sub_title_en || sliderForm.sub_title || '',
+        sub_title_ar: sliderForm.sub_title_ar || '',
+        sub_title_en: sliderForm.sub_title_en || sliderForm.sub_title || '',
+        btn_text: sliderForm.btn_text || 'Book Now',
+        btn_text_ar: sliderForm.btn_text_ar || 'احجز الآن',
+        btn_text_en: sliderForm.btn_text_en || 'Book Now',
+        action_type: sliderForm.action_type || 'none',
+        action_target: sliderForm.action_target || '',
+        background_image: sliderForm.background_image,
+        order: sliderForm.order !== undefined ? Number(sliderForm.order) : undefined,
+        status: sliderForm.status ?? 1,
+      };
+
+      if (sliderForm.id) {
+        await LaravelAPI.updateSlider(sliderForm.id, payload);
+      } else {
+        await LaravelAPI.createSlider(payload);
+      }
+
+      await fetchSliders();
+      setSliderForm(null);
+      triggerSuccess(t.carousel_save_success || (language === 'ar' ? 'تم حفظ الشريحة بنجاح!' : 'Slide saved successfully!'));
+    } catch (err: any) {
+      alert(err.message || 'Failed to save slide');
+    } finally {
+      setIsSavingSlider(false);
+    }
+  };
+
+  const handleToggleSliderStatus = async (slide: SliderItem) => {
+    if (!hasPermission) return;
+    const newStatus = slide.status === 1 ? 0 : 1;
+    try {
+      setSliders(prev => prev.map(s => s.id === slide.id ? { ...s, status: newStatus } : s));
+      await LaravelAPI.toggleSliderStatus(slide.id);
+      await fetchSliders();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update slide status');
+      await fetchSliders();
+    }
+  };
+
+  const handleMoveSlider = async (index: number, direction: 'up' | 'down') => {
+    if (!hasPermission) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sliders.length) return;
+
+    const reordered = [...sliders];
+    const item = reordered[index];
+    reordered[index] = reordered[targetIndex];
+    reordered[targetIndex] = item;
+    setSliders(reordered);
+
+    try {
+      const orderIds = reordered.map(s => s.id);
+      await LaravelAPI.reorderSliders(orderIds);
+    } catch (err: any) {
+      console.warn('Failed to persist slider order', err);
+      await fetchSliders();
+    }
+  };
+
+  const handleDeleteSlider = async () => {
+    if (!sliderToDelete || !hasPermission) return;
+    try {
+      await LaravelAPI.deleteSlider(sliderToDelete.id);
+      setSliderToDelete(null);
+      await fetchSliders();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete slide');
+    }
+  };
 
   // Up/Down reordering functions
   const moveHomepageSection = (index: number, direction: 'up' | 'down') => {
@@ -777,6 +934,7 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
             {language === 'en' ? 'Content & Layout Studio' : 'الاستوديو وصناعة المحتوى'}
           </p>
           {[
+            { id: 'sliders', label_en: 'Hero & Promotional Sliders', label_ar: 'سلايدر العروض والبنرات', icon: Layers },
             { id: 'blogs', label_en: 'Blogs & Taxonomy', label_ar: 'المدونات والتصنيفات', icon: BookOpen },
             { id: 'pages', label_en: 'Static Pages Builder', label_ar: 'منشئ الصفحات الثابتة', icon: FileText },
             { id: 'menus', label_en: 'Menus & Widgets', label_ar: 'القوائم والقطع البرمجية', icon: MenuIcon },
@@ -795,6 +953,7 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                 onClick={() => {
                   setActiveTab(tab.id);
                   setBlogForm(null);
+                  setSliderForm(null);
                 }}
                 className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${
                   active 
@@ -815,6 +974,749 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
           {/* Main workspace (Takes up 2 columns on extra wide screens) */}
           <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-5 space-y-5 shadow-xs min-h-[500px]">
             
+            {/* 0. TAB: HOME HERO & PROMOTIONAL SLIDERS */}
+            {activeTab === 'sliders' && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-5 w-5 text-indigo-600" />
+                      <h3 className="text-base font-bold text-slate-800">
+                        {t.carousel_title || (language === 'ar' ? 'سلايدر العروض والبنرات الترويجية' : 'Home Carousel & Promotional Sliders')}
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {t.carousel_subtitle || (language === 'ar' ? 'إدارة البنرات الإعلانية في الصفحة الرئيسية، الصور، النصوص الترويجية، ووجهات النقر والروابط المباشرة.' : 'Manage homepage hero slides, banner artwork, promotional copy, and deep-link click targets.')}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={fetchSliders}
+                      disabled={isLoadingSliders}
+                      className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                      title={language === 'en' ? 'Refresh' : 'تحديث'}
+                    >
+                      <RefreshCcw className={`h-4 w-4 ${isLoadingSliders ? 'animate-spin' : ''}`} />
+                    </button>
+                    {hasPermission && !sliderForm && (
+                      <button
+                        onClick={() => {
+                          setSliderForm({
+                            title: '',
+                            title_en: '',
+                            title_ar: '',
+                            sub_title: '',
+                            sub_title_en: '',
+                            sub_title_ar: '',
+                            btn_text_en: 'Book Now',
+                            btn_text_ar: 'احجز الآن',
+                            action_type: 'none',
+                            action_target: '',
+                            background_image: '',
+                            status: 1,
+                            order: sliders.length,
+                          });
+                          setSliderMediaPickerTab('vault');
+                        }}
+                        className="flex items-center gap-1.5 rounded-xl bg-indigo-600 text-white font-bold px-3.5 py-2 text-xs hover:bg-indigo-700 transition shadow-xs"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>{t.carousel_new_slide || (language === 'ar' ? 'إضافة شريحة جديدة' : 'Add New Slide')}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Top Statistics Bar & Filters */}
+                {!sliderForm && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 p-3 rounded-xl border border-slate-100 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        {language === 'en' ? 'Filter by Status:' : 'تصفية حسب الحالة:'}
+                      </span>
+                      <div className="inline-flex rounded-lg bg-slate-200/60 p-0.5">
+                        <button
+                          onClick={() => setSliderFilter('all')}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${
+                            sliderFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {language === 'en' ? 'All' : 'الكل'} ({sliderCounts.total})
+                        </button>
+                        <button
+                          onClick={() => setSliderFilter('active')}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${
+                            sliderFilter === 'active' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {t.carousel_active_slides || (language === 'ar' ? 'النشطة' : 'Active')} ({sliderCounts.active})
+                        </button>
+                        <button
+                          onClick={() => setSliderFilter('inactive')}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${
+                            sliderFilter === 'inactive' ? 'bg-slate-800 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {t.carousel_inactive_slides || (language === 'ar' ? 'غير النشطة' : 'Inactive')} ({sliderCounts.inactive})
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 font-medium flex items-center gap-2">
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span>{language === 'en' ? 'Dynamic mobile app delivery active' : 'التسليم المباشر لتطبيق الجوال مفعّل'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Slides Directory List View */}
+                {!sliderForm ? (
+                  <div className="space-y-3">
+                    {isLoadingSliders ? (
+                      <div className="py-16 text-center text-slate-400 space-y-2">
+                        <RefreshCcw className="h-6 w-6 animate-spin mx-auto text-indigo-500" />
+                        <p className="text-xs">{language === 'en' ? 'Loading promotional carousel slides...' : 'جاري تحميل شرائح السلايدر...'}</p>
+                      </div>
+                    ) : sliders.filter(s => sliderFilter === 'all' || (sliderFilter === 'active' ? s.status === 1 : s.status === 0)).length === 0 ? (
+                      <div className="py-16 text-center border-2 border-dashed border-slate-200 rounded-2xl p-6 space-y-3">
+                        <Layers className="h-10 w-10 text-slate-300 mx-auto" />
+                        <h4 className="text-sm font-bold text-slate-700">
+                          {language === 'en' ? 'No promotional slides found' : 'لم يتم العثور على شرائح ترويجية'}
+                        </h4>
+                        <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                          {language === 'en' ? 'Click "Add New Slide" to create the first banner for the mobile app home screen.' : 'انقر على "إضافة شريحة جديدة" لإنشاء أول بانر ترويجي في واجهة تطبيق الجوال.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-2xs">
+                        {sliders
+                          .filter(s => sliderFilter === 'all' || (sliderFilter === 'active' ? s.status === 1 : s.status === 0))
+                          .map((slide, index) => {
+                            const isSelected = selectedSlider?.id === slide.id;
+                            const displayImg = slide.img_url || (slide.background_image?.startsWith('assets/') ? `http://127.0.0.1:8000/${slide.background_image}` : slide.background_image);
+                            return (
+                              <div
+                                key={slide.id}
+                                onClick={() => setSelectedSlider(slide)}
+                                className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 transition cursor-pointer ${
+                                  isSelected ? 'bg-indigo-50/40 border-l-4 border-indigo-600' : 'hover:bg-slate-50/50'
+                                }`}
+                              >
+                                {/* Reorder Controls & Order Badge */}
+                                <div className="flex sm:flex-col items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                                  {hasPermission && (
+                                    <button
+                                      onClick={() => handleMoveSlider(index, 'up')}
+                                      disabled={index === 0}
+                                      className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600"
+                                      title={language === 'en' ? 'Move up' : 'تحريك لأعلى'}
+                                    >
+                                      <ChevronUp className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                  <span className="text-[11px] font-black text-slate-400 bg-slate-100 rounded-md px-1.5 py-0.5">
+                                    #{index + 1}
+                                  </span>
+                                  {hasPermission && (
+                                    <button
+                                      onClick={() => handleMoveSlider(index, 'down')}
+                                      disabled={index === sliders.length - 1}
+                                      className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600"
+                                      title={language === 'en' ? 'Move down' : 'تحريك لأسفل'}
+                                    >
+                                      <ChevronDown className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Slide Image Thumbnail */}
+                                <div className="relative w-28 h-18 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200 shadow-2xs">
+                                  {displayImg ? (
+                                    <img
+                                      src={displayImg}
+                                      alt={slide.title}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        (e.target as HTMLElement).style.display = 'none';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-slate-300">
+                                      <ImageIcon className="h-6 w-6" />
+                                    </div>
+                                  )}
+                                  <span className={`absolute top-1 right-1 text-[8px] font-black px-1.5 py-0.5 rounded-full ${
+                                    slide.status === 1 ? 'bg-emerald-500 text-white shadow-xs' : 'bg-slate-600 text-white'
+                                  }`}>
+                                    {slide.status === 1 ? (language === 'en' ? 'ACTIVE' : 'نشط') : (language === 'en' ? 'HIDDEN' : 'مخفي')}
+                                  </span>
+                                </div>
+
+                                {/* Slide Bilingual Text & Metadata */}
+                                <div className="flex-1 min-w-0 space-y-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <h4 className="text-xs font-bold text-slate-900 truncate">
+                                      {slide.title_en || slide.title}
+                                    </h4>
+                                    {slide.title_ar && (
+                                      <span className="text-xs font-bold text-slate-600 font-arabic border-r border-slate-300 pr-2">
+                                        {slide.title_ar}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <p className="text-[11px] text-slate-500 line-clamp-1">
+                                    {editingLang === 'ar' ? (slide.sub_title_ar || slide.sub_title) : (slide.sub_title_en || slide.sub_title)}
+                                  </p>
+
+                                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                                    {/* Action target badge */}
+                                    {slide.action_type === 'none' && (
+                                      <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-[9px] font-semibold text-slate-600">
+                                        {t.carousel_action_none || (language === 'ar' ? 'بدون إجراء (عرض مرئي)' : 'Visual Banner')}
+                                      </span>
+                                    )}
+                                    {slide.action_type === 'service' && (
+                                      <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[9px] font-bold text-indigo-700">
+                                        <ArrowUpRight className="h-3 w-3" />
+                                        {language === 'en' ? `Service #${slide.action_target}` : `خدمة #${slide.action_target}`}
+                                      </span>
+                                    )}
+                                    {slide.action_type === 'category' && (
+                                      <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
+                                        <Tag className="h-3 w-3" />
+                                        {language === 'en' ? `Category #${slide.action_target}` : `تصنيف #${slide.action_target}`}
+                                      </span>
+                                    )}
+                                    {slide.action_type === 'url' && (
+                                      <span className="inline-flex items-center gap-1 rounded bg-sky-50 px-2 py-0.5 text-[9px] font-bold text-sky-700 truncate max-w-[200px]">
+                                        <ExternalLink className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">{slide.action_target}</span>
+                                      </span>
+                                    )}
+
+                                    {/* Button label preview */}
+                                    <span className="rounded bg-slate-50 border border-slate-200 px-2 py-0.5 text-[9px] font-medium text-slate-600">
+                                      {language === 'en' ? `Button: "${slide.btn_text_en || 'Book Now'}"` : `الزر: "${slide.btn_text_ar || 'احجز الآن'}"`}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Row Actions */}
+                                {hasPermission && (
+                                  <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+                                    <button
+                                      onClick={() => handleToggleSliderStatus(slide)}
+                                      className={`p-2 rounded-xl transition ${
+                                        slide.status === 1 ? 'hover:bg-amber-50 text-amber-600' : 'hover:bg-emerald-50 text-emerald-600'
+                                      }`}
+                                      title={slide.status === 1 ? (language === 'en' ? 'Deactivate' : 'إخفاء الشريحة') : (language === 'en' ? 'Activate' : 'تفعيل الشريحة')}
+                                    >
+                                      <RefreshCcw className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setSliderForm({ ...slide });
+                                        setSliderMediaPickerTab('vault');
+                                      }}
+                                      className="p-2 rounded-xl text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition"
+                                      title={language === 'en' ? 'Edit slide' : 'تعديل الشريحة'}
+                                    >
+                                      <Edit2 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => setSliderToDelete(slide)}
+                                      className="p-2 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                                      title={language === 'en' ? 'Delete slide' : 'حذف الشريحة'}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Slide Create / Edit Form */
+                  <form onSubmit={handleSaveSlider} className="space-y-6 animate-fade-in bg-slate-50/50 p-5 rounded-2xl border border-slate-200">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSliderForm(null)}
+                          className="text-xs font-bold text-slate-500 hover:text-slate-800 transition"
+                        >
+                          ← {language === 'en' ? 'Back to Slides List' : 'العودة لقائمة الشرائح'}
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <h4 className="text-sm font-bold text-slate-800">
+                          {sliderForm.id
+                            ? (t.carousel_edit_slide || (language === 'ar' ? 'تعديل الشريحة' : 'Edit Slide'))
+                            : (t.carousel_new_slide || (language === 'ar' ? 'إضافة شريحة جديدة' : 'Add New Slide'))}
+                        </h4>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSliderForm(null)}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white"
+                        >
+                          {language === 'en' ? 'Cancel' : 'إلغاء'}
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSavingSlider}
+                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 disabled:opacity-50 shadow-xs"
+                        >
+                          <Save className="h-4 w-4" />
+                          <span>{isSavingSlider ? (language === 'en' ? 'Saving...' : 'جاري الحفظ...') : (language === 'en' ? 'Save Slide' : 'حفظ الشريحة')}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bilingual Text Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      {/* English Fields */}
+                      <div className="p-4 bg-white rounded-xl border border-slate-200/80 space-y-4">
+                        <div className="flex items-center justify-between border-b pb-2">
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                            English Promotional Content
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">LTR</span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            {t.carousel_title_en || 'Headline Title (EN)'} *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Book a DJ"
+                            value={sliderForm.title_en || sliderForm.title || ''}
+                            onChange={e => setSliderForm({ ...sliderForm, title_en: e.target.value, title: e.target.value })}
+                            className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            {t.carousel_subtitle_en || 'Subheading / Description (EN)'}
+                          </label>
+                          <textarea
+                            rows={2}
+                            placeholder="e.g. Premium entertainment for Riyadh and Saudi Arabia"
+                            value={sliderForm.sub_title_en || sliderForm.sub_title || ''}
+                            onChange={e => setSliderForm({ ...sliderForm, sub_title_en: e.target.value, sub_title: e.target.value })}
+                            className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            {t.carousel_btn_en || 'Button Text (EN)'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Book Now"
+                            value={sliderForm.btn_text_en || ''}
+                            onChange={e => setSliderForm({ ...sliderForm, btn_text_en: e.target.value })}
+                            className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Arabic Fields */}
+                      <div className="p-4 bg-white rounded-xl border border-slate-200/80 space-y-4 text-right" dir="rtl">
+                        <div className="flex items-center justify-between border-b pb-2">
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 font-arabic">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            المحتوى الترويجي بالعربية
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">RTL</span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700 font-arabic">
+                            {t.carousel_title_ar || 'العنوان الرئيسي (بالعربية)'} *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="مثال: حجز دي جي وموسيقى حية"
+                            value={sliderForm.title_ar || ''}
+                            onChange={e => setSliderForm({ ...sliderForm, title_ar: e.target.value })}
+                            className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-arabic text-right"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700 font-arabic">
+                            {t.carousel_subtitle_ar || 'الوصف الفرعي (بالعربية)'}
+                          </label>
+                          <textarea
+                            rows={2}
+                            placeholder="مثال: ترفيه متميز للرياض والمملكة العربية السعودية"
+                            value={sliderForm.sub_title_ar || ''}
+                            onChange={e => setSliderForm({ ...sliderForm, sub_title_ar: e.target.value })}
+                            className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-arabic text-right"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700 font-arabic">
+                            {t.carousel_btn_ar || 'نص زر الإجراء (بالعربية)'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="مثال: احجز الآن"
+                            value={sliderForm.btn_text_ar || ''}
+                            onChange={e => setSliderForm({ ...sliderForm, btn_text_ar: e.target.value })}
+                            className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-arabic text-right"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action & Deep Link Configuration */}
+                    <div className="p-4 bg-white rounded-xl border border-slate-200/80 space-y-4">
+                      <div className="flex items-center gap-2 border-b pb-2">
+                        <ArrowUpRight className="h-4 w-4 text-indigo-600" />
+                        <span className="text-xs font-bold text-slate-800">
+                          {t.carousel_action_type || 'Click Action & Deep Link Navigation'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            {t.carousel_action_type || 'Action Type'}
+                          </label>
+                          <select
+                            value={sliderForm.action_type || 'none'}
+                            onChange={e => {
+                              const newType = e.target.value as any;
+                              setSliderForm({
+                                ...sliderForm,
+                                action_type: newType,
+                                action_target: newType === 'none' ? '' : sliderForm.action_target,
+                              });
+                            }}
+                            className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-semibold"
+                          >
+                            <option value="none">{t.carousel_action_none || 'None (Visual Banner Only)'}</option>
+                            <option value="service">{t.carousel_action_service || 'Direct Link to Service'}</option>
+                            <option value="category">{t.carousel_action_category || 'Direct Link to Category'}</option>
+                            <option value="url">{t.carousel_action_url || 'External / Custom URL'}</option>
+                          </select>
+                        </div>
+
+                        {/* Action Target Selector based on Action Type */}
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            {t.carousel_action_target || 'Target Destination'}
+                          </label>
+
+                          {sliderForm.action_type === 'none' && (
+                            <input
+                              type="text"
+                              disabled
+                              value={language === 'en' ? 'No action triggered on tap' : 'لا يوجد إجراء عند النقر'}
+                              className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-slate-100 text-slate-400 italic"
+                            />
+                          )}
+
+                          {sliderForm.action_type === 'service' && (
+                            <select
+                              value={sliderForm.action_target || ''}
+                              onChange={e => setSliderForm({ ...sliderForm, action_target: e.target.value })}
+                              className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-medium"
+                            >
+                              <option value="">{t.carousel_select_service || 'Select a Service...'}</option>
+                              {sliderLookups.services.map((srv: any) => (
+                                <option key={srv.id} value={String(srv.id)}>
+                                  #{srv.id} - {srv.title}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+
+                          {sliderForm.action_type === 'category' && (
+                            <select
+                              value={sliderForm.action_target || ''}
+                              onChange={e => setSliderForm({ ...sliderForm, action_target: e.target.value })}
+                              className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-medium"
+                            >
+                              <option value="">{t.carousel_select_category || 'Select a Category...'}</option>
+                              {sliderLookups.categories.map((cat: any) => (
+                                <option key={cat.id} value={String(cat.id)}>
+                                  #{cat.id} - {cat.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+
+                          {sliderForm.action_type === 'url' && (
+                            <input
+                              type="url"
+                              placeholder="https://example.com/promo"
+                              value={sliderForm.action_target || ''}
+                              onChange={e => setSliderForm({ ...sliderForm, action_target: e.target.value })}
+                              className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Artwork & Background Image Selector */}
+                    <div className="p-4 bg-white rounded-xl border border-slate-200/80 space-y-4">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <div className="flex items-center gap-2">
+                          <ImageIcon className="h-4 w-4 text-indigo-600" />
+                          <span className="text-xs font-bold text-slate-800">
+                            {t.carousel_background_image || 'Slide Artwork & Background Image'} *
+                          </span>
+                        </div>
+
+                        {/* Picker Tabs */}
+                        <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setSliderMediaPickerTab('vault')}
+                            className={`px-3 py-1 rounded-md text-[11px] font-bold transition ${
+                              sliderMediaPickerTab === 'vault' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            {t.carousel_media_vault || 'Media Gallery'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSliderMediaPickerTab('upload')}
+                            className={`px-3 py-1 rounded-md text-[11px] font-bold transition ${
+                              sliderMediaPickerTab === 'upload' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            {t.carousel_upload_image || 'Upload File'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSliderMediaPickerTab('url')}
+                            className={`px-3 py-1 rounded-md text-[11px] font-bold transition ${
+                              sliderMediaPickerTab === 'url' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            {language === 'en' ? 'Asset Path / URL' : 'مسار الصورة / رابط'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Current Artwork Preview */}
+                      <div className="flex flex-col sm:flex-row items-center gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+                        <div className="relative w-44 h-24 rounded-lg overflow-hidden bg-slate-200 shrink-0 border border-slate-300">
+                          {sliderForm.img_url || sliderForm.background_image ? (
+                            <img
+                              src={sliderForm.img_url || (sliderForm.background_image?.startsWith('assets/') ? `http://127.0.0.1:8000/${sliderForm.background_image}` : sliderForm.background_image)}
+                              alt="preview"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold">
+                              {language === 'en' ? 'No Image Selected' : 'لم يتم اختيار صورة'}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex-1 space-y-1 text-xs">
+                          <p className="font-bold text-slate-700">
+                            {language === 'en' ? 'Selected Artwork Reference:' : 'مرجع الصورة المحددة:'}
+                          </p>
+                          <p className="text-[11px] font-mono text-slate-500 break-all bg-white p-1.5 rounded border border-slate-200">
+                            {sliderForm.background_image || (language === 'en' ? 'None' : 'لا يوجد')}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {language === 'en' ? 'Recommended aspect ratio: 16:9 banner format (e.g. 1200x675 px).' : 'النسبة الموصى بها: أبعاد البانر 16:9 (مثلاً 1200×675 بكسل).'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Tab 1: Media Vault Picker */}
+                      {sliderMediaPickerTab === 'vault' && (
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-bold text-slate-600">
+                            {language === 'en' ? 'Select an image from existing media gallery:' : 'اختر صورة من المعرض الحالي:'}
+                          </p>
+                          {mediaGallery.length === 0 ? (
+                            <p className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-lg">
+                              {language === 'en' ? 'No media vault assets loaded yet. Switch to "Upload File" tab to upload a banner image.' : 'لا توجد صور في المعرض. يرجى التبديل لتبويب "رفع ملف" لرفع صورة.'}
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2.5 max-h-48 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200">
+                              {mediaGallery.map(m => {
+                                const isChosen = sliderForm.background_image === String(m.id) || sliderForm.background_image === m.url;
+                                return (
+                                  <div
+                                    key={m.id}
+                                    onClick={() => setSliderForm({
+                                      ...sliderForm,
+                                      background_image: String(m.id),
+                                      img_url: m.url,
+                                    })}
+                                    className={`relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition ${
+                                      isChosen ? 'border-indigo-600 ring-2 ring-indigo-300' : 'border-transparent hover:border-slate-300'
+                                    }`}
+                                  >
+                                    <img src={m.url} alt={m.name} className="w-full h-full object-cover" />
+                                    {isChosen && (
+                                      <div className="absolute inset-0 bg-indigo-600/30 flex items-center justify-center text-white">
+                                        <Check className="h-4 w-4 drop-shadow" />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Tab 2: Upload File Dropzone */}
+                      {sliderMediaPickerTab === 'upload' && (
+                        <div className="space-y-3">
+                          <input
+                            ref={sliderImageInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleUploadSliderFile(file);
+                                e.currentTarget.value = '';
+                              }
+                            }}
+                          />
+                          <div
+                            onClick={() => sliderImageInputRef.current?.click()}
+                            onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+                            onDrop={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const file = e.dataTransfer.files?.[0];
+                              if (file) handleUploadSliderFile(file);
+                            }}
+                            className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 p-6 text-center cursor-pointer hover:bg-slate-50 hover:border-indigo-400 transition"
+                          >
+                            <Upload className={`h-8 w-8 mx-auto mb-2 ${isUploadingSliderImage ? 'animate-bounce text-indigo-600' : 'text-slate-400'}`} />
+                            <p className="text-xs font-bold text-slate-700">
+                              {isUploadingSliderImage
+                                ? (language === 'en' ? 'Uploading and optimizing image...' : 'جاري رفع وتحسين الصورة...')
+                                : (language === 'en' ? 'Click to browse or drop high-resolution artwork here' : 'انقر للتصفح أو اسحب وأفلت صورة البانر هنا')}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              {language === 'en' ? 'Automatically uploaded to secure media storage and attached to slide.' : 'يتم حفظ الملف في مستودع الوسائط المعتمد وربطه بالشريحة.'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tab 3: Custom URL / Asset Path Input */}
+                      {sliderMediaPickerTab === 'url' && (
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            {language === 'en' ? 'Direct Asset Path or Public Image URL' : 'مسار ملف محلي أو رابط ويب للصورة'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="assets/images/app/home/fun_moment_home_hero_01.png or https://..."
+                            value={sliderForm.background_image || ''}
+                            onChange={e => setSliderForm({
+                              ...sliderForm,
+                              background_image: e.target.value,
+                              img_url: e.target.value.startsWith('http') ? e.target.value : `http://127.0.0.1:8000/${e.target.value}`,
+                            })}
+                            className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-mono"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Publishing Status & Order Controls */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-white rounded-xl border border-slate-200/80">
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50">
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">
+                            {t.carousel_status || 'Publishing Status'}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {sliderForm.status === 1
+                              ? (t.carousel_status_active || 'Visible to all users in app')
+                              : (t.carousel_status_inactive || 'Hidden from mobile app')}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSliderForm({ ...sliderForm, status: sliderForm.status === 1 ? 0 : 1 })}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            sliderForm.status === 1 ? 'bg-emerald-600' : 'bg-slate-300'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              sliderForm.status === 1 ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50">
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">
+                            {t.carousel_order || 'Display Sequence Order'}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {language === 'en' ? 'Lower values display first (0, 1, 2...)' : 'القيم الأصغر تظهر أولاً (0، 1، 2...)'}
+                          </p>
+                        </div>
+                        <input
+                          type="number"
+                          min={0}
+                          value={sliderForm.order !== undefined ? sliderForm.order : 0}
+                          onChange={e => setSliderForm({ ...sliderForm, order: Number(e.target.value) })}
+                          className="w-18 text-xs font-bold text-center rounded-lg border border-slate-200 px-2 py-1 bg-white focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Form Action Footer */}
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setSliderForm(null)}
+                        className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white"
+                      >
+                        {language === 'en' ? 'Cancel' : 'إلغاء'}
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingSlider}
+                        className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 disabled:opacity-50 shadow-xs"
+                      >
+                        <Save className="h-4 w-4" />
+                        <span>{isSavingSlider ? (language === 'en' ? 'Saving...' : 'جاري الحفظ...') : (language === 'en' ? 'Save Slide' : 'حفظ الشريحة')}</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
             {/* 1. TAB: BLOGS & TAXONOMY */}
             {activeTab === 'blogs' && (
               <div className="space-y-6">
@@ -2237,6 +3139,101 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                   {/* Public Body Content (Changes depending on Active Workspace Tab) */}
                   <main className="flex-1 p-3 space-y-3.5 bg-slate-50/30">
                     
+                    {/* PREVIEW: Home Carousel & Promotional Sliders */}
+                    {activeTab === 'sliders' && (
+                      <div className="space-y-3 animate-fade-in">
+                        <div className="flex items-center justify-between text-[9px] text-slate-400 border-b pb-1">
+                          <span className="font-bold uppercase tracking-wider text-indigo-600">
+                            {t.carousel_preview || 'Mobile Home Hero Carousel'}
+                          </span>
+                          <span className="font-bold text-slate-500">
+                            {editingLang.toUpperCase()} Preview
+                          </span>
+                        </div>
+
+                        {(() => {
+                          const previewSlide = sliderForm || selectedSlider || sliders[0];
+                          if (!previewSlide) {
+                            return (
+                              <div className="p-6 text-center text-slate-400 text-[10px] bg-slate-100 rounded-xl">
+                                {language === 'en' ? 'No slide selected for preview' : 'لم يتم اختيار شريحة للمعاينة'}
+                              </div>
+                            );
+                          }
+                          const bg = previewSlide.img_url || (previewSlide.background_image?.startsWith('assets/') ? `http://127.0.0.1:8000/${previewSlide.background_image}` : previewSlide.background_image);
+                          const title = editingLang === 'ar' ? (previewSlide.title_ar || previewSlide.title) : (previewSlide.title_en || previewSlide.title);
+                          const sub = editingLang === 'ar' ? (previewSlide.sub_title_ar || previewSlide.sub_title) : (previewSlide.sub_title_en || previewSlide.sub_title);
+                          const btn = editingLang === 'ar' ? (previewSlide.btn_text_ar || 'احجز الآن') : (previewSlide.btn_text_en || 'Book Now');
+
+                          return (
+                            <div className="relative h-44 rounded-2xl overflow-hidden bg-slate-900 shadow-md text-white select-none">
+                              {bg && (
+                                <img
+                                  src={bg}
+                                  alt="preview"
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              )}
+                              {/* Dark energy gradient overlay matching Flutter FMGradients.energyGradient */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
+
+                              {/* Slide content aligned bottom */}
+                              <div className={`absolute inset-0 p-4 flex flex-col justify-end ${editingLang === 'ar' ? 'items-end text-right' : 'items-start text-left'}`} dir={editingLang === 'ar' ? 'rtl' : 'ltr'}>
+                                <h4 className="font-extrabold text-sm text-white leading-tight drop-shadow-sm max-w-[85%]">
+                                  {title || (editingLang === 'ar' ? 'عنوان الشريحة' : 'Slide Title')}
+                                </h4>
+                                <p className="text-[10px] text-fuchsia-300 font-medium mt-1 line-clamp-2 max-w-[80%] leading-relaxed">
+                                  {sub || (editingLang === 'ar' ? 'الوصف الفرعي الترويجي' : 'Promotional Subtitle')}
+                                </p>
+                                <div className="mt-2.5">
+                                  <span className="inline-block rounded-lg bg-gradient-to-r from-fuchsia-600 to-indigo-600 px-3 py-1 text-[10px] font-black text-white shadow-xs">
+                                    {btn}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Slide navigation indicator dots */}
+                              <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1 z-10 pointer-events-none">
+                                {sliders.map((s, idx) => (
+                                  <span
+                                    key={s.id || idx}
+                                    className={`inline-block h-1 rounded-full transition-all ${
+                                      (selectedSlider?.id === s.id || activePreviewSlideIndex === idx)
+                                        ? 'w-4 bg-fuchsia-400'
+                                        : 'w-1 bg-white/40'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Interactive Slide Selector for Preview */}
+                        {sliders.length > 1 && (
+                          <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1">
+                            <span>{language === 'en' ? 'Click slide to preview:' : 'اختر شريحة للمعاينة:'}</span>
+                            <div className="flex gap-1">
+                              {sliders.map((s, i) => (
+                                <button
+                                  key={s.id}
+                                  onClick={() => setSelectedSlider(s)}
+                                  className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                    selectedSlider?.id === s.id ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                  }`}
+                                >
+                                  #{i + 1}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* PREVIEW: Blogs tab */}
                     {activeTab === 'blogs' && selectedBlog && (
                       <div className="space-y-2 animate-fade-in">
@@ -2403,6 +3400,53 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
         </div>
 
       </div>
+
+      {/* Delete Slider Confirmation Modal */}
+      {sliderToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4 animate-scale-in" dir={isRtl ? 'rtl' : 'ltr'}>
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-3 bg-rose-50 rounded-xl">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  {t.carousel_delete_slide || (language === 'ar' ? 'حذف الشريحة' : 'Delete Slide')}
+                </h4>
+                <p className="text-xs text-slate-500">
+                  {language === 'en' ? 'Permanent slide removal' : 'إزالة الشريحة من السلايدر'}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              {t.carousel_delete_confirm || (language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف هذه الشريحة؟ لا يمكن التراجع عن هذا الإجراء.' : 'Are you sure you want to delete this slide? This action cannot be undone.')}
+            </p>
+
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500 space-y-1">
+              <p><span className="font-bold text-slate-700">{language === 'en' ? 'Slide Title:' : 'عنوان الشريحة:'}</span> {sliderToDelete.title_en || sliderToDelete.title}</p>
+              <p className="text-[10px] text-emerald-600 font-medium">✓ {language === 'en' ? 'Shared media files remain safely preserved in the media vault.' : 'تبقى ملفات الوسائط المشتركة محفوظة بأمان في المعرض.'}</p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSliderToDelete(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              >
+                {language === 'en' ? 'Cancel' : 'إلغاء'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSlider}
+                className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 shadow-xs"
+              >
+                {language === 'en' ? 'Delete Slide' : 'تأكيد الحذف'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1749,7 +1749,121 @@ export const LaravelAPI = {
 
     const payload = await response.json();
     return payload?.data ?? [];
-  }
+  },
+
+  // Home Carousel & Sliders Management
+  async getSliders(): Promise<{
+    sliders: import('./types').SliderItem[];
+    lookups: { services: any[]; categories: any[] };
+    counts: { total: number; active: number; inactive: number };
+  }> {
+    const response = await fetch('/admin-home/sliders-json', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load home sliders (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return {
+      sliders: Array.isArray(payload?.sliders) ? payload.sliders : [],
+      lookups: payload?.lookups ?? { services: [], categories: [] },
+      counts: payload?.counts ?? { total: 0, active: 0, inactive: 0 },
+    };
+  },
+
+  async createSlider(payload: Partial<import('./types').SliderItem>): Promise<import('./types').SliderItem> {
+    const response = await fetchWithCsrf('/admin-home/sliders-json', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to create slider (${response.status})`);
+    }
+
+    const res = await response.json();
+    return res?.slider;
+  },
+
+  async updateSlider(id: number, payload: Partial<import('./types').SliderItem>): Promise<import('./types').SliderItem> {
+    const response = await fetchWithCsrf(`/admin-home/sliders-json/${id}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to update slider (${response.status})`);
+    }
+
+    const res = await response.json();
+    return res?.slider;
+  },
+
+  async toggleSliderStatus(id: number, status?: 0 | 1): Promise<import('./types').SliderItem> {
+    const response = await fetchWithCsrf(`/admin-home/sliders-json/${id}/status`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(status !== undefined ? { status } : {}),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to update slider status (${response.status})`);
+    }
+
+    const res = await response.json();
+    return res?.slider;
+  },
+
+  async reorderSliders(orderedIds: number[]): Promise<void> {
+    const response = await fetchWithCsrf('/admin-home/sliders-json/reorder', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ ordered_ids: orderedIds }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to reorder sliders (${response.status})`);
+    }
+  },
+
+  async deleteSlider(id: number): Promise<void> {
+    const response = await fetchWithCsrf(`/admin-home/sliders-json/${id}/delete`, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || `Failed to delete slider (${response.status})`);
+    }
+  },
 };
 
 // CSRF Token Management for authenticated administrative requests

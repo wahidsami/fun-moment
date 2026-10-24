@@ -78,24 +78,80 @@ class ImageUrl {
 
 class SliderDetail {
   SliderDetail({
+    this.id,
     this.backgroundImage,
     this.title,
     this.subTitle,
+    this.titleEn,
+    this.titleAr,
+    this.subTitleEn,
+    this.subTitleAr,
+    this.btnText,
+    this.btnTextEn,
+    this.btnTextAr,
+    this.serviceId,
+    this.actionType = 'none',
+    this.actionTarget,
+    this.order = 0,
+    this.imgUrl,
   });
 
+  int? id;
   String? backgroundImage;
   String? title;
   String? subTitle;
+  String? titleEn;
+  String? titleAr;
+  String? subTitleEn;
+  String? subTitleAr;
+  String? btnText;
+  String? btnTextEn;
+  String? btnTextAr;
+  int? serviceId;
+  String? actionType;
+  String? actionTarget;
+  int? order;
+  String? imgUrl;
 
   factory SliderDetail.fromJson(Map<String, dynamic> json) => SliderDetail(
+        id: json["id"] == null ? null : int.tryParse(json["id"].toString()),
         backgroundImage: json["background_image"]?.toString(),
         title: json["title"]?.toString(),
         subTitle: json["sub_title"]?.toString(),
+        titleEn: json["title_en"]?.toString(),
+        titleAr: json["title_ar"]?.toString(),
+        subTitleEn: json["sub_title_en"]?.toString(),
+        subTitleAr: json["sub_title_ar"]?.toString(),
+        btnText: json["btn_text"]?.toString(),
+        btnTextEn: json["btn_text_en"]?.toString(),
+        btnTextAr: json["btn_text_ar"]?.toString(),
+        serviceId: json["service_id"] == null
+            ? null
+            : int.tryParse(json["service_id"].toString()),
+        actionType: json["action_type"]?.toString() ?? 'none',
+        actionTarget: json["action_target"]?.toString(),
+        order: json["order"] == null
+            ? 0
+            : (int.tryParse(json["order"].toString()) ?? 0),
+        imgUrl: json["img_url"]?.toString(),
       );
 
   Map<String, dynamic> toJson() => {
+        "id": id,
         "background_image": backgroundImage,
         "title": title,
         "sub_title": subTitle,
+        "title_en": titleEn,
+        "title_ar": titleAr,
+        "sub_title_en": subTitleEn,
+        "sub_title_ar": subTitleAr,
+        "btn_text": btnText,
+        "btn_text_en": btnTextEn,
+        "btn_text_ar": btnTextAr,
+        "service_id": serviceId,
+        "action_type": actionType,
+        "action_target": actionTarget,
+        "order": order,
+        "img_url": imgUrl,
       };
 }

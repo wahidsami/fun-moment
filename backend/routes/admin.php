@@ -102,6 +102,14 @@ Route::middleware(['setlang'])->group(function(){
     Route::post('/cms-media/{id}/delete', 'AdminCmsController@apiDeleteMedia')->name('admin.cms.media.delete.api');
     Route::post('/cms-media/{id}/alt', 'AdminCmsController@apiUpdateMediaAlt')->name('admin.cms.media.alt.api');
 
+    // Sliders / Home Carousel API routes for React Admin
+    Route::get('/sliders-json', 'AdminSliderApiController@index')->name('admin.sliders.api');
+    Route::post('/sliders-json', 'AdminSliderApiController@store')->name('admin.sliders.store.api');
+    Route::post('/sliders-json/reorder', 'AdminSliderApiController@reorder')->name('admin.sliders.reorder.api');
+    Route::post('/sliders-json/{id}', 'AdminSliderApiController@update')->name('admin.sliders.update.api');
+    Route::post('/sliders-json/{id}/status', 'AdminSliderApiController@updateStatus')->name('admin.sliders.status.api');
+    Route::post('/sliders-json/{id}/delete', 'AdminSliderApiController@destroy')->name('admin.sliders.delete.api');
+
     // Legal & Terms API routes for React Admin
     Route::get('/legal-terms', 'AdminLegalTermsController@index')->name('admin.legal.terms.index');
     Route::post('/legal-terms/{id}/draft', 'AdminLegalTermsController@updateDraft')->name('admin.legal.terms.draft');
