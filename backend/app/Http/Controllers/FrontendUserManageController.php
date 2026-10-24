@@ -47,6 +47,7 @@ use App\ReportChatMessage;
 use App\OrderCompleteDecline;
 use App\Actions\Media\MediaHelper;
 use Illuminate\Support\Str;
+use App\Services\User\UserDeletionService;
 use Modules\Subscription\Entities\SellerSubscription;
 use Modules\Subscription\Entities\SubscriptionHistory;
 use Modules\JobPost\Entities\BuyerJob;
@@ -62,7 +63,13 @@ class FrontendUserManageController extends Controller
     {
         $this->middleware('auth:admin');
         $this->middleware('permission:user-list|user-create|user-edit|user-delete',['only' => ['all_user', 'apiUsers', 'apiUpdateUserStatus', 'apiUpdateUserBalance', 'apiVerifySeller', 'apiGetVerification']]);
-        $this->middleware('permission:user-delete',['only' => ['bulk_action','new_user_delete']]);
+        $this->middleware('permission:user-delete',['only' => [
+            'bulk_action',
+            'userDelete',
+            'deletePreview',
+            'apiDeletePreview',
+            'apiDeleteUser',
+        ]]);
     }
 
     public function apiUsers(Request $request): JsonResponse
@@ -575,7 +582,14 @@ class FrontendUserManageController extends Controller
                                 </a>';
                     $admin = auth()->guard('admin')->user();
                     if ($admin->can('user-delete')){
-                        $action .= General::deletePopover(route('admin.frontend.user.delete',$row->id));
+                        $action .= '<a href="#"
+                                       class="btn btn-danger btn-sm mb-3 mr-1 review_delete_user_btn"
+                                       data-id="'.$row->id.'"
+                                       data-name="'.e($row->name).'"
+                                       data-email="'.e($row->email).'"
+                                       title="'.__('Review & Delete').'">
+                                        <i class="ti-trash"></i>
+                                    </a>';
                     }
                     if ($admin->can('email-verify-code')){
                         $action .= '<a href="#"
@@ -784,121 +798,159 @@ class FrontendUserManageController extends Controller
         return redirect()->back()->with(FlashMsg::item_new('Status change success--'));
     }
 
-    public function userDelete($id=null)
+    public function deletePreview($id)
     {
+        $user = User::findOrFail($id);
+        $service = app(UserDeletionService::class);
+        $preview = $service->buildImpactPreview($user);
 
-        $user_info = User::find($id);
+        return response()->json([
+            'status' => 'success',
+            'preview' => $preview,
+        ]);
+    }
 
-        //delete user related data
-        if($user_info){
-            $user_column = $user_info->user_type === 0 ? "seller_id" : "buyer_id";
-        }else{
-            return redirect()->back()->with(FlashMsg::item_delete('User not found--'));
-        }
+    public function apiDeletePreview($id): JsonResponse
+    {
+        $user = User::findOrFail($id);
+        $service = app(UserDeletionService::class);
+        $preview = $service->buildImpactPreview($user);
 
-        //check user type
-        if($user_info->user_type === 0){
-            //delete seller related data
-            //delete user service
-            $services = Service::where("seller_id",$user_info->id)->delete();
-            //delete payout history
-            PayoutRequest::where("seller_id",$user_info->id)->delete();
-            
-            //delete subscription
-            if(moduleExists("Subscription")){
-                SubscriptionHistory::where('seller_id',$user_info->id)->delete();
-                SellerSubscription::where('seller_id',$user_info->id)->delete();
-            }
-            
-            //schedule
-            Schedule::where("seller_id",$user_info->id)->delete();
-            SellerVerify::where("seller_id",$user_info->id)->delete();
-            Servicebenifit::where("seller_id",$user_info->id)->delete();
-            Serviceadditional::where("seller_id",$user_info->id)->delete();
-            Serviceinclude::where("seller_id",$user_info->id)->delete();
-            ServiceCoupon::where("seller_id",$user_info->id)->delete();
-            OnlineServiceFaq::where("seller_id",$user_info->id)->delete();
-            EditServiceHistory::where("seller_id",$user_info->id)->delete();
-            Day::where("seller_id",$user_info->id)->delete();
-        
-        
-        }else{
-            //delete buyer related data
-            if(moduleExists("JobPost")){
-                $jobs = BuyerJob::where('buyer_id',$user_info->id)->get();
-                foreach($jobs as $job){
-                    JobRequest::where('job_post_id',$job->id)->delete();
-                    $job->delete();
-                }
-            }
-            //delete jobs
-        }
-        
-        
-        
-        $media_uploads = MediaUpload::where(["user_id" => $user_info->id,"type" => "web"])->get();
-        foreach($media_uploads as $media){
-            //delete media uploader records 
-            MediaHelper::delete_user_media_image($media->id);
-            $media->delete();
-        }
-        
-        
-        //report
-        Accountdeactive::where("user_id",$user_info->id)->delete();
+        return response()->json([
+            'status' => 'success',
+            'preview' => $preview,
+        ]);
+    }
 
-        
-        // Wallet
-         if(moduleExists("Wallet")){
-                $wallet = Wallet::where('buyer_id',$user_info->id)->delete();
-                WalletHistory::where('buyer_id',$user_info->id)->delete();
-            }
-        
-        //delete order
-        $orders = Order::where($user_column,$user_info->id)->get();
-        foreach($orders as $order){
-            OrderAdditional::where("order_id",$order->id)->delete();
-            OrderCompleteDecline::where("order_id",$order->id)->delete();
-            ExtraService::where("order_id",$order->id)->delete();
-            $reports = Report::where($user_column,$user_info->id)->get();
-            foreach($reports as $report){
-                ReportChatMessage::where("report_id",$order->id)->delete();
-                $report->delete();
-            }
-            $order->delete();
-        }
-        
-        //review 
-        Review::where($user_column,$user_info->id)->delete();
-        ToDoList::where("user_id",$user_info->id)->delete();
-       
-        
-       //delete support ticket
-        $support_tickets =  SupportTicket::where($user_column,$user_info->id)->get();
-        foreach($support_tickets as $ticket){
-             //delete support ticket messages
-            SupportTicketMessage::where("support_ticket_id",$ticket->id)->delete();
-            $ticket->delete();
+    public function userDelete(Request $request, $id = null)
+    {
+        $user = User::find($id);
+        if (!$user) {
+            return redirect()->back()->with(FlashMsg::item_delete(__('User not found')));
         }
 
-        //delete live chat records
-        //LiveChat
-         if(moduleExists("LiveChat")){
-            $wallet = LiveChatMessage::where($user_column,$user_info->id)->delete();
+        $adminId = (int) (Auth::guard('admin')->id() ?? 1);
+        $confirmEmail = $request->input('confirm_email');
+
+        try {
+            $service = app(UserDeletionService::class);
+            $result = $service->executeDeletion($user, $adminId, $confirmEmail);
+
+            return redirect()->back()->with(FlashMsg::item_new($result['message']));
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()->with(FlashMsg::item_delete($e->getMessage()));
+        } catch (\RuntimeException $e) {
+            return redirect()->back()->with(FlashMsg::item_delete($e->getMessage()));
+        } catch (\Throwable $e) {
+            Log::error('User deletion failed: ' . $e->getMessage());
+            return redirect()->back()->with(FlashMsg::item_delete(__('Deletion failed: ') . $e->getMessage()));
         }
-        
-        
-        $user_info->delete();
-        return redirect()->back()->with(FlashMsg::item_new('User delete success--'));
+    }
+
+    public function apiDeleteUser(Request $request, $id): JsonResponse
+    {
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => __('User not found'),
+            ], 404);
+        }
+
+        $adminId = (int) (Auth::guard('admin')->id() ?? 1);
+        $confirmEmail = $request->input('confirm_email');
+
+        try {
+            $service = app(UserDeletionService::class);
+            $result = $service->executeDeletion($user, $adminId, $confirmEmail);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $result['message'],
+                'result' => $result,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 400);
+        } catch (\Throwable $e) {
+            Log::error('API user deletion failed: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => __('Deletion failed: ') . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function bulk_action(Request $request)
     {
-        $all = User::find($request->ids);
-        foreach ($all as $item) {
-            $item->delete();
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'integer',
+        ]);
+
+        $adminId = (int) (Auth::guard('admin')->id() ?? 1);
+        $service = app(UserDeletionService::class);
+
+        $processed = [];
+        $blocked = [];
+        $errors = [];
+
+        foreach ($request->ids as $id) {
+            $user = User::find($id);
+            if (!$user) {
+                continue;
+            }
+
+            // Calculate independent impact preview for each account
+            $preview = $service->buildImpactPreview($user);
+            if (!$preview['can_delete']) {
+                $blocked[] = [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'reasons' => $preview['blocking_reasons'],
+                ];
+                continue;
+            }
+
+            try {
+                // Execute deletion safely through the domain service without blind CASCADE
+                $result = $service->executeDeletion($user, $adminId, null);
+                $processed[] = [
+                    'id' => $id,
+                    'name' => $user->name,
+                    'mode' => $result['mode'],
+                    'released_email' => $result['released_email'],
+                ];
+            } catch (\Throwable $e) {
+                $errors[] = [
+                    'id' => $id,
+                    'name' => $user->name,
+                    'error' => $e->getMessage(),
+                ];
+            }
         }
-        return response()->json(['status' => 'ok']);
+
+        $status = count($errors) > 0 ? 'warning' : (count($blocked) > 0 ? 'partial' : 'ok');
+
+        return response()->json([
+            'status' => $status,
+            'message' => __('Bulk operation completed. Processed: :processed, Blocked: :blocked, Errors: :errors', [
+                'processed' => count($processed),
+                'blocked' => count($blocked),
+                'errors' => count($errors),
+            ]),
+            'processed' => $processed,
+            'blocked' => $blocked,
+            'errors' => $errors,
+        ]);
     }
 
     public function email_verify_code($id=null){

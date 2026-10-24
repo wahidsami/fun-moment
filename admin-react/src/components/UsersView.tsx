@@ -95,6 +95,14 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
   const [editingBalanceUser, setEditingBalanceUser] = useState<User | null>(null);
   const [newBalance, setNewBalance] = useState<string>('');
 
+  // Delete User Impact Preview
+  const [deleteTargetUser, setDeleteTargetUser] = useState<User | null>(null);
+  const [deletePreview, setDeletePreview] = useState<any | null>(null);
+  const [loadingDeletePreview, setLoadingDeletePreview] = useState(false);
+  const [confirmEmailInput, setConfirmEmailInput] = useState('');
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   // Admin and permission controls
   const [adminUsers, setAdminUsers] = useState<AdminAccount[]>([]);
   const [adminRoles, setAdminRoles] = useState<AdminRoleRecord[]>([]);
@@ -407,6 +415,39 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
+  const handleOpenDeleteModal = async (user: User) => {
+    setDeleteTargetUser(user);
+    setDeletePreview(null);
+    setDeleteError(null);
+    setConfirmEmailInput('');
+    setLoadingDeletePreview(true);
+    try {
+      const preview = await LaravelAPI.getUserDeletePreview(user.id);
+      setDeletePreview(preview);
+    } catch (err: any) {
+      setDeleteError(err?.message || 'Failed to calculate deletion impact preview.');
+    } finally {
+      setLoadingDeletePreview(false);
+    }
+  };
+
+  const handleExecuteDelete = async () => {
+    if (!deleteTargetUser) return;
+    setIsDeletingUser(true);
+    setDeleteError(null);
+    try {
+      const res = await LaravelAPI.deleteUser(deleteTargetUser.id, confirmEmailInput);
+      showSuccess(res?.message || `Account #${deleteTargetUser.id} deleted successfully. Email released.`);
+      setDeleteTargetUser(null);
+      setDeletePreview(null);
+      await loadUsers();
+    } catch (err: any) {
+      setDeleteError(err?.message || 'Account deletion failed.');
+    } finally {
+      setIsDeletingUser(false);
+    }
+  };
+
   // Filter lists
   const sellersList = users.filter(u => u.role === 'seller');
   const buyersList = users.filter(u => u.role === 'buyer');
@@ -612,6 +653,15 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                                 </button>
                               )
                             )}
+                            {hasPermission && (
+                              <button
+                                onClick={() => handleOpenDeleteModal(user)}
+                                className="rounded p-1 text-rose-600 hover:bg-rose-50"
+                                title={language === 'en' ? 'Review & Delete Seller' : 'مراجعة وحذف حساب المزود'}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -681,13 +731,24 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => setSelectedBuyerId(user.id)}
-                            className="rounded bg-slate-100 p-1 text-slate-600 hover:bg-slate-200"
-                            title="Inspect Buyer Logs"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => setSelectedBuyerId(user.id)}
+                              className="rounded bg-slate-100 p-1 text-slate-600 hover:bg-slate-200"
+                              title="Inspect Buyer Logs"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            {hasPermission && (
+                              <button
+                                onClick={() => handleOpenDeleteModal(user)}
+                                className="rounded p-1 text-rose-600 hover:bg-rose-50"
+                                title={language === 'en' ? 'Review & Delete Buyer' : 'مراجعة وحذف حساب العميل'}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1237,6 +1298,207 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                 className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
               >
                 {t.save}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ======================= USER DELETION IMPACT PREVIEW MODAL ======================= */}
+      {deleteTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl animate-scale-in max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-rose-100 p-2 text-rose-600">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">
+                    {language === 'en' ? 'Review & Delete User Account' : 'مراجعة وحذف حساب المستخدم'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {language === 'en' ? 'Server-side dependency analysis and safe email release' : 'تحليل التبعيات من الخادم وتحرير البريد الإلكتروني بأمان'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setDeleteTargetUser(null);
+                  setDeletePreview(null);
+                  setDeleteError(null);
+                }}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="overflow-y-auto p-6 space-y-4 flex-1">
+              {loadingDeletePreview && (
+                <div className="py-12 text-center space-y-3">
+                  <RefreshCcw className="h-8 w-8 animate-spin mx-auto text-indigo-600" />
+                  <p className="text-xs text-slate-500 font-medium">
+                    {language === 'en' ? 'Calculating account dependencies & financial ledgers...' : 'جارٍ فحص التبعيات والقيود المالية...'}
+                  </p>
+                </div>
+              )}
+
+              {deleteError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 flex items-start gap-2">
+                  <ShieldAlert className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{deleteError}</span>
+                </div>
+              )}
+
+              {!loadingDeletePreview && deletePreview && (
+                <div className="space-y-4">
+                  {/* Account Summary Card */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-bold text-slate-800 text-sm">{deletePreview.account.name}</div>
+                      <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                        deletePreview.account.role === 'seller' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'
+                      }`}>
+                        {deletePreview.account.role.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                      <div><span className="text-slate-400">ID:</span> #{deletePreview.account.id}</div>
+                      <div><span className="text-slate-400">Username:</span> {deletePreview.account.username}</div>
+                      <div className="col-span-2">
+                        <span className="text-slate-400">Email:</span> <span className="font-semibold text-slate-900">{deletePreview.account.email}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">Deletion Mode:</span>{' '}
+                        <span className={`font-bold ${deletePreview.deletion_mode === 'purge' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {deletePreview.deletion_mode === 'purge' ? 'Clean Purge' : 'Anonymize & Retain Ledgers'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">Email Release:</span>{' '}
+                        <span className="text-emerald-600 font-bold">Immediate</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Blocking Alerts */}
+                  {!deletePreview.can_delete && deletePreview.blocking_reasons?.length > 0 && (
+                    <div className="rounded-xl border border-rose-300 bg-rose-50 p-4">
+                      <div className="flex items-center gap-2 text-rose-800 font-bold text-xs mb-1">
+                        <ShieldAlert className="h-4 w-4 text-rose-600" />
+                        {language === 'en' ? 'Deletion Blocked: Unresolved Obligations' : 'الحذف محظور: توجد التزامات نشطة معلقة'}
+                      </div>
+                      <ul className="list-disc list-inside text-xs text-rose-700 space-y-1 mt-1">
+                        {deletePreview.blocking_reasons.map((reason: string, i: number) => (
+                          <li key={i}>{reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Metrics Cards */}
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                      <div className="text-[10px] text-slate-400 uppercase">Services</div>
+                      <div className="text-base font-bold text-slate-800">{deletePreview.counts?.services_count ?? 0}</div>
+                      <div className="text-[10px] text-slate-400">Unpublished</div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                      <div className="text-[10px] text-slate-400 uppercase">Active Orders</div>
+                      <div className={`text-base font-bold ${deletePreview.counts?.active_orders_count > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                        {deletePreview.counts?.active_orders_count ?? 0}
+                      </div>
+                      <div className="text-[10px] text-slate-400">Blocker &gt; 0</div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                      <div className="text-[10px] text-slate-400 uppercase">Balance</div>
+                      <div className={`text-base font-bold ${deletePreview.counts?.wallet_balance > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
+                        {deletePreview.counts?.wallet_balance ?? 0}
+                      </div>
+                      <div className="text-[10px] text-slate-400">SAR</div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                      <div className="text-[10px] text-slate-400 uppercase">Retained Records</div>
+                      <div className="text-base font-bold text-slate-800">
+                        {(deletePreview.counts?.retained_orders_count ?? 0) + (deletePreview.counts?.wallet_history_count ?? 0)}
+                      </div>
+                      <div className="text-[10px] text-slate-400">Ledgers</div>
+                    </div>
+                  </div>
+
+                  {/* Impact Breakdown */}
+                  <div className="space-y-3 text-xs">
+                    <div className="rounded-lg border border-slate-100 p-3 bg-slate-50/40">
+                      <div className="font-bold text-slate-700 mb-1">Permanently Deleted:</div>
+                      <ul className="list-disc list-inside text-slate-500 space-y-0.5">
+                        {deletePreview.breakdown?.permanently_deleted?.map((item: string, i: number) => (
+                          <li key={i}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {deletePreview.breakdown?.retained_records?.length > 0 && (
+                      <div className="rounded-lg border border-slate-100 p-3 bg-slate-50/40">
+                        <div className="font-bold text-slate-700 mb-1">Retained For Financial & Legal Integrity:</div>
+                        <ul className="list-disc list-inside text-slate-500 space-y-0.5">
+                          {deletePreview.breakdown?.retained_records?.map((item: string, i: number) => (
+                            <li key={i}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Email Confirmation Input */}
+                  {deletePreview.can_delete && (
+                    <div className="rounded-xl border border-slate-200 p-3 space-y-2 bg-amber-50/30">
+                      <label className="text-xs font-semibold text-slate-700 block">
+                        {language === 'en' ? 'Type the exact target email to unlock deletion:' : 'اكتب البريد الإلكتروني للمستخدم لتأكيد الحذف:'}
+                        <span className="font-bold text-rose-600 ml-1.5">{deletePreview.account.email}</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={confirmEmailInput}
+                        onChange={(e) => setConfirmEmailInput(e.target.value)}
+                        placeholder={deletePreview.account.email}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs outline-hidden focus:border-rose-500 bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-6 py-3 bg-slate-50/50">
+              <button
+                onClick={() => {
+                  setDeleteTargetUser(null);
+                  setDeletePreview(null);
+                  setDeleteError(null);
+                }}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                {t.cancel}
+              </button>
+              <button
+                disabled={
+                  !deletePreview ||
+                  !deletePreview.can_delete ||
+                  isDeletingUser ||
+                  confirmEmailInput.trim().toLowerCase() !== (deletePreview?.account?.email || '').trim().toLowerCase()
+                }
+                onClick={handleExecuteDelete}
+                className="rounded-lg bg-rose-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {isDeletingUser && <RefreshCcw className="h-3 w-3 animate-spin" />}
+                <span>
+                  {deletePreview?.can_delete
+                    ? (language === 'en' ? 'Confirm & Execute Deletion' : 'تأكيد وتنفيذ الحذف')
+                    : (language === 'en' ? 'Deletion Blocked' : 'الحذف محظور')}
+                </span>
               </button>
             </div>
           </div>

@@ -23,6 +23,8 @@ Route::middleware(['setlang'])->group(function(){
     Route::post('/frontend-users/{id}/balance', 'FrontendUserManageController@apiUpdateUserBalance')->name('admin.frontend.users.balance.api');
     Route::post('/frontend-users/{id}/verify', 'FrontendUserManageController@apiVerifySeller')->name('admin.frontend.users.verify.api');
     Route::get('/frontend-users/{id}/verification', 'FrontendUserManageController@apiGetVerification')->name('admin.frontend.users.verification.api');
+    Route::get('/frontend-users/{id}/delete-preview', 'FrontendUserManageController@apiDeletePreview')->name('admin.frontend.users.delete_preview.api');
+    Route::post('/frontend-users/{id}/delete', 'FrontendUserManageController@apiDeleteUser')->name('admin.frontend.users.delete.api');
     Route::get('/verification-documents/{sellerId}/{type}', 'VerificationDocumentController@streamAdmin')->name('admin.verification.document');
     Route::get('/admin-directory', 'AdminRoleManageController@apiDirectory')->name('admin.directory.api');
     Route::get('/services-json', 'ServiceController@apiServices')->name('admin.services.api');
@@ -687,6 +689,7 @@ Route::group(['prefix' => 'page-builder','middleware' => 'auth:admin','setlang']
     //Frontend User  management    
     Route::get('/frontend/all-user','FrontendUserManageController@all_user')->name('admin.all.frontend.user');
     Route::post('/frontend/change-user-status/{id}','FrontendUserManageController@userStatus')->name('admin.frontend.user.status');
+    Route::get('/frontend/delete-preview/{id}','FrontendUserManageController@deletePreview')->name('admin.frontend.user.delete.preview');
     Route::post('/frontend/delete-user/{id}','FrontendUserManageController@userDelete')->name('admin.frontend.user.delete');
     Route::post('/frontend/all-user/bulk-action','FrontendUserManageController@bulk_action')->name('admin.all.frontend.user.bulk.action');
     Route::get('/frontend/all-user/email-verify-code/{id?}','FrontendUserManageController@email_verify_code')->name('admin.frontend.user.email.verify.code');

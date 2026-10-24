@@ -215,6 +215,145 @@
                 </form>
             </div>
         </div>
+    <!-- User Deletion Impact Preview Modal -->
+    <div class="modal fade" id="delete_user_impact_modal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title text-danger">
+                        <i class="ti-trash mr-1"></i> {{__('Review & Delete User Account')}}
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form id="delete_user_confirmed_form" method="POST" action="">
+                    @csrf
+                    <div class="modal-body">
+                        <!-- Loading State -->
+                        <div id="delete_modal_loading" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="sr-only">{{__('Loading impact analysis...')}}</span>
+                            </div>
+                            <p class="mt-2 text-muted">{{__('Calculating account dependencies and deletion impact...')}}</p>
+                        </div>
+
+                        <!-- Content State -->
+                        <div id="delete_modal_content" style="display:none;">
+                            <!-- Account Identity Card -->
+                            <div class="card mb-3 border-secondary">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0 font-weight-bold" id="preview_user_name_badge"></h6>
+                                        <span class="badge" id="preview_user_role_badge"></span>
+                                    </div>
+                                    <div class="row text-sm">
+                                        <div class="col-md-6">
+                                            <strong>{{__('User ID:')}}</strong> <span id="preview_user_id"></span><br>
+                                            <strong>{{__('Username:')}}</strong> <span id="preview_user_username"></span><br>
+                                            <strong>{{__('Email:')}}</strong> <span id="preview_user_email" class="text-primary font-weight-bold"></span>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>{{__('Status:')}}</strong> <span id="preview_user_status"></span><br>
+                                            <strong>{{__('Email Release:')}}</strong> <span class="badge badge-success">{{__('Released on Deletion')}}</span><br>
+                                            <strong>{{__('Deletion Mode:')}}</strong> <span id="preview_deletion_mode_badge"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Blocking Alert Box (when deletion is not permitted) -->
+                            <div id="delete_modal_blockers_box" class="alert alert-danger" style="display:none;">
+                                <h6 class="alert-heading font-weight-bold mb-1">
+                                    <i class="ti-close mr-1"></i> {{__('Deletion Blocked: Unresolved Obligations')}}
+                                </h6>
+                                <p class="mb-1 text-sm">{{__('This account cannot be deleted until the following obligations are settled:')}}</p>
+                                <ul id="delete_modal_blockers_list" class="mb-0 pl-3 text-sm"></ul>
+                            </div>
+
+                            <!-- Metrics Summary Cards -->
+                            <div class="row mb-3">
+                                <div class="col-6 col-md-3 mb-2">
+                                    <div class="p-2 border rounded text-center bg-light">
+                                        <div class="text-xs text-muted text-uppercase">{{__('Services')}}</div>
+                                        <div class="h5 mb-0 font-weight-bold text-dark" id="preview_count_services">0</div>
+                                        <small class="text-muted">{{__('Unpublished')}}</small>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3 mb-2">
+                                    <div class="p-2 border rounded text-center bg-light">
+                                        <div class="text-xs text-muted text-uppercase">{{__('Active Orders')}}</div>
+                                        <div class="h5 mb-0 font-weight-bold text-danger" id="preview_count_active_orders">0</div>
+                                        <small class="text-muted">{{__('Blocker if > 0')}}</small>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3 mb-2">
+                                    <div class="p-2 border rounded text-center bg-light">
+                                        <div class="text-xs text-muted text-uppercase">{{__('Wallet Balance')}}</div>
+                                        <div class="h5 mb-0 font-weight-bold text-warning" id="preview_count_balance">0.00</div>
+                                        <small class="text-muted">{{__('Blocker if > 0')}}</small>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3 mb-2">
+                                    <div class="p-2 border rounded text-center bg-light">
+                                        <div class="text-xs text-muted text-uppercase">{{__('Retained History')}}</div>
+                                        <div class="h5 mb-0 font-weight-bold text-info" id="preview_count_retained">0</div>
+                                        <small class="text-muted">{{__('Ledgers/Invoices')}}</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Detailed Impact Tabs / Sections -->
+                            <div class="card mb-3">
+                                <div class="card-header bg-white py-2">
+                                    <ul class="nav nav-pills card-header-pills text-sm" id="impact_tabs" role="tablist">
+                                        <li class="nav-item">
+                                            <a class="nav-link active py-1 px-2" id="tab-deleted-link" data-toggle="pill" href="#tab-deleted">{{__('Permanently Deleted')}}</a>
+                                        </li>
+                                        <li class="nav-item">
+                                            <a class="nav-link py-1 px-2" id="tab-retained-link" data-toggle="pill" href="#tab-retained">{{__('Retained Integrity')}}</a>
+                                        </li>
+                                        <li class="nav-item">
+                                            <a class="nav-link py-1 px-2" id="tab-anonymized-link" data-toggle="pill" href="#tab-anonymized">{{__('Anonymized Fields')}}</a>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="tab-content" id="impact_tab_content">
+                                        <div class="tab-pane fade show active text-sm" id="tab-deleted">
+                                            <ul id="preview_list_deleted" class="mb-0 pl-3 text-muted"></ul>
+                                        </div>
+                                        <div class="tab-pane fade text-sm" id="tab-retained">
+                                            <ul id="preview_list_retained" class="mb-0 pl-3 text-muted"></ul>
+                                        </div>
+                                        <div class="tab-pane fade text-sm" id="tab-anonymized">
+                                            <ul id="preview_list_anonymized" class="mb-0 pl-3 text-muted"></ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Target Confirmation Input (Only when can_delete is true) -->
+                            <div id="delete_modal_confirm_wrapper">
+                                <div class="form-group mb-2">
+                                    <label for="confirm_delete_email_input" class="font-weight-bold text-sm">
+                                        {{__('To prevent accidental deletion, type the account email address to confirm:')}}
+                                        <span class="text-danger ml-1" id="delete_target_expected_email"></span>
+                                    </label>
+                                    <input type="text" class="form-control" id="confirm_delete_email_input" name="confirm_email" autocomplete="off" placeholder="{{__('Type email here to unlock deletion')}}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2">
+                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">{{__('Cancel')}}</button>
+                        <button type="submit" id="confirm_delete_submit_btn" class="btn btn-danger btn-sm" disabled>
+                            <i class="ti-trash mr-1"></i> {{__('Confirm & Execute Deletion')}}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 <x-media.markup/>
 @endsection
@@ -376,11 +515,135 @@
                             ids: allIds
                         },
                         success:function (data) {
-                            location.reload();
+                            if (data.blocked && data.blocked.length > 0) {
+                                let blockedMsg = data.message + "\n\n" + data.blocked.map(function(b) {
+                                    return b.name + ' (' + b.email + '): ' + b.reasons.join(', ');
+                                }).join("\n");
+                                Swal.fire({
+                                    title: "{{__('Bulk Action Notice')}}",
+                                    text: blockedMsg,
+                                    icon: "warning"
+                                }).then(function() { location.reload(); });
+                            } else {
+                                location.reload();
+                            }
+                        },
+                        error: function(err) {
+                            Swal.fire({
+                                title: "{{__('Error')}}",
+                                text: err.responseJSON ? err.responseJSON.message : "{{__('Bulk operation failed')}}",
+                                icon: "error"
+                            });
                         }
                     });
                 }
 
+            });
+
+            var currentDeleteExpectedEmail = '';
+
+            $(document).on('click', '.review_delete_user_btn', function(e) {
+                e.preventDefault();
+                var btn = $(this);
+                var userId = btn.data('id');
+
+                var modal = $('#delete_user_impact_modal');
+                var form = $('#delete_user_confirmed_form');
+                form.attr('action', "{{ url('/admin-home/frontend/delete-user') }}/" + userId);
+
+                $('#delete_modal_loading').show();
+                $('#delete_modal_content').hide();
+                $('#confirm_delete_email_input').val('');
+                $('#confirm_delete_submit_btn').prop('disabled', true);
+                modal.modal('show');
+
+                $.ajax({
+                    url: "{{ url('/admin-home/frontend/delete-preview') }}/" + userId,
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.status !== 'success' || !res.preview) {
+                            Swal.fire("{{__('Error')}}", "{{__('Failed to calculate deletion impact.')}}", 'error');
+                            modal.modal('hide');
+                            return;
+                        }
+
+                        var p = res.preview;
+                        var acc = p.account;
+                        currentDeleteExpectedEmail = (acc.email || '').trim().toLowerCase();
+
+                        $('#preview_user_name_badge').text(acc.name);
+                        $('#preview_user_id').text('#' + acc.id);
+                        $('#preview_user_username').text(acc.username);
+                        $('#preview_user_email').text(acc.email);
+                        $('#delete_target_expected_email').text(acc.email);
+                        $('#preview_user_status').html(acc.status === 'active' ? '<span class="badge badge-success">{{__("Active")}}</span>' : '<span class="badge badge-secondary">{{__("Inactive")}}</span>');
+
+                        var roleBadgeClass = acc.role === 'seller' ? 'badge-primary' : 'badge-info';
+                        $('#preview_user_role_badge').attr('class', 'badge ' + roleBadgeClass).text(acc.role.toUpperCase() + (acc.seller_type !== 'n/a' ? ' (' + acc.seller_type + ')' : ''));
+
+                        if (p.deletion_mode === 'purge') {
+                            $('#preview_deletion_mode_badge').html('<span class="badge badge-success"><i class="ti-check"></i> {{__("Clean Purge")}}</span>');
+                        } else {
+                            $('#preview_deletion_mode_badge').html('<span class="badge badge-warning"><i class="ti-shield"></i> {{__("Anonymize & Retain Ledgers")}}</span>');
+                        }
+
+                        $('#preview_count_services').text(p.counts.services_count || 0);
+                        $('#preview_count_active_orders').text(p.counts.active_orders_count || 0);
+                        $('#preview_count_balance').text((p.counts.wallet_balance || 0).toFixed(2));
+                        $('#preview_count_retained').text((p.counts.retained_orders_count || 0) + (p.counts.wallet_history_count || 0));
+
+                        // Blockers
+                        if (!p.can_delete && p.blocking_reasons && p.blocking_reasons.length > 0) {
+                            var bList = $('#delete_modal_blockers_list');
+                            bList.empty();
+                            $.each(p.blocking_reasons, function(i, reason) {
+                                bList.append('<li>' + reason + '</li>');
+                            });
+                            $('#delete_modal_blockers_box').show();
+                            $('#delete_modal_confirm_wrapper').hide();
+                            $('#confirm_delete_submit_btn').prop('disabled', true).text("{{__('Deletion Blocked')}}");
+                        } else {
+                            $('#delete_modal_blockers_box').hide();
+                            $('#delete_modal_confirm_wrapper').show();
+                            $('#confirm_delete_submit_btn').prop('disabled', true).html('<i class="ti-trash mr-1"></i> {{__("Confirm & Execute Deletion")}}');
+                        }
+
+                        // Lists
+                        var populateList = function(listId, items) {
+                            var el = $(listId).empty();
+                            if (!items || items.length === 0) {
+                                el.append('<li class="text-muted font-italic">{{__("None")}}</li>');
+                            } else {
+                                $.each(items, function(i, item) {
+                                    el.append('<li>' + item + '</li>');
+                                });
+                            }
+                        };
+
+                        populateList('#preview_list_deleted', p.breakdown.permanently_deleted);
+                        populateList('#preview_list_retained', p.breakdown.retained_records);
+                        populateList('#preview_list_anonymized', p.breakdown.anonymized_fields);
+
+                        $('#delete_modal_loading').hide();
+                        $('#delete_modal_content').show();
+                    },
+                    error: function(err) {
+                        $('#delete_modal_loading').hide();
+                        Swal.fire("{{__('Error')}}", "{{__('Failed to fetch impact preview.')}}", 'error');
+                        modal.modal('hide');
+                    }
+                });
+            });
+
+            // Unlock submit button only when typed email matches target email
+            $(document).on('input keyup paste', '#confirm_delete_email_input', function() {
+                var typed = $(this).val().trim().toLowerCase();
+                if (currentDeleteExpectedEmail && typed === currentDeleteExpectedEmail) {
+                    $('#confirm_delete_submit_btn').prop('disabled', false).removeClass('btn-secondary').addClass('btn-danger');
+                } else {
+                    $('#confirm_delete_submit_btn').prop('disabled', true);
+                }
             });
 
             $(document).on('click','.send_mail_modal_btn',function(){

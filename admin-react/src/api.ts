@@ -132,6 +132,44 @@ export const LaravelAPI = {
       throw new Error(payload?.message || 'User balance update failed');
     },
 
+    async getUserDeletePreview(id: number): Promise<any> {
+      const response = await fetch(`/admin-home/frontend-users/${id}/delete-preview`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch user deletion preview (${response.status})`);
+      }
+
+      const payload = await response.json();
+      if (payload?.status === 'success' && payload?.preview) {
+        return payload.preview;
+      }
+
+      throw new Error(payload?.message || 'Failed to fetch deletion preview');
+    },
+
+    async deleteUser(id: number, confirmEmail: string): Promise<any> {
+      const response = await fetch(`/admin-home/frontend-users/${id}/delete`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ confirm_email: confirmEmail }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.message || `Failed to delete user (${response.status})`);
+      }
+
+      return payload;
+    },
+
     async getAdminDirectory(): Promise<{ admins: AdminAccount[]; roles: AdminRoleRecord[] }> {
       try {
         const response = await fetch('/admin-home/admin-directory', {
