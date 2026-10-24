@@ -27,30 +27,42 @@ class ResetPasswordService with ChangeNotifier {
     notifyListeners();
   }
 
-  sendOtp(email, BuildContext context, {isFromOtpPage = false}) async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.none) {
-      OthersHelper()
-          .showToast("Please turn on your internet connection", Colors.black);
-      return false;
-    } else {
-      var header = {
-        //if header type is application/json then the data should be in jsonEncode method
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-      };
-      var data = jsonEncode({
-        'email': email,
-      });
+  Future<bool> sendOtp(dynamic email, BuildContext? context,
+      {bool isFromOtpPage = false, http.Client? client}) async {
+    try {
+      final connectivityResult = await (Connectivity().checkConnectivity());
+      if (connectivityResult == ConnectivityResult.none) {
+        OthersHelper()
+            .showToast("Please turn on your internet connection", Colors.black);
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Connectivity check note: $e');
+    }
 
-      setLoadingTrue();
-      var response = await http.post(Uri.parse('$baseApi/send-otp-in-mail'),
-          headers: header, body: data);
-      if (response.statusCode == 201) {
-        otpNumber = jsonDecode(response.body)['otp'];
-        debugPrint('otp is $otpNumber');
+    final header = {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+    };
+    final data = jsonEncode({
+      'email': email,
+      'purpose': 'password_reset',
+    });
+
+    setLoadingTrue();
+    final httpClient = client ?? http.Client();
+    final shouldClose = client == null;
+
+    try {
+      final response = await httpClient.post(
+        Uri.parse('$baseApi/send-otp-in-mail'),
+        headers: header,
+        body: data,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
         notifyListeners();
-        if (!isFromOtpPage) {
+        if (!isFromOtpPage && context != null) {
           Navigator.push(
             context,
             MaterialPageRoute<void>(
@@ -61,55 +73,84 @@ class ResetPasswordService with ChangeNotifier {
           );
         }
         setLoadingFalse();
+        return true;
       } else {
         try {
           final res = jsonDecode(response.body);
           final msg = res['message'] ?? res['msg'] ?? 'Failed to send OTP code';
           OthersHelper().showToast(msg.toString(), Colors.black);
         } catch (_) {
-          OthersHelper().showToast('Failed to send OTP code (${response.statusCode})', Colors.black);
+          OthersHelper().showToast(
+              'Failed to send OTP code (${response.statusCode})', Colors.black);
         }
         setLoadingFalse();
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Error sending password reset OTP: $e');
+      OthersHelper().showToast('Failed to send verification code', Colors.black);
+      setLoadingFalse();
+      return false;
+    } finally {
+      if (shouldClose) {
+        httpClient.close();
       }
     }
   }
 
-  resetPassword(newPass, repeatNewPass, email, BuildContext context) async {
+  Future<bool> resetPassword(
+    dynamic newPass,
+    dynamic repeatNewPass,
+    dynamic email,
+    BuildContext? context, {
+    String? resetToken,
+    http.Client? client,
+  }) async {
     if (newPass != repeatNewPass) {
       OthersHelper().showToast("Password didn't match", Colors.black);
-    } else {
-      //check internet connection
-      var connectivityResult = await (Connectivity().checkConnectivity());
+      return false;
+    }
+
+    try {
+      final connectivityResult = await (Connectivity().checkConnectivity());
       if (connectivityResult == ConnectivityResult.none) {
-        //internet off
         OthersHelper()
             .showToast("Please turn on your internet connection", Colors.black);
         return false;
-      } else {
-        //internet connection is on
-        var header = {
-          //if header type is application/json then the data should be in jsonEncode method
-          "Accept": "application/json",
-          "Content-Type": "application/json"
-        };
-        var data = jsonEncode({'email': email, 'password': newPass});
+      }
+    } catch (e) {
+      debugPrint('Connectivity check note: $e');
+    }
 
-        setLoadingTrue();
-        if (baseApi == 'https://funmoments.sa/api/v1') {
-          await Future.delayed(const Duration(seconds: 1));
-          OthersHelper().showToast(
-              'This feature is turned off in test mode', Colors.black);
-          setLoadingFalse();
-          return;
-        }
-        var response = await http.post(Uri.parse('$baseApi/reset-password'),
-            headers: header, body: data);
+    final header = {
+      "Accept": "application/json",
+      "Content-Type": "application/json"
+    };
+    final Map<String, dynamic> payload = {
+      'email': email,
+      'password': newPass,
+    };
+    if (resetToken != null && resetToken.isNotEmpty) {
+      payload['reset_token'] = resetToken;
+    }
 
-        if (response.statusCode == 201) {
-          OthersHelper()
-              .showToast("Password updated successfully", Colors.black);
-          setLoadingFalse();
+    setLoadingTrue();
+    final httpClient = client ?? http.Client();
+    final shouldClose = client == null;
 
+    try {
+      final response = await httpClient.post(
+        Uri.parse('$baseApi/reset-password'),
+        headers: header,
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        OthersHelper()
+            .showToast("Password updated successfully", Colors.black);
+        setLoadingFalse();
+
+        if (context != null) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute<void>(
@@ -118,16 +159,28 @@ class ResetPasswordService with ChangeNotifier {
               ),
             ),
           );
-        } else {
-          try {
-            final res = jsonDecode(response.body);
-            final msg = res['message'] ?? res['msg'] ?? 'Password reset failed';
-            OthersHelper().showToast(msg.toString(), Colors.black);
-          } catch (_) {
-            OthersHelper().showToast('Password reset failed (${response.statusCode})', Colors.black);
-          }
-          setLoadingFalse();
         }
+        return true;
+      } else {
+        try {
+          final res = jsonDecode(response.body);
+          final msg = res['message'] ?? res['msg'] ?? 'Password reset failed';
+          OthersHelper().showToast(msg.toString(), Colors.black);
+        } catch (_) {
+          OthersHelper().showToast(
+              'Password reset failed (${response.statusCode})', Colors.black);
+        }
+        setLoadingFalse();
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Error executing resetPassword: $e');
+      OthersHelper().showToast('Password reset failed', Colors.black);
+      setLoadingFalse();
+      return false;
+    } finally {
+      if (shouldClose) {
+        httpClient.close();
       }
     }
   }

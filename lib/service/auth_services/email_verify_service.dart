@@ -97,21 +97,7 @@ class EmailVerifyService with ChangeNotifier {
           )
           .timeout(timeoutDuration);
 
-      if (response.statusCode == 201) {
-        final decoded = jsonDecode(response.body);
-        final otpNumber = decoded['otp']?.toString() ?? '';
-        lastOtpCode = otpNumber;
-
-        if (context != null) {
-          try {
-            Provider.of<ResetPasswordService>(context, listen: false)
-                .setOtp(otpNumber);
-          } catch (e) {
-            debugPrint('ResetPasswordService context note: $e');
-          }
-        }
-
-        debugPrint('otp is $otpNumber');
+      if (response.statusCode == 200 || response.statusCode == 201) {
         lastOtpStatus = OtpSendStatus.sent;
         lastOtpMessage = 'OTP sent successfully';
         notifyListeners();
@@ -208,7 +194,7 @@ class EmailVerifyService with ChangeNotifier {
 
   Future<bool> verifyOtpAndLogin(
     dynamic enteredOtp,
-    BuildContext context,
+    BuildContext? context,
     dynamic email,
     dynamic token,
     dynamic userId,
@@ -225,21 +211,12 @@ class EmailVerifyService with ChangeNotifier {
 
     debugPrint('[OtpVerification] verify started');
 
-    final rps = Provider.of<ResetPasswordService>(context, listen: false);
-    final expectedOtp = rps.otpNumber ?? lastOtpCode;
-
-    if (expectedOtp == null) {
-      debugPrint('[OtpVerification] OTP verification failed: expected OTP is null');
+    final trimmedOtp = enteredOtp?.toString().trim() ?? '';
+    if (trimmedOtp.isEmpty) {
       OthersHelper().showToast(
-        'Verification code is missing. Please tap "Send again".',
+        'Please enter the 4 digit code',
         Colors.black,
       );
-      return false;
-    }
-
-    if (enteredOtp.toString().trim() != expectedOtp.toString().trim()) {
-      debugPrint('[OtpVerification] OTP verification failed: code did not match');
-      OthersHelper().showToast("Otp didn't match", Colors.black);
       return false;
     }
 
@@ -265,18 +242,22 @@ class EmailVerifyService with ChangeNotifier {
     final httpClient = client ?? http.Client();
     final shouldCloseClient = client == null;
 
-    debugPrint('[OtpVerification] /user/send-otp-in-mail/success request started');
+    debugPrint('[OtpVerification] /verify-email-otp request started');
     try {
       final header = {
         "Accept": "application/json",
         "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
+        if (token != null && token.toString().isNotEmpty)
+          "Authorization": "Bearer $token",
       };
-      final data = jsonEncode({'user_id': userId, 'email_verified': 1});
+      final data = jsonEncode({
+        'email': email,
+        'otp': trimmedOtp,
+      });
 
       final response = await httpClient
           .post(
-            Uri.parse('$baseApi/user/send-otp-in-mail/success'),
+            Uri.parse('$baseApi/verify-email-otp'),
             headers: header,
             body: data,
           )
@@ -304,7 +285,7 @@ class EmailVerifyService with ChangeNotifier {
 
         // Non-blocking background sync
         try {
-          if (context.mounted) {
+          if (context != null && context.mounted) {
             await Provider.of<ProfileService>(context, listen: false).fetchData();
           }
         } catch (profileErr) {
@@ -312,7 +293,7 @@ class EmailVerifyService with ChangeNotifier {
         }
 
         try {
-          if (context.mounted) {
+          if (context != null && context.mounted) {
             await Provider.of<PushNotificationService>(context, listen: false)
                 .fetchPusherCredential(context: context);
           }
@@ -323,7 +304,7 @@ class EmailVerifyService with ChangeNotifier {
         verifyOtpLoading = false;
         notifyListeners();
 
-        if (context.mounted) {
+        if (context != null && context.mounted) {
           debugPrint('[OtpVerification] navigation started to LandingPage');
           HomepageHelper.tabIndex.value = 0;
           Navigator.pushAndRemoveUntil(

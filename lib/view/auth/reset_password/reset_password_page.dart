@@ -6,9 +6,10 @@ import 'package:funmoments/theme/fun_moment_components.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 
 class ResetPasswordPage extends StatefulWidget {
-  const ResetPasswordPage({Key? key, this.email}) : super(key: key);
+  const ResetPasswordPage({Key? key, this.email, this.resetToken}) : super(key: key);
 
   final email;
+  final String? resetToken;
 
   @override
   State<ResetPasswordPage> createState() => _ResetPasswordPageState();
@@ -140,6 +141,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                               repeatNewPasswordController.text,
                               widget.email,
                               context,
+                              resetToken: widget.resetToken,
                             );
                           }
                         },

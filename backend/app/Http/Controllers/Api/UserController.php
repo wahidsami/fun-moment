@@ -34,6 +34,7 @@ use App\Services\ProviderVerificationDocumentService;
 use App\LegalTerm;
 use App\Services\LegalTermsAcceptanceService;
 use App\Services\Auth\AppleTokenVerificationService;
+use App\Services\Auth\OtpVerificationService;
 use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
@@ -847,7 +848,7 @@ class UserController extends Controller
         return [];
     }
 
-    // send otp
+    // send otp success (legacy endpoint secured: requires server-verified OTP)
     public function sendOTPSuccess(Request $request)
     {
         $request->validate([
@@ -855,98 +856,163 @@ class UserController extends Controller
             'email_verified' => 'required|integer',
         ]);
 
-        if(!in_array($request->email_verified,[0,1])){
-            return response()->error([
-                'message' => __('email verify code must have to be 1 or 0'),
-            ]);
-        }
-
         $auth_user_id = auth('sanctum')->id();
         if ($auth_user_id != $request->user_id) {
             return response()->error([
                 'message' => __('Unauthorized action'),
+            ], 403);
+        }
+
+        $user = User::find($auth_user_id);
+        if (!$user) {
+            return response()->error(['message' => __('User not found')], 404);
+        }
+
+        // If client provides 'otp', verify it securely on the server
+        if ($request->filled('otp')) {
+            $otpService = app(OtpVerificationService::class);
+            $res = $otpService->verifyOtp($user->email, (string) $request->otp, OtpVerificationService::PURPOSE_EMAIL_VERIFY);
+            if (!$res['success']) {
+                return response()->error([
+                    'message' => $res['message'],
+                ], $res['status_code'] ?? 422);
+            }
+            return response()->success([
+                'message' => __('Email Verify Success'),
             ]);
         }
 
-        $user = User::where('id', $auth_user_id)->update([
-            'email_verified' =>  $request->email_verified
-        ]);
-
-        if(!$user){
-            return response()->error([
-                'message' => __('Something went wrong, plese try after sometime,'),
-            ]);
-        }
-
-        return response()->success([
-            'message' => __('Email Verify Success'),
-        ]);
+        // Insecure client-supplied email_verified flag without OTP is strictly rejected
+        return response()->error([
+            'message' => __('Verification code is required to verify email address.'),
+        ], 422);
     }
 
     public function sendOTP(Request $request)
     {
-        $request->validate([
-            'email' => 'required',
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'email' => 'required|email',
+            'purpose' => 'nullable|string|in:email_verify,password_reset',
         ]);
 
-        $otp_code = sprintf("%d", random_int(1234, 9999));
-        $user_email = User::where('email', $request->email)->first();
-
-        if (!is_null($user_email)) {
-            try {
-                $rawMessage = get_static_option('user_email_verify_message');
-                if (empty($rawMessage)) {
-                    $rawMessage = __('Hello @name, your email verification code is: @email_verify_tokn');
-                }
-                $message = str_replace(["@name", "@email_verify_tokn"],[$user_email->name, $otp_code],$rawMessage);
-                $subject = get_static_option('user_email_verify_subject') ?: __('Email Verification Code');
-
-                Mail::to($user_email->email)->send(new BasicMail([
-                    'subject' => $subject,
-                    'message' => $message
-                ]));
-            } catch (\Exception $e) {
-                \Log::error('OTP send error: ' . $e->getMessage());
-                return response()->error([
-                    'message' => __('Unable to send verification email. Please check your email configuration or try again later.'),
-                ]);
-            }
-
-            return response()->success([
-                'email' => $request->email,
-                'otp' => $otp_code,
-            ]);
-
-        } else {
+        if ($validator->fails()) {
             return response()->error([
-                'message' => __('Email Does not Exists'),
-            ]);
+                'message' => $validator->errors()->first(),
+            ], 422);
         }
 
+        $purpose = $request->input('purpose') ?: OtpVerificationService::PURPOSE_EMAIL_VERIFY;
+        $otpService = app(OtpVerificationService::class);
+        $result = $otpService->generateAndSendOtp((string) $request->email, $purpose);
+
+        if (!$result['success']) {
+            return response()->error([
+                'message' => $result['message'],
+            ], $result['status_code'] ?? 422);
+        }
+
+        return response()->success([
+            'email' => $result['email'],
+            'message' => $result['message'],
+        ]);
     }
 
-    //reset password
-    public function resetPassword(Request $request)
+    public function verifyEmailOtp(Request $request)
     {
-        $request->validate([
-            'email' => 'required',
-            'password' => 'required',
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'email' => 'required|email',
+            'otp' => 'required|string',
         ]);
 
-        $email = $request->email;
-        $user = User::select('email')->where('email', $email)->first();
-        if (!is_null($user)) {
-            User::where('email', $user->email)->update([
-                'password' => Hash::make($request->password),
-            ]);
-            return response()->success([
-                'message' => 'success',
-            ]);
-        } else {
+        if ($validator->fails()) {
             return response()->error([
-                'message' => __('Email Not Found'),
-            ]);
+                'message' => $validator->errors()->first(),
+            ], 422);
         }
+
+        $otpService = app(OtpVerificationService::class);
+        $result = $otpService->verifyOtp((string) $request->email, (string) $request->otp, OtpVerificationService::PURPOSE_EMAIL_VERIFY);
+
+        if (!$result['success']) {
+            return response()->error([
+                'message' => $result['message'],
+            ], $result['status_code'] ?? 422);
+        }
+
+        return response()->success([
+            'message' => $result['message'],
+        ]);
+    }
+
+    public function verifyResetOtp(Request $request)
+    {
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'email' => 'required|email',
+            'otp' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->error([
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        $otpService = app(OtpVerificationService::class);
+        $result = $otpService->verifyOtp((string) $request->email, (string) $request->otp, OtpVerificationService::PURPOSE_PASSWORD_RESET);
+
+        if (!$result['success']) {
+            return response()->error([
+                'message' => $result['message'],
+            ], $result['status_code'] ?? 422);
+        }
+
+        return response()->success([
+            'reset_token' => $result['reset_token'],
+            'message' => $result['message'],
+        ]);
+    }
+
+    //reset password (requires valid, single-use, account-bound reset token)
+    public function resetPassword(Request $request)
+    {
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'email' => 'required|email',
+            'password' => 'required|min:8|max:191',
+            'reset_token' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->error([
+                'message' => $validator->errors()->first() ?? __('Password reset token and valid credentials are required.'),
+            ], 403);
+        }
+
+        $otpService = app(OtpVerificationService::class);
+        $tokenValid = $otpService->consumePasswordResetToken((string) $request->email, (string) $request->reset_token);
+
+        if (!$tokenValid) {
+            return response()->error([
+                'message' => __('Invalid or expired password reset token. Please verify your OTP again.'),
+            ], 403);
+        }
+
+        $email = strtolower(trim($request->email));
+        $user = User::where('email', $email)->first();
+        if (!$user) {
+            return response()->error([
+                'message' => __('User not found'),
+            ], 404);
+        }
+
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        // Invalidate all active Sanctum tokens for security
+        $user->tokens()->delete();
+
+        return response()->success([
+            'message' => __('Password updated successfully'),
+        ]);
     }
 
     //logout

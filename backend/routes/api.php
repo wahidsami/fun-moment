@@ -64,6 +64,8 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
     Route::post('/login',[UserController::class,'login']);
     Route::post('social/login',[UserController::class,'socialLogin']);
     Route::post('/send-otp-in-mail',[UserController::class,'sendOTP']);
+    Route::post('/verify-email-otp',[UserController::class,'verifyEmailOtp']);
+    Route::post('/verify-reset-otp',[UserController::class,'verifyResetOtp']);
     Route::post('/reset-password',[UserController::class,'resetPassword']);
     
     //services list by seller id

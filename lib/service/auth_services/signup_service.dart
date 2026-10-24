@@ -136,12 +136,23 @@ class SignupService with ChangeNotifier {
           String countryId =
               responseData['users']?['country_id']?.toString() ?? '';
 
-          //Send otp
-          var isOtepSent =
-              await Provider.of<EmailVerifyService>(context, listen: false)
-                  .sendOtpForEmailValidation(email, context, token);
+          // Send OTP
+          bool isOtepSent = false;
+          try {
+            isOtepSent = await Provider.of<EmailVerifyService>(context, listen: false)
+                .sendOtpForEmailValidation(email, context, token, client: httpClient);
+          } catch (e) {
+            debugPrint('[BuyerSignup] OTP dispatch note: $e');
+          }
           setLoadingFalse();
-          if (isOtepSent) {
+
+          if (context.mounted) {
+            if (!isOtepSent) {
+              OthersHelper().showToast(
+                "Registration successful. We couldn't send the verification code right now. Please tap Send again on the verification screen.",
+                Colors.black,
+              );
+            }
             Navigator.pushReplacement<void, void>(
               context,
               MaterialPageRoute<void>(
