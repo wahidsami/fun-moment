@@ -132,10 +132,14 @@ export const LaravelAPI = {
       throw new Error(payload?.message || 'User balance update failed');
     },
 
-    async getUserDeletePreview(id: number): Promise<any> {
-      const response = await fetch(`/admin-home/frontend-users/${id}/delete-preview`, {
+    async getUserDeletePreview(id: number, lang?: string): Promise<any> {
+      const url = lang ? `/admin-home/frontend-users/${id}/delete-preview?lang=${encodeURIComponent(lang)}` : `/admin-home/frontend-users/${id}/delete-preview`;
+      const response = await fetch(url, {
         method: 'GET',
-        headers: { 'Accept': 'application/json' },
+        headers: {
+          'Accept': 'application/json',
+          ...(lang ? { 'X-Language': lang } : {}),
+        },
         credentials: 'include',
       });
 
@@ -151,15 +155,17 @@ export const LaravelAPI = {
       throw new Error(payload?.message || 'Failed to fetch deletion preview');
     },
 
-    async deleteUser(id: number, confirmEmail: string): Promise<any> {
-      const response = await fetch(`/admin-home/frontend-users/${id}/delete`, {
+    async deleteUser(id: number, confirmEmail: string, lang?: string): Promise<any> {
+      const url = lang ? `/admin-home/frontend-users/${id}/delete?lang=${encodeURIComponent(lang)}` : `/admin-home/frontend-users/${id}/delete`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          ...(lang ? { 'X-Language': lang } : {}),
         },
         credentials: 'include',
-        body: JSON.stringify({ confirm_email: confirmEmail }),
+        body: JSON.stringify({ confirm_email: confirmEmail, lang }),
       });
 
       const payload = await response.json();

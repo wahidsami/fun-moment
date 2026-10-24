@@ -798,11 +798,12 @@ class FrontendUserManageController extends Controller
         return redirect()->back()->with(FlashMsg::item_new('Status change success--'));
     }
 
-    public function deletePreview($id)
+    public function deletePreview(Request $request, $id)
     {
         $user = User::findOrFail($id);
         $service = app(UserDeletionService::class);
-        $preview = $service->buildImpactPreview($user);
+        $locale = $request->input('lang', session('lang') ?? app()->getLocale());
+        $preview = $service->buildImpactPreview($user, $locale);
 
         return response()->json([
             'status' => 'success',
@@ -810,11 +811,12 @@ class FrontendUserManageController extends Controller
         ]);
     }
 
-    public function apiDeletePreview($id): JsonResponse
+    public function apiDeletePreview(Request $request, $id): JsonResponse
     {
         $user = User::findOrFail($id);
         $service = app(UserDeletionService::class);
-        $preview = $service->buildImpactPreview($user);
+        $locale = $request->input('lang', $request->header('X-Language', $request->header('Accept-Language', app()->getLocale())));
+        $preview = $service->buildImpactPreview($user, $locale);
 
         return response()->json([
             'status' => 'success',
@@ -831,10 +833,11 @@ class FrontendUserManageController extends Controller
 
         $adminId = (int) (Auth::guard('admin')->id() ?? 1);
         $confirmEmail = $request->input('confirm_email');
+        $locale = $request->input('lang', session('lang') ?? app()->getLocale());
 
         try {
             $service = app(UserDeletionService::class);
-            $result = $service->executeDeletion($user, $adminId, $confirmEmail);
+            $result = $service->executeDeletion($user, $adminId, $confirmEmail, $locale);
 
             return redirect()->back()->with(FlashMsg::item_new($result['message']));
         } catch (\InvalidArgumentException $e) {
@@ -859,10 +862,11 @@ class FrontendUserManageController extends Controller
 
         $adminId = (int) (Auth::guard('admin')->id() ?? 1);
         $confirmEmail = $request->input('confirm_email');
+        $locale = $request->input('lang', $request->header('X-Language', $request->header('Accept-Language', app()->getLocale())));
 
         try {
             $service = app(UserDeletionService::class);
-            $result = $service->executeDeletion($user, $adminId, $confirmEmail);
+            $result = $service->executeDeletion($user, $adminId, $confirmEmail, $locale);
 
             return response()->json([
                 'status' => 'success',
@@ -878,7 +882,7 @@ class FrontendUserManageController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage(),
-            ], 400);
+            ], 422);
         } catch (\Throwable $e) {
             Log::error('API user deletion failed: ' . $e->getMessage());
             return response()->json([
@@ -896,6 +900,7 @@ class FrontendUserManageController extends Controller
         ]);
 
         $adminId = (int) (Auth::guard('admin')->id() ?? 1);
+        $locale = $request->input('lang', session('lang') ?? $request->header('X-Language', app()->getLocale()));
         $service = app(UserDeletionService::class);
 
         $processed = [];
@@ -908,8 +913,8 @@ class FrontendUserManageController extends Controller
                 continue;
             }
 
-            // Calculate independent impact preview for each account
-            $preview = $service->buildImpactPreview($user);
+            // Calculate independent impact preview for each account with locale
+            $preview = $service->buildImpactPreview($user, $locale);
             if (!$preview['can_delete']) {
                 $blocked[] = [
                     'id' => $user->id,
@@ -922,7 +927,7 @@ class FrontendUserManageController extends Controller
 
             try {
                 // Execute deletion safely through the domain service without blind CASCADE
-                $result = $service->executeDeletion($user, $adminId, null);
+                $result = $service->executeDeletion($user, $adminId, null, $locale);
                 $processed[] = [
                     'id' => $id,
                     'name' => $user->name,

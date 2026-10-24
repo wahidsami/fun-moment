@@ -422,10 +422,10 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
     setConfirmEmailInput('');
     setLoadingDeletePreview(true);
     try {
-      const preview = await LaravelAPI.getUserDeletePreview(user.id);
+      const preview = await LaravelAPI.getUserDeletePreview(user.id, language);
       setDeletePreview(preview);
     } catch (err: any) {
-      setDeleteError(err?.message || 'Failed to calculate deletion impact preview.');
+      setDeleteError(err?.message || (language === 'en' ? 'Failed to calculate deletion impact preview.' : 'فشل فحص وتحليل أثر حذف الحساب.'));
     } finally {
       setLoadingDeletePreview(false);
     }
@@ -436,13 +436,13 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
     setIsDeletingUser(true);
     setDeleteError(null);
     try {
-      const res = await LaravelAPI.deleteUser(deleteTargetUser.id, confirmEmailInput);
-      showSuccess(res?.message || `Account #${deleteTargetUser.id} deleted successfully. Email released.`);
+      const res = await LaravelAPI.deleteUser(deleteTargetUser.id, confirmEmailInput, language);
+      showSuccess(res?.message || t.delete_success_toast);
       setDeleteTargetUser(null);
       setDeletePreview(null);
       await loadUsers();
     } catch (err: any) {
-      setDeleteError(err?.message || 'Account deletion failed.');
+      setDeleteError(err?.message || (language === 'en' ? 'Account deletion failed.' : 'فشل تنفيذ عملية الحذف.'));
     } finally {
       setIsDeletingUser(false);
     }
@@ -1315,10 +1315,10 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-800">
-                    {language === 'en' ? 'Review & Delete User Account' : 'مراجعة وحذف حساب المستخدم'}
+                    {t.delete_modal_title}
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    {language === 'en' ? 'Server-side dependency analysis and safe email release' : 'تحليل التبعيات من الخادم وتحرير البريد الإلكتروني بأمان'}
+                    {t.delete_modal_subtitle}
                   </p>
                 </div>
               </div>
@@ -1340,7 +1340,7 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                 <div className="py-12 text-center space-y-3">
                   <RefreshCcw className="h-8 w-8 animate-spin mx-auto text-indigo-600" />
                   <p className="text-xs text-slate-500 font-medium">
-                    {language === 'en' ? 'Calculating account dependencies & financial ledgers...' : 'جارٍ فحص التبعيات والقيود المالية...'}
+                    {t.delete_loading_calculating}
                   </p>
                 </div>
               )}
@@ -1361,24 +1361,24 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                       <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                         deletePreview.account.role === 'seller' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'
                       }`}>
-                        {deletePreview.account.role.toUpperCase()}
+                        {deletePreview.localized?.role || (deletePreview.account.role === 'seller' ? t.seller : t.buyer)}
                       </span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
-                      <div><span className="text-slate-400">ID:</span> #{deletePreview.account.id}</div>
-                      <div><span className="text-slate-400">Username:</span> {deletePreview.account.username}</div>
+                      <div><span className="text-slate-400">{t.delete_user_id}:</span> #{deletePreview.account.id}</div>
+                      <div><span className="text-slate-400">{t.delete_username}:</span> {deletePreview.account.username}</div>
                       <div className="col-span-2">
-                        <span className="text-slate-400">Email:</span> <span className="font-semibold text-slate-900">{deletePreview.account.email}</span>
+                        <span className="text-slate-400">{t.delete_email}:</span> <span className="font-semibold text-slate-900 inline-block" dir="ltr">{deletePreview.account.email}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400">Deletion Mode:</span>{' '}
+                        <span className="text-slate-400">{t.delete_mode}:</span>{' '}
                         <span className={`font-bold ${deletePreview.deletion_mode === 'purge' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                          {deletePreview.deletion_mode === 'purge' ? 'Clean Purge' : 'Anonymize & Retain Ledgers'}
+                          {deletePreview.localized?.deletion_mode || (deletePreview.deletion_mode === 'purge' ? t.delete_mode_purge : t.delete_mode_anonymize)}
                         </span>
                       </div>
                       <div>
-                        <span className="text-slate-400">Email Release:</span>{' '}
-                        <span className="text-emerald-600 font-bold">Immediate</span>
+                        <span className="text-slate-400">{t.delete_email_release}:</span>{' '}
+                        <span className="text-emerald-600 font-bold">{t.delete_email_release_immediate}</span>
                       </div>
                     </div>
                   </div>
@@ -1388,7 +1388,7 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                     <div className="rounded-xl border border-rose-300 bg-rose-50 p-4">
                       <div className="flex items-center gap-2 text-rose-800 font-bold text-xs mb-1">
                         <ShieldAlert className="h-4 w-4 text-rose-600" />
-                        {language === 'en' ? 'Deletion Blocked: Unresolved Obligations' : 'الحذف محظور: توجد التزامات نشطة معلقة'}
+                        {t.delete_blocked_title}
                       </div>
                       <ul className="list-disc list-inside text-xs text-rose-700 space-y-1 mt-1">
                         {deletePreview.blocking_reasons.map((reason: string, i: number) => (
@@ -1401,37 +1401,37 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                   {/* Metrics Cards */}
                   <div className="grid grid-cols-4 gap-2 text-center">
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                      <div className="text-[10px] text-slate-400 uppercase">Services</div>
+                      <div className="text-[10px] text-slate-400 uppercase">{t.delete_services}</div>
                       <div className="text-base font-bold text-slate-800">{deletePreview.counts?.services_count ?? 0}</div>
-                      <div className="text-[10px] text-slate-400">Unpublished</div>
+                      <div className="text-[10px] text-slate-400">{t.delete_unpublished}</div>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                      <div className="text-[10px] text-slate-400 uppercase">Active Orders</div>
+                      <div className="text-[10px] text-slate-400 uppercase">{t.delete_active_orders}</div>
                       <div className={`text-base font-bold ${deletePreview.counts?.active_orders_count > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
                         {deletePreview.counts?.active_orders_count ?? 0}
                       </div>
-                      <div className="text-[10px] text-slate-400">Blocker &gt; 0</div>
+                      <div className="text-[10px] text-slate-400">{t.delete_blocker_if_gt_zero}</div>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                      <div className="text-[10px] text-slate-400 uppercase">Balance</div>
+                      <div className="text-[10px] text-slate-400 uppercase">{t.delete_balance}</div>
                       <div className={`text-base font-bold ${deletePreview.counts?.wallet_balance > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
                         {deletePreview.counts?.wallet_balance ?? 0}
                       </div>
-                      <div className="text-[10px] text-slate-400">SAR</div>
+                      <div className="text-[10px] text-slate-400">{t.delete_currency_sar}</div>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                      <div className="text-[10px] text-slate-400 uppercase">Retained Records</div>
+                      <div className="text-[10px] text-slate-400 uppercase">{t.delete_retained_records}</div>
                       <div className="text-base font-bold text-slate-800">
                         {(deletePreview.counts?.retained_orders_count ?? 0) + (deletePreview.counts?.wallet_history_count ?? 0)}
                       </div>
-                      <div className="text-[10px] text-slate-400">Ledgers</div>
+                      <div className="text-[10px] text-slate-400">{t.delete_retained_ledgers}</div>
                     </div>
                   </div>
 
                   {/* Impact Breakdown */}
                   <div className="space-y-3 text-xs">
                     <div className="rounded-lg border border-slate-100 p-3 bg-slate-50/40">
-                      <div className="font-bold text-slate-700 mb-1">Permanently Deleted:</div>
+                      <div className="font-bold text-slate-700 mb-1">{t.delete_permanently_deleted}</div>
                       <ul className="list-disc list-inside text-slate-500 space-y-0.5">
                         {deletePreview.breakdown?.permanently_deleted?.map((item: string, i: number) => (
                           <li key={i}>{item}</li>
@@ -1441,7 +1441,7 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
 
                     {deletePreview.breakdown?.retained_records?.length > 0 && (
                       <div className="rounded-lg border border-slate-100 p-3 bg-slate-50/40">
-                        <div className="font-bold text-slate-700 mb-1">Retained For Financial & Legal Integrity:</div>
+                        <div className="font-bold text-slate-700 mb-1">{t.delete_retained_for_integrity}</div>
                         <ul className="list-disc list-inside text-slate-500 space-y-0.5">
                           {deletePreview.breakdown?.retained_records?.map((item: string, i: number) => (
                             <li key={i}>{item}</li>
@@ -1455,11 +1455,12 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                   {deletePreview.can_delete && (
                     <div className="rounded-xl border border-slate-200 p-3 space-y-2 bg-amber-50/30">
                       <label className="text-xs font-semibold text-slate-700 block">
-                        {language === 'en' ? 'Type the exact target email to unlock deletion:' : 'اكتب البريد الإلكتروني للمستخدم لتأكيد الحذف:'}
-                        <span className="font-bold text-rose-600 ml-1.5">{deletePreview.account.email}</span>
+                        {t.delete_confirm_prompt}
+                        <span className="font-bold text-rose-600 ml-1.5 mr-1.5 inline-block" dir="ltr">{deletePreview.account.email}</span>
                       </label>
                       <input
                         type="text"
+                        dir="ltr"
                         value={confirmEmailInput}
                         onChange={(e) => setConfirmEmailInput(e.target.value)}
                         placeholder={deletePreview.account.email}
@@ -1496,8 +1497,8 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                 {isDeletingUser && <RefreshCcw className="h-3 w-3 animate-spin" />}
                 <span>
                   {deletePreview?.can_delete
-                    ? (language === 'en' ? 'Confirm & Execute Deletion' : 'تأكيد وتنفيذ الحذف')
-                    : (language === 'en' ? 'Deletion Blocked' : 'الحذف محظور')}
+                    ? t.delete_confirm_btn
+                    : t.delete_blocked_btn}
                 </span>
               </button>
             </div>

@@ -52,8 +52,19 @@ class UserDeletionService
      * @param User $user
      * @return array
      */
-    public function buildImpactPreview(User $user): array
+    public function buildImpactPreview(User $user, ?string $locale = null): array
     {
+        $targetLocale = $locale ?: request('lang');
+        if (!$targetLocale && request()->header('X-Language')) {
+            $targetLocale = request()->header('X-Language');
+        }
+        if (!$targetLocale && session()->has('lang')) {
+            $targetLocale = session()->get('lang');
+        }
+        if ($targetLocale && in_array(strtolower($targetLocale), ['ar', 'en'])) {
+            app()->setLocale(strtolower($targetLocale));
+        }
+
         $role = (int) $user->user_type === User::USER_TYPE_SELLER ? 'seller' : 'buyer';
         $sellerType = 'n/a';
         if ($role === 'seller') {
@@ -254,6 +265,18 @@ class UserDeletionService
                 'retained_records' => $retainedRecords,
                 'anonymized_fields' => $anonymizedFields,
             ],
+            'localized' => [
+                'role' => $role === 'seller' ? __('Seller') : __('Buyer'),
+                'deletion_mode' => $deletionMode === 'purge' ? __('Clean Purge') : __('Anonymize & Retain Ledgers'),
+                'email_release' => __('Immediate'),
+                'status' => (int) $user->user_status === 1 ? __('Active') : __('Inactive'),
+                'services' => __('Services'),
+                'unpublished' => __('Unpublished'),
+                'active_orders' => __('Active Orders'),
+                'balance' => __('Balance'),
+                'retained_records' => __('Retained Records'),
+                'permanently_deleted' => __('Permanently Deleted'),
+            ],
         ];
     }
 
@@ -264,13 +287,25 @@ class UserDeletionService
      * @param User $user
      * @param int $adminId
      * @param string|null $confirmEmail
+     * @param string|null $locale
      * @return array
      *
      * @throws \InvalidArgumentException
      * @throws \RuntimeException
      */
-    public function executeDeletion(User $user, int $adminId, ?string $confirmEmail = null): array
+    public function executeDeletion(User $user, int $adminId, ?string $confirmEmail = null, ?string $locale = null): array
     {
+        $targetLocale = $locale ?: request('lang');
+        if (!$targetLocale && request()->header('X-Language')) {
+            $targetLocale = request()->header('X-Language');
+        }
+        if (!$targetLocale && session()->has('lang')) {
+            $targetLocale = session()->get('lang');
+        }
+        if ($targetLocale && in_array(strtolower($targetLocale), ['ar', 'en'])) {
+            app()->setLocale(strtolower($targetLocale));
+        }
+
         // 1. Target Account Confirmation
         if ($confirmEmail !== null) {
             $inputEmail = trim(strtolower($confirmEmail));

@@ -57,6 +57,7 @@ class UserDeletionTestSuite
         $this->testOtpCachePurging();
         $this->testBulkActionSkipsBlockedAccountsSafely();
         $this->testAdminAuditLogRecorded();
+        $this->testPreviewLocalization();
 
         echo "\n--------------------------------------------------------------------\n";
         echo "TEST RESULTS: Passed: {$this->passed}, Failed: {$this->failed}\n";
@@ -466,6 +467,47 @@ class UserDeletionTestSuite
             $this->assert($log !== null, 'AdminAuditLog entry created with action user_delete');
             $this->assert($log->new_values['email_released'] === true, 'AdminAuditLog records email released');
             $this->assert(isset($log->new_values['deletion_mode']), 'AdminAuditLog records deletion mode');
+        } finally {
+            DB::rollBack();
+        }
+    }
+
+    /**
+     * 11. Test impact preview localization (Arabic and English)
+     */
+    private function testPreviewLocalization()
+    {
+        DB::beginTransaction();
+        try {
+            $user = $this->createSyntheticUser();
+
+            // Arabic Preview
+            $previewAr = $this->service->buildImpactPreview($user, 'ar');
+            $hasAccountRecordAr = collect($previewAr['breakdown']['permanently_deleted'])
+                ->contains(fn($item) => str_contains($item, 'سجل حساب'));
+
+            $this->assert(
+                isset($previewAr['localized']) &&
+                $previewAr['localized']['deletion_mode'] === 'حذف نهائي كامل' &&
+                $previewAr['localized']['role'] === 'المشتري' &&
+                $previewAr['localized']['status'] === 'نشط' &&
+                $hasAccountRecordAr,
+                'Arabic localized preview outputs natural Arabic strings and labels'
+            );
+
+            // English Preview
+            $previewEn = $this->service->buildImpactPreview($user, 'en');
+            $hasAccountRecordEn = collect($previewEn['breakdown']['permanently_deleted'])
+                ->contains(fn($item) => str_contains($item, 'User account'));
+
+            $this->assert(
+                isset($previewEn['localized']) &&
+                $previewEn['localized']['deletion_mode'] === 'Clean Purge' &&
+                $previewEn['localized']['role'] === 'Buyer' &&
+                $previewEn['localized']['status'] === 'Active' &&
+                $hasAccountRecordEn,
+                'English localized preview outputs clear English strings and labels'
+            );
         } finally {
             DB::rollBack();
         }

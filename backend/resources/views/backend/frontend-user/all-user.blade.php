@@ -251,11 +251,11 @@
                                         <div class="col-md-6">
                                             <strong>{{__('User ID:')}}</strong> <span id="preview_user_id"></span><br>
                                             <strong>{{__('Username:')}}</strong> <span id="preview_user_username"></span><br>
-                                            <strong>{{__('Email:')}}</strong> <span id="preview_user_email" class="text-primary font-weight-bold"></span>
+                                            <strong>{{__('Email:')}}</strong> <span id="preview_user_email" class="text-primary font-weight-bold d-inline-block" dir="ltr"></span>
                                         </div>
                                         <div class="col-md-6">
                                             <strong>{{__('Status:')}}</strong> <span id="preview_user_status"></span><br>
-                                            <strong>{{__('Email Release:')}}</strong> <span class="badge badge-success">{{__('Released on Deletion')}}</span><br>
+                                            <strong>{{__('Email Release:')}}</strong> <span class="badge badge-success">{{__('Immediate')}}</span><br>
                                             <strong>{{__('Deletion Mode:')}}</strong> <span id="preview_deletion_mode_badge"></span>
                                         </div>
                                     </div>
@@ -268,7 +268,7 @@
                                     <i class="ti-close mr-1"></i> {{__('Deletion Blocked: Unresolved Obligations')}}
                                 </h6>
                                 <p class="mb-1 text-sm">{{__('This account cannot be deleted until the following obligations are settled:')}}</p>
-                                <ul id="delete_modal_blockers_list" class="mb-0 pl-3 text-sm"></ul>
+                                <ul id="delete_modal_blockers_list" class="mb-0 pl-3 pr-3 text-sm"></ul>
                             </div>
 
                             <!-- Metrics Summary Cards -->
@@ -291,7 +291,7 @@
                                     <div class="p-2 border rounded text-center bg-light">
                                         <div class="text-xs text-muted text-uppercase">{{__('Wallet Balance')}}</div>
                                         <div class="h5 mb-0 font-weight-bold text-warning" id="preview_count_balance">0.00</div>
-                                        <small class="text-muted">{{__('Blocker if > 0')}}</small>
+                                        <small class="text-muted">{{__('SAR')}}</small>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-3 mb-2">
@@ -321,13 +321,13 @@
                                 <div class="card-body p-3">
                                     <div class="tab-content" id="impact_tab_content">
                                         <div class="tab-pane fade show active text-sm" id="tab-deleted">
-                                            <ul id="preview_list_deleted" class="mb-0 pl-3 text-muted"></ul>
+                                            <ul id="preview_list_deleted" class="mb-0 pl-3 pr-3 text-muted"></ul>
                                         </div>
                                         <div class="tab-pane fade text-sm" id="tab-retained">
-                                            <ul id="preview_list_retained" class="mb-0 pl-3 text-muted"></ul>
+                                            <ul id="preview_list_retained" class="mb-0 pl-3 pr-3 text-muted"></ul>
                                         </div>
                                         <div class="tab-pane fade text-sm" id="tab-anonymized">
-                                            <ul id="preview_list_anonymized" class="mb-0 pl-3 text-muted"></ul>
+                                            <ul id="preview_list_anonymized" class="mb-0 pl-3 pr-3 text-muted"></ul>
                                         </div>
                                     </div>
                                 </div>
@@ -338,9 +338,9 @@
                                 <div class="form-group mb-2">
                                     <label for="confirm_delete_email_input" class="font-weight-bold text-sm">
                                         {{__('To prevent accidental deletion, type the account email address to confirm:')}}
-                                        <span class="text-danger ml-1" id="delete_target_expected_email"></span>
+                                        <span class="text-danger ml-1 mr-1 d-inline-block font-weight-bold" id="delete_target_expected_email" dir="ltr"></span>
                                     </label>
-                                    <input type="text" class="form-control" id="confirm_delete_email_input" name="confirm_email" autocomplete="off" placeholder="{{__('Type email here to unlock deletion')}}">
+                                    <input type="text" class="form-control" id="confirm_delete_email_input" name="confirm_email" autocomplete="off" dir="ltr" placeholder="{{__('Type email here to unlock deletion')}}">
                                 </div>
                             </div>
                         </div>
@@ -558,7 +558,7 @@
                 modal.modal('show');
 
                 $.ajax({
-                    url: "{{ url('/admin-home/frontend/delete-preview') }}/" + userId,
+                    url: "{{ url('/admin-home/frontend/delete-preview') }}/" + userId + "?lang={{ app()->getLocale() }}",
                     type: 'GET',
                     dataType: 'json',
                     success: function(res) {
@@ -577,15 +577,20 @@
                         $('#preview_user_username').text(acc.username);
                         $('#preview_user_email').text(acc.email);
                         $('#delete_target_expected_email').text(acc.email);
-                        $('#preview_user_status').html(acc.status === 'active' ? '<span class="badge badge-success">{{__("Active")}}</span>' : '<span class="badge badge-secondary">{{__("Inactive")}}</span>');
+
+                        var statusText = (p.localized && p.localized.status) ? p.localized.status : (acc.status === 'active' ? "{{__('Active')}}" : "{{__('Inactive')}}");
+                        $('#preview_user_status').html(acc.status === 'active' ? '<span class="badge badge-success">' + statusText + '</span>' : '<span class="badge badge-secondary">' + statusText + '</span>');
 
                         var roleBadgeClass = acc.role === 'seller' ? 'badge-primary' : 'badge-info';
-                        $('#preview_user_role_badge').attr('class', 'badge ' + roleBadgeClass).text(acc.role.toUpperCase() + (acc.seller_type !== 'n/a' ? ' (' + acc.seller_type + ')' : ''));
+                        var roleLabel = (p.localized && p.localized.role) ? p.localized.role : (acc.role === 'seller' ? "{{__('Seller')}}" : "{{__('Buyer')}}");
+                        var sellerTypeLabel = acc.seller_type === 'company' ? "{{__('Company')}}" : (acc.seller_type === 'individual' ? "{{__('Individual')}}" : acc.seller_type);
+                        $('#preview_user_role_badge').attr('class', 'badge ' + roleBadgeClass).text(roleLabel + (acc.seller_type !== 'n/a' ? ' (' + sellerTypeLabel + ')' : ''));
 
+                        var modeText = (p.localized && p.localized.deletion_mode) ? p.localized.deletion_mode : (p.deletion_mode === 'purge' ? "{{__('Clean Purge')}}" : "{{__('Anonymize & Retain Ledgers')}}");
                         if (p.deletion_mode === 'purge') {
-                            $('#preview_deletion_mode_badge').html('<span class="badge badge-success"><i class="ti-check"></i> {{__("Clean Purge")}}</span>');
+                            $('#preview_deletion_mode_badge').html('<span class="badge badge-success"><i class="ti-check"></i> ' + modeText + '</span>');
                         } else {
-                            $('#preview_deletion_mode_badge').html('<span class="badge badge-warning"><i class="ti-shield"></i> {{__("Anonymize & Retain Ledgers")}}</span>');
+                            $('#preview_deletion_mode_badge').html('<span class="badge badge-warning"><i class="ti-shield"></i> ' + modeText + '</span>');
                         }
 
                         $('#preview_count_services').text(p.counts.services_count || 0);
