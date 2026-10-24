@@ -104,6 +104,7 @@ Route::middleware(['setlang'])->group(function(){
 
     // Sliders / Home Carousel API routes for React Admin
     Route::get('/sliders-json', 'AdminSliderApiController@index')->name('admin.sliders.api');
+    Route::get('/sliders-json/lookups', 'AdminSliderApiController@lookups')->name('admin.sliders.lookups.api');
     Route::post('/sliders-json', 'AdminSliderApiController@store')->name('admin.sliders.store.api');
     Route::post('/sliders-json/reorder', 'AdminSliderApiController@reorder')->name('admin.sliders.reorder.api');
     Route::post('/sliders-json/{id}', 'AdminSliderApiController@update')->name('admin.sliders.update.api');

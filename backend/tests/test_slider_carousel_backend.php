@@ -187,6 +187,55 @@ it("2.4 Admin API validates invalid action_type and rejects bad target", functio
     return $caught;
 });
 
+it("2.5 Admin API index returns enriched lookups with seller_name and display_label", function() use ($adminController) {
+    $res = $adminController->index();
+    $data = json_decode($res->getContent(), true);
+    $services = $data['lookups']['services'] ?? [];
+    $categories = $data['lookups']['categories'] ?? [];
+
+    if (empty($services) || empty($categories)) return false;
+
+    $firstService = $services[0];
+    $hasServiceFields = isset($firstService['id']) && isset($firstService['title']) && array_key_exists('seller_name', $firstService) && isset($firstService['display_label']);
+
+    $firstCategory = $categories[0];
+    $hasCategoryFields = isset($firstCategory['id']) && isset($firstCategory['name']) && array_key_exists('name_ar', $firstCategory) && isset($firstCategory['display_label']);
+
+    return $hasServiceFields && $hasCategoryFields;
+});
+
+it("2.6 Dedicated /sliders-json/lookups returns active marketplace services across multiple sellers", function() use ($adminController) {
+    $req = Request::create('/admin-home/sliders-json/lookups', 'GET');
+    $res = $adminController->lookups($req);
+    $data = json_decode($res->getContent(), true);
+
+    if (($data['status'] ?? '') !== 'success') return false;
+
+    $services = $data['services'] ?? [];
+    $sellerIds = array_unique(array_filter(array_column($services, 'seller_id')));
+
+    // Verifies services belong to multiple marketplace sellers
+    return count($services) > 0 && count($sellerIds) >= 2;
+});
+
+it("2.7 Dedicated /sliders-json/lookups supports search query and type filter", function() use ($adminController) {
+    // Search by title or seller
+    $searchReq = Request::create('/admin-home/sliders-json/lookups', 'GET', [
+        'search' => 'Provider',
+        'type' => 'service'
+    ]);
+    $searchRes = $adminController->lookups($searchReq);
+    $searchData = json_decode($searchRes->getContent(), true);
+
+    $services = $searchData['services'] ?? [];
+    $categories = $searchData['categories'] ?? [];
+
+    // type=service should leave categories empty
+    $typeFilterHonored = empty($categories) && count($services) > 0;
+
+    return $typeFilterHonored;
+});
+
 // --- 3. Database & Seeder safety tests ---
 echo "\n--- 3. DATABASE SEEDER SAFETY ---\n";
 

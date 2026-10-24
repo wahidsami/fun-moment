@@ -1754,7 +1754,7 @@ export const LaravelAPI = {
   // Home Carousel & Sliders Management
   async getSliders(): Promise<{
     sliders: import('./types').SliderItem[];
-    lookups: { services: any[]; categories: any[] };
+    lookups: { services: import('./types').SliderLookupService[]; categories: import('./types').SliderLookupCategory[] };
     counts: { total: number; active: number; inactive: number };
   }> {
     const response = await fetch('/admin-home/sliders-json', {
@@ -1768,10 +1768,91 @@ export const LaravelAPI = {
     }
 
     const payload = await response.json();
+    let lookups = payload?.lookups ?? { services: [], categories: [] };
+
+    // Resilient fallback: if sliders-json did not supply lookups, pull from marketplace services payload
+    if ((!lookups.services || lookups.services.length === 0) || (!lookups.categories || lookups.categories.length === 0)) {
+      try {
+        const fallback = await this.getServicesPayload();
+        if (!lookups.services || lookups.services.length === 0) {
+          lookups.services = fallback.services.map((s: any) => ({
+            id: s.id,
+            title: s.title_en || s.title || `Service #${s.id}`,
+            seller_id: s.seller_id,
+            seller_name: s.seller_name || (s.seller ? s.seller.name : null),
+            category_id: s.category_id,
+            category_name: s.category_en || (s.category ? s.category.name : null),
+            price: s.price,
+            display_label: (s.seller_name || s.seller?.name)
+              ? `${s.title_en || s.title || `Service #${s.id}`} (${s.seller_name || s.seller?.name})`
+              : (s.title_en || s.title || `Service #${s.id}`),
+          }));
+        }
+        if (!lookups.categories || lookups.categories.length === 0) {
+          lookups.categories = fallback.categories.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            name_ar: c.name_ar || c.name,
+            display_label: c.name,
+          }));
+        }
+      } catch (_) {}
+    }
+
     return {
       sliders: Array.isArray(payload?.sliders) ? payload.sliders : [],
-      lookups: payload?.lookups ?? { services: [], categories: [] },
+      lookups,
       counts: payload?.counts ?? { total: 0, active: 0, inactive: 0 },
+    };
+  },
+
+  async getSliderLookups(search?: string, type?: 'service' | 'category'): Promise<{
+    services: import('./types').SliderLookupService[];
+    categories: import('./types').SliderLookupCategory[];
+  }> {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (type) params.append('type', type);
+
+    try {
+      const response = await fetch(`/admin-home/sliders-json/lookups?${params.toString()}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const payload = await response.json();
+        if (payload?.lookups) {
+          return {
+            services: Array.isArray(payload.lookups.services) ? payload.lookups.services : [],
+            categories: Array.isArray(payload.lookups.categories) ? payload.lookups.categories : [],
+          };
+        }
+      }
+    } catch (_) {}
+
+    // Fallback to getServicesPayload
+    const fallback = await this.getServicesPayload();
+    return {
+      services: fallback.services.map((s: any) => ({
+        id: s.id,
+        title: s.title_en || s.title || `Service #${s.id}`,
+        seller_id: s.seller_id,
+        seller_name: s.seller_name || (s.seller ? s.seller.name : null),
+        category_id: s.category_id,
+        category_name: s.category_en || (s.category ? s.category.name : null),
+        price: s.price,
+        display_label: (s.seller_name || s.seller?.name)
+          ? `${s.title_en || s.title || `Service #${s.id}`} (${s.seller_name || s.seller?.name})`
+          : (s.title_en || s.title || `Service #${s.id}`),
+      })),
+      categories: fallback.categories.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        name_ar: c.name_ar || c.name,
+        display_label: c.name,
+      })),
     };
   },
 

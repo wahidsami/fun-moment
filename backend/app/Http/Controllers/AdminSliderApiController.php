@@ -21,19 +21,23 @@ class AdminSliderApiController extends Controller
     /**
      * List all sliders for the admin dashboard.
      */
-    public function index(): JsonResponse
+    public function index(?Request $request = null): JsonResponse
     {
         $sliders = Slider::orderBy('order', 'asc')->orderBy('id', 'asc')->get()->map(function (Slider $slider) {
             return $this->formatSliderPayload($slider);
         });
 
-        // Provide lookup options for target selection in modal
-        $services = Service::select('id', 'title')->where('status', 1)->orderBy('title')->take(100)->get();
-        $categories = Category::select('id', 'name')->where('status', 1)->orderBy('name')->take(100)->get();
+        // Provide comprehensive lookup options for target selection in modal
+        $searchService = $request ? $request->query('search_service') : null;
+        $searchCategory = $request ? $request->query('search_category') : null;
+        $services = $this->getEligibleServices($searchService);
+        $categories = $this->getEligibleCategories($searchCategory);
 
         return response()->json([
             'status' => 'success',
             'sliders' => $sliders,
+            'services' => $services,
+            'categories' => $categories,
             'lookups' => [
                 'services' => $services,
                 'categories' => $categories,
@@ -42,8 +46,138 @@ class AdminSliderApiController extends Controller
                 'total' => $sliders->count(),
                 'active' => $sliders->where('status', 1)->count(),
                 'inactive' => $sliders->where('status', 0)->count(),
+                'services_count' => count($services),
+                'categories_count' => count($categories),
             ],
         ]);
+    }
+
+    /**
+     * Dedicated dynamic lookups endpoint with search support.
+     */
+    public function lookups(?Request $request = null): JsonResponse
+    {
+        $search = $request ? $request->query('search') : null;
+        $type = $request ? $request->query('type') : null; // 'service', 'category', or null (both)
+
+        $services = ($type === 'category') ? [] : $this->getEligibleServices($search);
+        $categories = ($type === 'service') ? [] : $this->getEligibleCategories($search);
+
+        return response()->json([
+            'status' => 'success',
+            'services' => $services,
+            'categories' => $categories,
+            'lookups' => [
+                'services' => $services,
+                'categories' => $categories,
+            ],
+            'counts' => [
+                'services_count' => count($services),
+                'categories_count' => count($categories),
+            ],
+        ]);
+    }
+
+    /**
+     * Retrieve eligible marketplace services across all sellers.
+     */
+    public function getEligibleServices(?string $search = null): array
+    {
+        $query = Service::query()
+            ->with([
+                'seller' => function ($q) {
+                    $q->select('id', 'name', 'username', 'email');
+                },
+                'category' => function ($q) {
+                    $q->select('id', 'name', 'name_ar');
+                }
+            ])
+            ->where('status', 1)
+            ->where(function ($q) {
+                $q->where('is_service_on', 1)->orWhereNull('is_service_on');
+            });
+
+        if (!empty($search)) {
+            $term = trim($search);
+            $query->where(function ($q) use ($term) {
+                $q->where('title', 'like', "%{$term}%")
+                    ->orWhereHas('seller', function ($sq) use ($term) {
+                        $sq->where('name', 'like', "%{$term}%")
+                            ->orWhere('username', 'like', "%{$term}%");
+                    })
+                    ->orWhereHas('category', function ($cq) use ($term) {
+                        $cq->where('name', 'like', "%{$term}%")
+                            ->orWhere('name_ar', 'like', "%{$term}%");
+                    });
+
+                if (is_numeric($term)) {
+                    $q->orWhere('id', (int) $term);
+                }
+            });
+        }
+
+        return $query->orderBy('title', 'asc')
+            ->get()
+            ->map(function ($s) {
+                $sellerName = $s->seller?->name ?: ($s->seller?->username ?: null);
+                return [
+                    'id' => (int) $s->id,
+                    'title' => $s->title,
+                    'seller_id' => $s->seller_id ? (int) $s->seller_id : null,
+                    'seller_name' => $sellerName,
+                    'category_id' => $s->category_id ? (int) $s->category_id : null,
+                    'category_name' => $s->category?->name,
+                    'category_name_ar' => $s->category?->name_ar,
+                    'price' => $s->price !== null ? (float) $s->price : null,
+                    'status' => (int) $s->status,
+                    'is_service_on' => (int) ($s->is_service_on ?? 1),
+                    'display_label' => $sellerName ? "{$s->title} ({$sellerName})" : $s->title,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Retrieve eligible customer-facing categories across marketplace.
+     */
+    public function getEligibleCategories(?string $search = null): array
+    {
+        $query = Category::query()
+            ->select('id', 'name', 'name_ar', 'status', 'icon', 'sort_order')
+            ->where('status', 1);
+
+        if (!empty($search)) {
+            $term = trim($search);
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'like', "%{$term}%")
+                    ->orWhere('name_ar', 'like', "%{$term}%");
+
+                if (is_numeric($term)) {
+                    $q->orWhere('id', (int) $term);
+                }
+            });
+        }
+
+        return $query->orderBy('sort_order', 'asc')
+            ->orderBy('name', 'asc')
+            ->get()
+            ->map(function ($c) {
+                $nameAr = $c->name_ar ?: $c->name;
+                $displayLabel = ($nameAr && $nameAr !== $c->name)
+                    ? "{$c->name} ({$nameAr})"
+                    : $c->name;
+
+                return [
+                    'id' => (int) $c->id,
+                    'name' => $c->name,
+                    'name_ar' => $nameAr,
+                    'status' => (int) $c->status,
+                    'display_label' => $displayLabel,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**

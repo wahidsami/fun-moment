@@ -723,3 +723,24 @@ export interface SliderItem {
   updated_at?: string;
 }
 
+export interface SliderLookupService {
+  id: number;
+  title: string;
+  seller_id?: number | null;
+  seller_name?: string | null;
+  category_id?: number | null;
+  category_name?: string | null;
+  category_name_ar?: string | null;
+  price?: number | null;
+  status?: number;
+  is_service_on?: number;
+  display_label?: string;
+}
+
+export interface SliderLookupCategory {
+  id: number;
+  name: string;
+  name_ar?: string | null;
+  status?: number;
+  display_label?: string;
+}

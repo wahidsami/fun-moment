@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
-import { Language, UserRole, SliderItem } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Language, UserRole, SliderItem, SliderLookupService, SliderLookupCategory } from '../types';
 import { translations } from '../translations';
 import { LaravelAPI } from '../api';
 import {
@@ -149,7 +149,14 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
 
   // 0. Home Carousel & Promotional Sliders State
   const [sliders, setSliders] = useState<SliderItem[]>([]);
-  const [sliderLookups, setSliderLookups] = useState<{ services: any[]; categories: any[] }>({ services: [], categories: [] });
+  const [sliderLookups, setSliderLookups] = useState<{
+    services: SliderLookupService[];
+    categories: SliderLookupCategory[];
+  }>({ services: [], categories: [] });
+  const [isLoadingLookups, setIsLoadingLookups] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [serviceSearchTerm, setServiceSearchTerm] = useState('');
+  const [categorySearchTerm, setCategorySearchTerm] = useState('');
   const [sliderCounts, setSliderCounts] = useState<{ total: number; active: number; inactive: number }>({ total: 0, active: 0, inactive: 0 });
   const [isLoadingSliders, setIsLoadingSliders] = useState(false);
   const [selectedSlider, setSelectedSlider] = useState<SliderItem | null>(null);
@@ -373,10 +380,15 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
       const data = await LaravelAPI.getSliders();
       const list = Array.isArray(data.sliders) ? data.sliders : [];
       setSliders(list);
+      const incomingServices = Array.isArray(data.lookups?.services) ? data.lookups.services : [];
+      const incomingCategories = Array.isArray(data.lookups?.categories) ? data.lookups.categories : [];
       setSliderLookups({
-        services: Array.isArray(data.lookups?.services) ? data.lookups.services : [],
-        categories: Array.isArray(data.lookups?.categories) ? data.lookups.categories : [],
+        services: incomingServices,
+        categories: incomingCategories,
       });
+      if (incomingServices.length === 0 && incomingCategories.length === 0) {
+        fetchSliderLookups();
+      }
       setSliderCounts({
         total: data.counts?.total ?? list.length,
         active: data.counts?.active ?? list.filter((s: SliderItem) => s.status === 1).length,
@@ -391,6 +403,48 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
       setIsLoadingSliders(false);
     }
   };
+
+  const fetchSliderLookups = async (search?: string, type?: 'service' | 'category') => {
+    setIsLoadingLookups(true);
+    setLookupError(null);
+    try {
+      const res = await LaravelAPI.getSliderLookups(search, type);
+      setSliderLookups(prev => ({
+        services: type === 'category' ? prev.services : (Array.isArray(res.services) ? res.services : []),
+        categories: type === 'service' ? prev.categories : (Array.isArray(res.categories) ? res.categories : []),
+      }));
+    } catch (err: any) {
+      console.warn('Failed to load slider lookups', err);
+      setLookupError(err?.message || 'Failed to load lookups');
+    } finally {
+      setIsLoadingLookups(false);
+    }
+  };
+
+  const filteredServices = useMemo(() => {
+    const list = sliderLookups.services || [];
+    if (!serviceSearchTerm.trim()) return list;
+    const q = serviceSearchTerm.toLowerCase().trim();
+    return list.filter((s: SliderLookupService) => {
+      const matchId = String(s.id).includes(q);
+      const matchTitle = (s.title || '').toLowerCase().includes(q);
+      const matchSeller = (s.seller_name || '').toLowerCase().includes(q);
+      const matchCategory = (s.category_name || '').toLowerCase().includes(q) || (s.category_name_ar || '').toLowerCase().includes(q);
+      return matchId || matchTitle || matchSeller || matchCategory;
+    });
+  }, [sliderLookups.services, serviceSearchTerm]);
+
+  const filteredCategories = useMemo(() => {
+    const list = sliderLookups.categories || [];
+    if (!categorySearchTerm.trim()) return list;
+    const q = categorySearchTerm.toLowerCase().trim();
+    return list.filter((c: SliderLookupCategory) => {
+      const matchId = String(c.id).includes(q);
+      const matchName = (c.name || '').toLowerCase().includes(q);
+      const matchNameAr = (c.name_ar || '').toLowerCase().includes(q);
+      return matchId || matchName || matchNameAr;
+    });
+  }, [sliderLookups.categories, categorySearchTerm]);
 
   const handleUploadSliderFile = async (file?: File | null) => {
     if (!hasPermission || !file) return;
@@ -1019,6 +1073,11 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                             order: sliders.length,
                           });
                           setSliderMediaPickerTab('vault');
+                          setServiceSearchTerm('');
+                          setCategorySearchTerm('');
+                          if (sliderLookups.services.length === 0 && sliderLookups.categories.length === 0) {
+                            fetchSliderLookups();
+                          }
                         }}
                         className="flex items-center gap-1.5 rounded-xl bg-indigo-600 text-white font-bold px-3.5 py-2 text-xs hover:bg-indigo-700 transition shadow-xs"
                       >
@@ -1220,6 +1279,11 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                                       onClick={() => {
                                         setSliderForm({ ...slide });
                                         setSliderMediaPickerTab('vault');
+                                        setServiceSearchTerm('');
+                                        setCategorySearchTerm('');
+                                        if (sliderLookups.services.length === 0 && sliderLookups.categories.length === 0) {
+                                          fetchSliderLookups();
+                                        }
                                       }}
                                       className="p-2 rounded-xl text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition"
                                       title={language === 'en' ? 'Edit slide' : 'تعديل الشريحة'}
@@ -1405,8 +1469,13 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                               setSliderForm({
                                 ...sliderForm,
                                 action_type: newType,
-                                action_target: newType === 'none' ? '' : sliderForm.action_target,
+                                action_target: '',
                               });
+                              if (newType === 'service' && sliderLookups.services.length === 0) {
+                                fetchSliderLookups(undefined, 'service');
+                              } else if (newType === 'category' && sliderLookups.categories.length === 0) {
+                                fetchSliderLookups(undefined, 'category');
+                              }
                             }}
                             className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-semibold"
                           >
@@ -1433,33 +1502,169 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                           )}
 
                           {sliderForm.action_type === 'service' && (
-                            <select
-                              value={sliderForm.action_target || ''}
-                              onChange={e => setSliderForm({ ...sliderForm, action_target: e.target.value })}
-                              className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-medium"
-                            >
-                              <option value="">{t.carousel_select_service || 'Select a Service...'}</option>
-                              {sliderLookups.services.map((srv: any) => (
-                                <option key={srv.id} value={String(srv.id)}>
-                                  #{srv.id} - {srv.title}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="space-y-2">
+                              {/* Header & Controls */}
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-semibold text-slate-500">
+                                  {language === 'en'
+                                    ? `${filteredServices.length} of ${sliderLookups.services.length} services`
+                                    : `${filteredServices.length} من أصل ${sliderLookups.services.length} خدمة`}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => fetchSliderLookups(serviceSearchTerm || undefined, 'service')}
+                                  disabled={isLoadingLookups}
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                                >
+                                  <RefreshCcw className={`h-3 w-3 ${isLoadingLookups ? 'animate-spin' : ''}`} />
+                                  <span>{t.carousel_refresh_lookups || (language === 'ar' ? 'تحديث القائمة' : 'Refresh')}</span>
+                                </button>
+                              </div>
+
+                              {/* Search Filter Input */}
+                              <div className="relative">
+                                <Search className={`absolute top-2.5 h-3.5 w-3.5 text-slate-400 ${isRtl ? 'right-3' : 'left-3'}`} />
+                                <input
+                                  type="text"
+                                  value={serviceSearchTerm}
+                                  onChange={e => setServiceSearchTerm(e.target.value)}
+                                  placeholder={t.carousel_search_services || (language === 'ar' ? 'تصفية الخدمات أو اسم المزود...' : 'Filter services or provider name...')}
+                                  className={`w-full text-xs rounded-xl border border-slate-200 py-2 bg-slate-50/70 focus:bg-white focus:border-indigo-500 focus:outline-none transition ${
+                                    isRtl ? 'pr-9 pl-7' : 'pl-9 pr-7'
+                                  }`}
+                                />
+                                {serviceSearchTerm && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setServiceSearchTerm('')}
+                                    className={`absolute top-2 text-slate-400 hover:text-slate-600 ${isRtl ? 'left-2.5' : 'right-2.5'}`}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Dropdown Selector */}
+                              <select
+                                value={sliderForm.action_target || ''}
+                                onChange={e => setSliderForm({ ...sliderForm, action_target: e.target.value })}
+                                disabled={isLoadingLookups && sliderLookups.services.length === 0}
+                                className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-medium truncate"
+                              >
+                                <option value="">{t.carousel_select_service || 'Select a Service...'}</option>
+                                {sliderForm.action_target &&
+                                  !filteredServices.some(s => String(s.id) === String(sliderForm.action_target)) && (
+                                    <option value={sliderForm.action_target}>
+                                      [ID #{sliderForm.action_target}] - {language === 'en' ? 'Currently Selected Service' : 'الخدمة المختارة حالياً'}
+                                    </option>
+                                  )}
+                                {filteredServices.map((srv: SliderLookupService) => (
+                                  <option key={srv.id} value={String(srv.id)}>
+                                    #{srv.id} - {srv.title} {srv.seller_name ? `(${srv.seller_name})` : ''} {srv.price ? `• ${srv.price} SAR` : ''}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {/* Loading / Status Helper */}
+                              {isLoadingLookups && (
+                                <p className="text-[10px] text-indigo-600 animate-pulse flex items-center gap-1">
+                                  <RefreshCcw className="h-2.5 w-2.5 animate-spin" />
+                                  {t.carousel_loading_lookups || (language === 'ar' ? 'جاري تحميل سجلات السوق...' : 'Loading marketplace records...')}
+                                </p>
+                              )}
+                              {!isLoadingLookups && filteredServices.length === 0 && (
+                                <p className="text-[11px] text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                                  {t.carousel_no_services_found || (language === 'ar' ? 'لم يتم العثور على خدمات مطابقة في السوق' : 'No eligible marketplace services found')}
+                                </p>
+                              )}
+                            </div>
                           )}
 
                           {sliderForm.action_type === 'category' && (
-                            <select
-                              value={sliderForm.action_target || ''}
-                              onChange={e => setSliderForm({ ...sliderForm, action_target: e.target.value })}
-                              className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-medium"
-                            >
-                              <option value="">{t.carousel_select_category || 'Select a Category...'}</option>
-                              {sliderLookups.categories.map((cat: any) => (
-                                <option key={cat.id} value={String(cat.id)}>
-                                  #{cat.id} - {cat.name}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="space-y-2">
+                              {/* Header & Controls */}
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-semibold text-slate-500">
+                                  {language === 'en'
+                                    ? `${filteredCategories.length} of ${sliderLookups.categories.length} categories`
+                                    : `${filteredCategories.length} من أصل ${sliderLookups.categories.length} تصنيف`}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => fetchSliderLookups(categorySearchTerm || undefined, 'category')}
+                                  disabled={isLoadingLookups}
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                                >
+                                  <RefreshCcw className={`h-3 w-3 ${isLoadingLookups ? 'animate-spin' : ''}`} />
+                                  <span>{t.carousel_refresh_lookups || (language === 'ar' ? 'تحديث القائمة' : 'Refresh')}</span>
+                                </button>
+                              </div>
+
+                              {/* Search Filter Input */}
+                              <div className="relative">
+                                <Search className={`absolute top-2.5 h-3.5 w-3.5 text-slate-400 ${isRtl ? 'right-3' : 'left-3'}`} />
+                                <input
+                                  type="text"
+                                  value={categorySearchTerm}
+                                  onChange={e => setCategorySearchTerm(e.target.value)}
+                                  placeholder={t.carousel_search_categories || (language === 'ar' ? 'تصفية التصنيفات...' : 'Filter categories...')}
+                                  className={`w-full text-xs rounded-xl border border-slate-200 py-2 bg-slate-50/70 focus:bg-white focus:border-indigo-500 focus:outline-none transition ${
+                                    isRtl ? 'pr-9 pl-7' : 'pl-9 pr-7'
+                                  }`}
+                                />
+                                {categorySearchTerm && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setCategorySearchTerm('')}
+                                    className={`absolute top-2 text-slate-400 hover:text-slate-600 ${isRtl ? 'left-2.5' : 'right-2.5'}`}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Dropdown Selector */}
+                              <select
+                                value={sliderForm.action_target || ''}
+                                onChange={e => setSliderForm({ ...sliderForm, action_target: e.target.value })}
+                                disabled={isLoadingLookups && sliderLookups.categories.length === 0}
+                                className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-medium truncate"
+                              >
+                                <option value="">{t.carousel_select_category || 'Select a Category...'}</option>
+                                {sliderForm.action_target &&
+                                  !filteredCategories.some(c => String(c.id) === String(sliderForm.action_target)) && (
+                                    <option value={sliderForm.action_target}>
+                                      [ID #{sliderForm.action_target}] - {language === 'en' ? 'Currently Selected Category' : 'التصنيف المختار حالياً'}
+                                    </option>
+                                  )}
+                                {filteredCategories.map((cat: SliderLookupCategory) => {
+                                  const localizedName = isRtl
+                                    ? (cat.name_ar || cat.name)
+                                    : cat.name;
+                                  const secondaryName = isRtl
+                                    ? (cat.name_ar && cat.name !== cat.name_ar ? `(${cat.name})` : '')
+                                    : (cat.name_ar ? `(${cat.name_ar})` : '');
+                                  return (
+                                    <option key={cat.id} value={String(cat.id)}>
+                                      #{cat.id} - {localizedName} {secondaryName}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+
+                              {/* Loading / Status Helper */}
+                              {isLoadingLookups && (
+                                <p className="text-[10px] text-indigo-600 animate-pulse flex items-center gap-1">
+                                  <RefreshCcw className="h-2.5 w-2.5 animate-spin" />
+                                  {t.carousel_loading_lookups || (language === 'ar' ? 'جاري تحميل سجلات السوق...' : 'Loading marketplace records...')}
+                                </p>
+                              )}
+                              {!isLoadingLookups && filteredCategories.length === 0 && (
+                                <p className="text-[11px] text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                                  {t.carousel_no_categories_found || (language === 'ar' ? 'لم يتم العثور على تصنيفات' : 'No categories found')}
+                                </p>
+                              )}
+                            </div>
                           )}
 
                           {sliderForm.action_type === 'url' && (
