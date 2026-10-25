@@ -24,6 +24,8 @@ import 'package:funmoments/view/wallet/wallet_page.dart';
 import 'package:funmoments/view/provider/provider_services_page.dart';
 import 'package:funmoments/view/provider/provider_add_service_page.dart';
 import 'package:funmoments/view/provider/provider_availability_page.dart';
+import 'package:funmoments/view/music/music_marketplace_page.dart';
+import 'package:funmoments/view/music/my_music_favorites_page.dart';
 
 import '../../auth/delete_account_page.dart';
 import '../../utils/login_or_register.dart';
@@ -207,6 +209,58 @@ class _MenuPageState extends State<MenuPage> {
                                                         ),
                                                       );
                                                     }),
+
+                                                    CommonHelper()
+                                                        .dividerCommon(),
+                                                    SettingsHelper().settingOption(
+                                                        '',
+                                                        asProvider.getString(
+                                                            "Music Marketplace"),
+                                                        () {
+                                                      Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute<void>(
+                                                          builder: (BuildContext
+                                                                  context) =>
+                                                              const MusicMarketplacePage(),
+                                                        ),
+                                                      );
+                                                    },
+                                                    leading: Container(
+                                                      width: 35,
+                                                      height: 35,
+                                                      decoration: BoxDecoration(
+                                                        color: FMColors.cyan.withOpacity(0.15),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: const Icon(Icons.music_note_rounded, color: FMColors.cyan, size: 20),
+                                                    )),
+
+                                                    CommonHelper()
+                                                        .dividerCommon(),
+                                                    SettingsHelper().settingOption(
+                                                        '',
+                                                        asProvider.getString(
+                                                            "Favorite Tracks"),
+                                                        () {
+                                                      Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute<void>(
+                                                          builder: (BuildContext
+                                                                  context) =>
+                                                              const MyMusicFavoritesPage(),
+                                                        ),
+                                                      );
+                                                    },
+                                                    leading: Container(
+                                                      width: 35,
+                                                      height: 35,
+                                                      decoration: BoxDecoration(
+                                                        color: FMColors.magenta.withOpacity(0.15),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: const Icon(Icons.favorite_rounded, color: FMColors.magenta, size: 20),
+                                                    )),
 
                                                     CommonHelper()
                                                         .dividerCommon(),

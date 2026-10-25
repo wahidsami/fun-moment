@@ -14,6 +14,7 @@ import 'package:funmoments/view/home/components/recent_services.dart';
 import 'package:funmoments/view/home/components/slider_home.dart';
 import 'package:funmoments/view/home/components/top_rated_services.dart';
 import 'package:funmoments/view/home/homepage_helper.dart';
+import 'package:funmoments/view/music/music_marketplace_page.dart';
 import 'package:funmoments/view/search/service_filter_molde.dart';
 import 'package:funmoments/view/utils/constant_colors.dart';
 import 'package:funmoments/view/utils/constant_styles.dart';
@@ -188,6 +189,104 @@ class _HomepageState extends State<Homepage> {
                         cc: cc,
                         asProvider: asProvider,
                       ),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MusicMarketplacePage(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(FMRadii.lg),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF1E1338), Color(0xFF101B34)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            border: Border.all(color: FMColors.cyan.withOpacity(0.4)),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x332DE2FF),
+                                blurRadius: 14,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: FMGradients.funGradient,
+                                ),
+                                child: const Icon(
+                                  Icons.music_note_rounded,
+                                  color: Colors.white,
+                                  size: 26,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          asProvider.getString('Music Marketplace'),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: FMColors.magenta.withOpacity(0.25),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: FMColors.magenta, width: 0.5),
+                                          ),
+                                          child: const Text(
+                                            'NEW',
+                                            style: TextStyle(
+                                              color: FMColors.magentaLight,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      asProvider.getString('Stream and explore exclusive music tracks & releases'),
+                                      style: const TextStyle(
+                                        color: FMColors.textMuted,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                color: FMColors.cyan,
+                                size: 14,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
                       RecentServices(
                         cc: cc,
                         asProvider: asProvider,

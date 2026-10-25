@@ -67,7 +67,8 @@ class MusicStreamController extends Controller
         }
 
         $ttlSeconds = 900; // 15 minutes
-        $ticket = $this->streamService->createStreamTicket($user, $track, $access['mode'], $ttlSeconds);
+        $sessionId = (string) \Illuminate\Support\Str::uuid();
+        $ticket = $this->streamService->createStreamTicket($user, $track, $access['mode'], $ttlSeconds, $sessionId);
 
         return response()->json([
             'success' => true,
@@ -76,6 +77,8 @@ class MusicStreamController extends Controller
                 'track_id' => $track->id,
                 'title' => $track->title,
                 'mode' => $access['mode'],
+                'playback_session_id' => $sessionId,
+                'session_token' => $ticket,
                 'preview_duration_seconds' => $access['mode'] === 'preview' ? $track->preview_duration_seconds : null,
                 'ticket' => $ticket,
                 'stream_url' => route('api.v1.music.tracks.stream', [

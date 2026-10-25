@@ -223,6 +223,11 @@ class MusicTrack extends Model
         return $this->hasMany(MusicFavorite::class, 'track_id', 'id');
     }
 
+    public function playbackEvents(): HasMany
+    {
+        return $this->hasMany(MusicPlaybackEvent::class, 'track_id', 'id');
+    }
+
     // Scopes
     public function scopePublished($query)
     {

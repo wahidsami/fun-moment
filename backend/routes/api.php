@@ -365,12 +365,27 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
     Route::get('/terms-and-condition', [SliderController::class, 'terms_and_condition_page']);
     Route::get('/privacy-policy', [SliderController::class, 'privacy_policy_page']);
 
-    // Music Stream & Playback Authorization Endpoints (Phase 2 & 3A)
+    // Music Stream, Catalog, Favorites & Playback Analytics (Phase 2, 3A, 4)
     Route::group(['prefix' => 'music'], function () {
         Route::get('/config', [\App\Http\Controllers\Api\MusicStreamController::class, 'config'])->name('api.v1.music.config');
         Route::get('/genres', [\App\Http\Controllers\Api\SellerMusicTrackController::class, 'genres'])->name('api.v1.music.genres');
         Route::get('/tracks/{id}/stream-ticket', [\App\Http\Controllers\Api\MusicStreamController::class, 'requestStreamTicket'])->name('api.v1.music.tracks.stream-ticket');
         Route::get('/tracks/{id}/stream', [\App\Http\Controllers\Api\MusicStreamController::class, 'stream'])->name('api.v1.music.tracks.stream');
+
+        // Phase 4: Buyer Music Catalog & Discovery
+        Route::get('/catalog', [\App\Http\Controllers\Api\MusicCatalogController::class, 'index'])->name('api.v1.music.catalog.index');
+        Route::get('/catalog/latest-releases', [\App\Http\Controllers\Api\MusicCatalogController::class, 'latestReleases'])->name('api.v1.music.catalog.latest-releases');
+        Route::get('/catalog/tracks/{id}', [\App\Http\Controllers\Api\MusicCatalogController::class, 'show'])->name('api.v1.music.catalog.show');
+
+        // Phase 4: Playback Analytics Ingestion
+        Route::post('/analytics/playback-event', [\App\Http\Controllers\Api\MusicAnalyticsController::class, 'recordPlaybackEvent'])->name('api.v1.music.analytics.playback-event');
+
+        // Phase 4: Authenticated Favorites
+        Route::group(['middleware' => 'auth:sanctum'], function () {
+            Route::post('/favorites/toggle', [\App\Http\Controllers\Api\MusicFavoriteController::class, 'toggle'])->name('api.v1.music.favorites.toggle');
+            Route::get('/favorites', [\App\Http\Controllers\Api\MusicFavoriteController::class, 'index'])->name('api.v1.music.favorites.index');
+        });
     });
+
 
 });

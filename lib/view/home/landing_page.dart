@@ -22,6 +22,7 @@ import 'package:funmoments/view/jobs/my_jobs_page.dart';
 import 'package:funmoments/view/provider/provider_dashboard_page.dart';
 import 'package:funmoments/view/provider/provider_services_page.dart';
 
+import 'package:funmoments/view/music/components/mini_player_bar.dart';
 import 'package:funmoments/view/utils/constant_colors.dart';
 import '../search/service_filter_molde.dart';
 
@@ -169,10 +170,16 @@ class _HomePageState extends State<LandingPage> {
       bottomNavigationBar: ValueListenableBuilder<int>(
         valueListenable: HomepageHelper.tabIndex,
         builder: (context, value, child) {
-          return BottomNav(
-            currentIndex: value,
-            onTabTapped: onTabTapped,
-            isSeller: isSeller,
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!isSeller) const MiniPlayerBar(),
+              BottomNav(
+                currentIndex: value,
+                onTabTapped: onTabTapped,
+                isSeller: isSeller,
+              ),
+            ],
           );
         },
       ),

@@ -29,16 +29,35 @@ class MusicFavorite extends Model
     }
 
     /**
-     * Atomically toggle favorite state for a user and track.
+     * Set or toggle favorite state idempotently for a user and track.
+     * $action can be 'favorite', 'unfavorite', or 'toggle'.
      * Returns true if favorited, false if unfavorited.
      */
-    public static function toggle(int $userId, int $trackId): bool
+    public static function setFavorite(int $userId, int $trackId, string $action = 'toggle'): bool
     {
-        return DB::transaction(function () use ($userId, $trackId) {
+        return DB::transaction(function () use ($userId, $trackId, $action) {
             $existing = static::where('user_id', $userId)
                 ->where('track_id', $trackId)
                 ->first();
 
+            if ($action === 'favorite') {
+                if (!$existing) {
+                    static::create([
+                        'user_id' => $userId,
+                        'track_id' => $trackId,
+                    ]);
+                }
+                return true;
+            }
+
+            if ($action === 'unfavorite') {
+                if ($existing) {
+                    $existing->delete();
+                }
+                return false;
+            }
+
+            // Default 'toggle'
             if ($existing) {
                 $existing->delete();
                 return false;
@@ -50,5 +69,22 @@ class MusicFavorite extends Model
             ]);
             return true;
         });
+    }
+
+    /**
+     * Atomically toggle favorite state for a user and track.
+     * Returns true if favorited, false if unfavorited.
+     */
+    public static function toggle(int $userId, int $trackId): bool
+    {
+        return static::setFavorite($userId, $trackId, 'toggle');
+    }
+
+    /**
+     * Check if a track is favorited by a user.
+     */
+    public static function isFavorite(int $userId, int $trackId): bool
+    {
+        return static::where('user_id', $userId)->where('track_id', $trackId)->exists();
     }
 }

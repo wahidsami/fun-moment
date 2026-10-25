@@ -203,12 +203,19 @@ class MusicStreamService
      * @param int $ttlSeconds Ticket lifetime (default 900s = 15 minutes)
      * @return string
      */
-    public function createStreamTicket(?\Illuminate\Contracts\Auth\Authenticatable $user, MusicTrack $track, string $mode, int $ttlSeconds = 900): string
-    {
+    public function createStreamTicket(
+        ?\Illuminate\Contracts\Auth\Authenticatable $user,
+        MusicTrack $track,
+        string $mode,
+        int $ttlSeconds = 900,
+        ?string $sessionId = null
+    ): string {
+        $sessionId = $sessionId ?: (string) Str::uuid();
         $payload = [
             'trk' => $track->id,
-            'usr' => $user ? $user->getAuthIdentifier() : null,
+            'usr' => $user ? (int) $user->getAuthIdentifier() : null,
             'mod' => $mode,
+            'sid' => $sessionId,
             'exp' => time() + $ttlSeconds,
             'jti' => Str::random(16),
         ];
@@ -357,8 +364,50 @@ class MusicStreamService
             'valid' => true,
             'mode' => $mode,
             'user_id' => $ticketUserId,
+            'session_id' => $payload['sid'] ?? null,
             'error' => null,
         ];
+    }
+
+    /**
+     * Validate a playback session token for telemetry ingestion.
+     *
+     * @param string $token HMAC signed stream ticket or session token
+     * @param MusicTrack $track Expected track
+     * @param \Illuminate\Contracts\Auth\Authenticatable|null $currentUser Current authenticated user or null
+     * @param string|null $expectedSessionId Expected session UUID if provided
+     * @return array{
+     *     valid: bool,
+     *     mode: ?string,
+     *     user_id: ?int,
+     *     session_id: ?string,
+     *     error: ?string
+     * }
+     */
+    public function validatePlaybackSessionToken(
+        string $token,
+        MusicTrack $track,
+        ?\Illuminate\Contracts\Auth\Authenticatable $currentUser = null,
+        ?string $expectedSessionId = null
+    ): array {
+        $validation = $this->validateStreamTicket($token, $track, $currentUser);
+        if (!$validation['valid']) {
+            return $validation;
+        }
+
+        if ($expectedSessionId !== null && !empty($validation['session_id'])) {
+            if ($validation['session_id'] !== $expectedSessionId) {
+                return [
+                    'valid' => false,
+                    'mode' => null,
+                    'user_id' => null,
+                    'session_id' => null,
+                    'error' => 'Playback session ID mismatch with session token',
+                ];
+            }
+        }
+
+        return $validation;
     }
 
     /**
