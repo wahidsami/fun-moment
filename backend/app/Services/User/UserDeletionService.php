@@ -7,6 +7,7 @@ use App\AdminAuditLog;
 use App\Day;
 use App\EditServiceHistory;
 use App\MediaUpload;
+use App\MusicTrack;
 use App\OnlineServiceFaq;
 use App\Order;
 use App\PayoutRequest;
@@ -342,6 +343,9 @@ class UserDeletionService
                 'status' => 0,
                 'is_service_on' => 0,
             ]);
+
+            // Suspend seller's music catalog while preserving past orders & entitlements
+            MusicTrack::suspendForDeactivatedSeller($originalId, "Account deleted by Admin #{$adminId} (Mode: {$mode})");
 
             // Step 2: Delete seller-specific non-financial configuration
             Schedule::where('seller_id', $originalId)->delete();

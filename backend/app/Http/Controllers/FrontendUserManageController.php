@@ -38,6 +38,7 @@ use App\Day;
 use App\Schedule;
 use App\ExtraService;
 use App\EditServiceHistory;
+use App\MusicTrack;
 use App\OnlineServiceFaq;
 use App\ServiceCoupon;
 use App\SellerVerify;
@@ -753,6 +754,7 @@ class FrontendUserManageController extends Controller
         if($user_status_2->user_status == 0){
             Service::where('seller_id',$id)
             ->update(['status'=>0]);
+            MusicTrack::suspendForDeactivatedSeller((int) $id, 'Seller status set to inactive by administrator');
         }
         if($user_status_2->user_status == 1){
             Service::where('seller_id',$id)

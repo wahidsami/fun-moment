@@ -40,4 +40,12 @@ class Admin extends Authenticatable
     public function verifiedSellers(){
         return $this->hasMany(SellerVerify::class, 'verified_by', 'id');
     }
+
+    public function musicTracks(){
+        return $this->hasMany(MusicTrack::class, 'admin_id', 'id');
+    }
+
+    public function reviewedMusicTracks(){
+        return $this->hasMany(MusicTrack::class, 'reviewed_by_admin_id', 'id');
+    }
 }

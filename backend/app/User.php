@@ -76,7 +76,29 @@ class User extends Authenticatable
         'user_type' => 'integer',
         'email_verified' => 'integer',
     ];
-    
+
+    public static function boot()
+    {
+        parent::boot();
+
+        static::updated(function (User $user) {
+            if ($user->isDirty('user_status') && (int) $user->user_status === 0 && $user->isProvider()) {
+                MusicTrack::suspendForDeactivatedSeller(
+                    (int) $user->id,
+                    'Seller account deactivated'
+                );
+            }
+        });
+
+        static::deleting(function (User $user) {
+            if ($user->isProvider()) {
+                MusicTrack::suspendForDeactivatedSeller(
+                    (int) $user->id,
+                    'Seller account deleted'
+                );
+            }
+        });
+    }
 
     public function country(){
         return $this->belongsTo(Country::class,'country_id','id');
@@ -171,5 +193,39 @@ class User extends Authenticatable
     public function isCompanyProvider(): bool
     {
         return $this->isProvider() && (int) $this->seller_type === self::SELLER_TYPE_COMPANY;
+    }
+
+    /*--------------------------------------------------------------------------
+     * Music Marketplace Relationships
+     *--------------------------------------------------------------------------*/
+
+    public function musicTracks()
+    {
+        return $this->hasMany(MusicTrack::class, 'seller_id', 'id');
+    }
+
+    public function musicOrdersAsBuyer()
+    {
+        return $this->hasMany(MusicOrder::class, 'buyer_id', 'id');
+    }
+
+    public function musicOrdersAsSeller()
+    {
+        return $this->hasMany(MusicOrder::class, 'seller_id', 'id');
+    }
+
+    public function musicEntitlements()
+    {
+        return $this->hasMany(MusicEntitlement::class, 'user_id', 'id');
+    }
+
+    public function musicFavorites()
+    {
+        return $this->hasMany(MusicFavorite::class, 'user_id', 'id');
+    }
+
+    public function favoriteMusicTracks()
+    {
+        return $this->belongsToMany(MusicTrack::class, 'music_favorites', 'user_id', 'track_id')->withTimestamps();
     }
 }
