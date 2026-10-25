@@ -341,7 +341,19 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
                 Route::get('/history', [SellerSubscriptionController::class, 'subscription_history'])->name('seller.subscription.history');
             });
         }
-        
+
+        // Seller Music Management (Phase 3B)
+        Route::group(['prefix' => 'music'], function () {
+            Route::get('/config', [\App\Http\Controllers\Api\SellerMusicTrackController::class, 'config']);
+            Route::get('/genres', [\App\Http\Controllers\Api\SellerMusicTrackController::class, 'genres']);
+            Route::get('/tracks', [\App\Http\Controllers\Api\SellerMusicTrackController::class, 'index']);
+            Route::post('/tracks', [\App\Http\Controllers\Api\SellerMusicTrackController::class, 'store']);
+            Route::get('/tracks/{id}', [\App\Http\Controllers\Api\SellerMusicTrackController::class, 'show']);
+            Route::post('/tracks/{id}', [\App\Http\Controllers\Api\SellerMusicTrackController::class, 'update']);
+            Route::post('/tracks/{id}/retry', [\App\Http\Controllers\Api\SellerMusicTrackController::class, 'retryProcessing']);
+            Route::delete('/tracks/{id}', [\App\Http\Controllers\Api\SellerMusicTrackController::class, 'destroy']);
+        });
+
     });
 
     Route::group(['prefix' => 'service'],function(){
@@ -356,6 +368,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
     // Music Stream & Playback Authorization Endpoints (Phase 2 & 3A)
     Route::group(['prefix' => 'music'], function () {
         Route::get('/config', [\App\Http\Controllers\Api\MusicStreamController::class, 'config'])->name('api.v1.music.config');
+        Route::get('/genres', [\App\Http\Controllers\Api\SellerMusicTrackController::class, 'genres'])->name('api.v1.music.genres');
         Route::get('/tracks/{id}/stream-ticket', [\App\Http\Controllers\Api\MusicStreamController::class, 'requestStreamTicket'])->name('api.v1.music.tracks.stream-ticket');
         Route::get('/tracks/{id}/stream', [\App\Http\Controllers\Api\MusicStreamController::class, 'stream'])->name('api.v1.music.tracks.stream');
     });

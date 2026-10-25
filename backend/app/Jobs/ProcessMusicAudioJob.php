@@ -30,10 +30,12 @@ class ProcessMusicAudioJob implements ShouldQueue
 
     /**
      * Create a new job instance.
+     *
+     * @param MusicTrack|int $track
      */
-    public function __construct(MusicTrack $track)
+    public function __construct($track)
     {
-        $this->track = $track;
+        $this->track = $track instanceof MusicTrack ? $track : MusicTrack::findOrFail($track);
     }
 
     /**

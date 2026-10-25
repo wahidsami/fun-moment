@@ -60,7 +60,7 @@ class MusicTrackPolicy
         }
 
         // Approved tracks require admin review to modify core audio/metadata
-        return in_array($track->status, [MusicTrack::STATUS_DRAFT, MusicTrack::STATUS_REJECTED], true);
+        return in_array($track->status, [MusicTrack::STATUS_DRAFT, MusicTrack::STATUS_PENDING, MusicTrack::STATUS_REJECTED], true);
     }
 
     /**
@@ -73,11 +73,16 @@ class MusicTrackPolicy
         }
 
         // Cannot delete if active paid orders exist (must preserve financial reconciliation)
-        if ($track->orders()->whereIn('payment_status', ['completed'])->exists()) {
+        if ($track->orders()->whereIn('payment_status', ['completed', 'paid'])->exists()) {
             return false;
         }
 
-        return in_array($track->status, [MusicTrack::STATUS_DRAFT, MusicTrack::STATUS_REJECTED], true);
+        return in_array($track->status, [
+            MusicTrack::STATUS_DRAFT,
+            MusicTrack::STATUS_PENDING,
+            MusicTrack::STATUS_REJECTED,
+            MusicTrack::STATUS_SUSPENDED,
+        ], true);
     }
 
     /**

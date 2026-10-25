@@ -10,6 +10,7 @@ import 'package:funmoments/view/jobs/my_jobs_page.dart';
 import 'package:funmoments/view/provider/provider_add_service_page.dart';
 import 'package:funmoments/view/provider/provider_availability_page.dart';
 import 'package:funmoments/view/provider/provider_services_page.dart';
+import 'package:funmoments/view/provider/seller_my_music_page.dart';
 import 'package:funmoments/view/tabs/orders/orders_page.dart';
 import 'package:funmoments/view/tabs/settings/supports/my_tickets_page.dart';
 import 'package:funmoments/view/wallet/wallet_page.dart';
@@ -200,6 +201,15 @@ class _ProviderDashboardPageState extends State<ProviderDashboardPage> {
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => const ProviderAddServicePage()),
+                        ),
+                      ),
+                      _actionTile(
+                        icon: Icons.library_music_outlined,
+                        title: lnProvider.getString('My Music'),
+                        subtitle: lnProvider.getString('Tracks & releases'),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SellerMyMusicPage()),
                         ),
                       ),
                       _actionTile(

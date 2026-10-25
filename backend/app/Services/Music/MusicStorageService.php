@@ -249,6 +249,23 @@ class MusicStorageService
     }
 
     /**
+     * Delete a stored file from the private music disk.
+     */
+    public function deleteFile(?string $relativePath): bool
+    {
+        if (empty($relativePath)) {
+            return false;
+        }
+
+        try {
+            $sanitized = $this->sanitizeRelativePath($relativePath);
+            return Storage::disk(self::DISK)->delete($sanitized);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * Sanitize original display filename.
      */
     protected function sanitizeFilename(string $filename): string

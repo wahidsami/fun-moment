@@ -784,3 +784,71 @@ export interface MusicSettingsApiResponse {
     can_manage: boolean;
   };
 }
+
+export interface MusicModerationOffer {
+  id: number;
+  offer_type: 'free' | 'rent' | 'sale';
+  price: number;
+  currency: string;
+  rental_duration_days?: number | null;
+  is_active: boolean;
+}
+
+export interface MusicModerationTrackItem {
+  id: number;
+  seller_id: number;
+  seller?: {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string;
+  };
+  title: string;
+  artist_name?: string | null;
+  description?: string | null;
+  genre_id?: number | null;
+  genre_name?: string | null;
+  secondary_genres?: string[] | null;
+  bpm?: number | null;
+  musical_key?: string | null;
+  rights_declaration?: string | null;
+  rights_notes?: string | null;
+  status: 'draft' | 'pending' | 'approved' | 'rejected' | 'suspended';
+  media_status: 'draft' | 'pending' | 'processing' | 'ready' | 'failed';
+  rejection_reason?: string | null;
+  admin_notes?: string | null;
+  cover_image_path?: string | null;
+  cover_image_url?: string | null;
+  duration_seconds?: number | null;
+  audio_format?: string | null;
+  audio_bitrate_kbps?: number | null;
+  audio_sample_rate_hz?: number | null;
+  audio_channels?: number | null;
+  processing_error?: string | null;
+  offers_count?: number;
+  offers?: MusicModerationOffer[];
+  created_at: string;
+  submitted_at?: string | null;
+  released_at?: string | null;
+  preview_stream_url?: string | null;
+}
+
+export interface MusicModerationCounts {
+  pending: number;
+  approved: number;
+  rejected: number;
+  suspended: number;
+  all: number;
+}
+
+export interface MusicModerationApiResponse {
+  success: boolean;
+  counts: MusicModerationCounts;
+  tracks: {
+    data: MusicModerationTrackItem[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}

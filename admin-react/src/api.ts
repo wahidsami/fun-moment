@@ -21,6 +21,8 @@ import {
   MusicMarketplaceSettings,
   MusicMarketplaceRuntime,
   MusicSettingsApiResponse,
+  MusicModerationTrackItem,
+  MusicModerationApiResponse,
 } from './types';
 
 export interface DashboardSettings {
@@ -1025,6 +1027,120 @@ export const LaravelAPI = {
     throw new Error(payload?.message_en || 'Music settings save failed');
   },
 
+  // Music Marketplace Moderation (Phase 3B)
+  async getMusicSubmissions(params?: { tab?: string; search?: string; page?: number; per_page?: number }): Promise<MusicModerationApiResponse> {
+    const query = new URLSearchParams();
+    if (params?.tab) query.set('tab', params.tab);
+    if (params?.search) query.set('search', params.search);
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.per_page) query.set('per_page', String(params.per_page));
+
+    const url = `/admin-home/music-moderation-json${query.toString() ? `?${query.toString()}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load music submissions (${response.status})`);
+    }
+
+    const payload = await response.json();
+    if (payload?.success) {
+      return payload as MusicModerationApiResponse;
+    }
+
+    throw new Error(payload?.message_en || 'Failed to load music submissions');
+  },
+
+  async getMusicSubmissionDetail(id: number): Promise<{ success: boolean; track: MusicModerationTrackItem }> {
+    const response = await fetch(`/admin-home/music-moderation-json/${id}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load track details (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async approveMusicSubmission(id: number): Promise<{ success: boolean; message_en: string; track: MusicModerationTrackItem }> {
+    const response = await fetchWithCsrf(`/admin-home/music-moderation-json/${id}/approve`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to approve track (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) {
+          errMsg = errJson.message_en;
+        }
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  async rejectMusicSubmission(id: number, reason: string): Promise<{ success: boolean; message_en: string; track: MusicModerationTrackItem }> {
+    const response = await fetchWithCsrf(`/admin-home/music-moderation-json/${id}/reject`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ rejection_reason: reason }),
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to reject track (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) {
+          errMsg = errJson.message_en;
+        } else if (errJson?.errors) {
+          errMsg = Object.values(errJson.errors).flat().join(', ');
+        }
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  async suspendMusicSubmission(id: number, reason?: string): Promise<{ success: boolean; message_en: string; track: MusicModerationTrackItem }> {
+    const response = await fetchWithCsrf(`/admin-home/music-moderation-json/${id}/suspend`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ suspension_reason: reason || '' }),
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to suspend track (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) {
+          errMsg = errJson.message_en;
+        }
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
   // Activity log
   async getActivityLogs(): Promise<DashboardActivityLog[]> {
     const response = await fetch('/admin-home/dashboard-summary', {
@@ -2003,6 +2119,8 @@ export const LaravelAPI = {
     }
   },
 };
+
+export const api = LaravelAPI;
 
 // CSRF Token Management for authenticated administrative requests
 let cachedCsrfToken: string | null = null;

@@ -19,6 +19,13 @@ Route::middleware(['setlang'])->group(function(){
     Route::post('/music-settings-json', 'AdminMusicSettingController@update')->name('admin.music.settings.json.update');
     Route::get('/music/settings-json', 'AdminMusicSettingController@index')->name('admin.music.settings.json.alias');
     Route::post('/music/settings-json', 'AdminMusicSettingController@update')->name('admin.music.settings.json.update.alias');
+    // Music Marketplace Moderation (Phase 3B)
+    Route::get('/music-moderation-json', 'AdminMusicModerationController@index')->name('admin.music.moderation.json');
+    Route::get('/music/moderation-json', 'AdminMusicModerationController@index')->name('admin.music.moderation.json.alias');
+    Route::get('/music-moderation-json/{id}', 'AdminMusicModerationController@show')->name('admin.music.moderation.json.show');
+    Route::post('/music-moderation-json/{id}/approve', 'AdminMusicModerationController@approve')->name('admin.music.moderation.json.approve');
+    Route::post('/music-moderation-json/{id}/reject', 'AdminMusicModerationController@reject')->name('admin.music.moderation.json.reject');
+    Route::post('/music-moderation-json/{id}/suspend', 'AdminMusicModerationController@suspend')->name('admin.music.moderation.json.suspend');
     Route::get('/dark-mode-toggle', 'AdminDashboardController@dark_mode_toggle')->name('admin.dark.mode.toggle');
     Route::get('/feature-flags', 'AdminFeatureFlagController@index')->name('admin.feature.flags');
     Route::post('/feature-flags/{module}', 'AdminFeatureFlagController@update')->name('admin.feature.flags.update');

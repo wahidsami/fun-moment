@@ -58,6 +58,7 @@ export const translations: Record<Language, Record<string, string>> = {
     nav_marketplace_section: "Marketplace",
     nav_monetization_section: "Monetization",
     nav_music_settings: "Music Marketplace",
+    nav_music_moderation: "Music Submissions",
 
     // Music Marketplace Settings
     music_settings_title: "Music Marketplace Settings",
@@ -90,6 +91,27 @@ export const translations: Record<Language, Record<string, string>> = {
     seller_approval_desc: "When enabled, newly uploaded seller tracks remain pending until approved by an administrator.",
     regeneration_alert_title: "Preview Duration Changed",
     regeneration_alert_desc: "Changing the preview duration enqueued background jobs to re-transcode previews for existing tracks.",
+
+    // Music Moderation (Phase 3B)
+    music_mod_title: "Music Submissions & Moderation",
+    music_mod_subtitle: "Review, inspect audio quality, approve or reject seller-submitted music tracks.",
+    music_mod_tab_pending: "Pending Review",
+    music_mod_tab_approved: "Approved",
+    music_mod_tab_rejected: "Rejected",
+    music_mod_tab_suspended: "Suspended",
+    music_mod_tab_all: "All Submissions",
+    music_mod_approve: "Approve & Publish",
+    music_mod_reject: "Reject",
+    music_mod_suspend: "Suspend",
+    music_mod_rejection_reason: "Rejection Reason",
+    music_mod_rejection_placeholder: "Enter constructive feedback or policy violation reason for the seller...",
+    music_mod_audio_not_ready: "Audio processing is not complete. Cannot approve until media status is Ready.",
+    music_mod_inspect: "Inspect & Preview",
+    music_mod_track_details: "Track Submission Details",
+    music_mod_offers: "Configured Commercial Offers",
+    music_mod_seller: "Seller Information",
+    music_mod_rights: "Rights Declaration",
+    music_mod_audio_props: "Audio Specifications",
 
     // Dashboard Stats
     stats_revenue: "Total Revenue",
@@ -356,6 +378,7 @@ export const translations: Record<Language, Record<string, string>> = {
     nav_marketplace_section: "السوق",
     nav_monetization_section: "تحقيق الدخل",
     nav_music_settings: "سوق الموسيقى",
+    nav_music_moderation: "مراجعات الموسيقى",
 
     // Music Marketplace Settings
     music_settings_title: "إعدادات سوق الموسيقى والبث",
@@ -388,6 +411,27 @@ export const translations: Record<Language, Record<string, string>> = {
     seller_approval_desc: "عند التفعيل، تظل المسارات المرفوعة قيد المراجعة حتى يعتمدها المشرف.",
     regeneration_alert_title: "تم تعديل مدة المقطع الترويجي",
     regeneration_alert_desc: "أدى تعديل مدة المقطع الترويجي إلى جدولة مهام تلقائية في الخلفية لإعادة معالجة المسارات القائمة.",
+
+    // Music Moderation (Phase 3B)
+    music_mod_title: "مراجعة واعتماد تقديمات الموسيقى",
+    music_mod_subtitle: "تدقيق جودة الصوت، فحص التراخيص وحقوق الملكية، واعتماد أو رفض المسارات المرفوعة من البائعين.",
+    music_mod_tab_pending: "قيد المراجعة",
+    music_mod_tab_approved: "معتمدة",
+    music_mod_tab_rejected: "مرفوضة",
+    music_mod_tab_suspended: "معلقة",
+    music_mod_tab_all: "كافة المسارات",
+    music_mod_approve: "اعتماد ونشر",
+    music_mod_reject: "رفض المسار",
+    music_mod_suspend: "تعليق إداري",
+    music_mod_rejection_reason: "سبب الرفض",
+    music_mod_rejection_placeholder: "اكتب سبب الرفض أو الملاحظات الموجهة للبائع بدقة...",
+    music_mod_audio_not_ready: "معالجة الملف الصوتي لم تكتمل بعد. لا يمكن الاعتماد قبل تحول حالة الوسائط إلى جاهز.",
+    music_mod_inspect: "فحص ومعاينة",
+    music_mod_track_details: "تفاصيل المسار الموسيقي",
+    music_mod_offers: "العروض والتراخيص التجارية",
+    music_mod_seller: "بيانات البائع",
+    music_mod_rights: "إقرار وتعهد الحقوق",
+    music_mod_audio_props: "المواصفات الفنية للملف الصوتي",
 
     // Dashboard Stats
     stats_revenue: "إجمالي الإيرادات",

@@ -27,6 +27,7 @@ import {
   Banknote,
   Scale,
   Music,
+  Headphones,
   X
 } from 'lucide-react';
 import logo from '../../thelogo.png';
@@ -80,6 +81,7 @@ export default function Sidebar({
   const marketplaceItems = [
     { view: 'jobs', label: t.nav_jobs, icon: Hammer, moduleKey: 'jobs' as AddonModuleKey },
     { view: 'music-settings', label: t.nav_music_settings || (isRtl ? 'سوق الموسيقى' : 'Music Marketplace'), icon: Music },
+    { view: 'music-moderation', label: t.nav_music_moderation || (isRtl ? 'مراجعات الموسيقى' : 'Music Submissions'), icon: Headphones },
   ];
 
   // Monetization
