@@ -43,6 +43,11 @@ class AdminMusicSettingController extends Controller
             'offer_rent_enabled' => MusicSetting::isOfferTypeEnabled('rent'),
             'offer_sale_enabled' => MusicSetting::isOfferTypeEnabled('sale'),
             'default_rental_duration_days' => (int) MusicSetting::get('default_rental_duration_days', 7),
+            'music_vat_enabled' => MusicSetting::isVatEnabled(),
+            'music_vat_rate' => MusicSetting::getVatRate(),
+            'music_checkout_enabled' => MusicSetting::isCheckoutEnabled(),
+            'music_price_display_mode' => MusicSetting::getPriceDisplayMode(),
+            'music_tax_policy_status' => MusicSetting::getTaxPolicyStatus(),
         ];
 
         $runtime = [
@@ -84,6 +89,20 @@ class AdminMusicSettingController extends Controller
             $request->merge(['allowed_audio_formats' => implode(',', array_filter($formats))]);
         }
 
+        // Merge current defaults for commercial fields if not explicitly provided (backward compatibility)
+        $commercialDefaults = [
+            'music_vat_enabled' => (string) MusicSetting::get('music_vat_enabled', '0'),
+            'music_vat_rate' => (string) MusicSetting::get('music_vat_rate', '15.00'),
+            'music_checkout_enabled' => (string) MusicSetting::get('music_checkout_enabled', '0'),
+            'music_price_display_mode' => (string) MusicSetting::get('music_price_display_mode', 'exclusive'),
+            'music_tax_policy_status' => (string) MusicSetting::get('music_tax_policy_status', 'unapproved'),
+        ];
+        foreach ($commercialDefaults as $cKey => $cDef) {
+            if (!$request->has($cKey)) {
+                $request->merge([$cKey => $cDef]);
+            }
+        }
+
         // Normalize boolean flags from boolean or string
         $booleanKeys = [
             'music_marketplace_enabled',
@@ -92,6 +111,8 @@ class AdminMusicSettingController extends Controller
             'offer_free_enabled',
             'offer_rent_enabled',
             'offer_sale_enabled',
+            'music_vat_enabled',
+            'music_checkout_enabled',
         ];
 
         foreach ($booleanKeys as $bKey) {
@@ -149,13 +170,35 @@ class AdminMusicSettingController extends Controller
 
         $dispatchedJobsSummary = [];
         $totalDispatchedJobs = 0;
+        $changedSettings = [];
 
         foreach ($validated as $key => $value) {
+            $oldVal = MusicSetting::get($key);
+            if ((string) $oldVal !== (string) $value) {
+                $changedSettings[$key] = [
+                    'old' => $oldVal,
+                    'new' => (string) $value,
+                ];
+            }
+
             $result = MusicSetting::updateWithSideEffects($key, (string) $value);
             if (!empty($result['dispatched_jobs']) && $result['dispatched_jobs'] > 0) {
                 $dispatchedJobsSummary[$key] = $result['dispatched_jobs'];
                 $totalDispatchedJobs += $result['dispatched_jobs'];
             }
+        }
+
+        // Record AdminAuditLog if financial or operational settings changed
+        if (!empty($changedSettings)) {
+            \App\AdminAuditLog::record([
+                'action' => 'update_music_settings',
+                'resource_type' => 'music_settings',
+                'resource_id' => null,
+                'details_en' => 'Updated music marketplace settings (' . implode(', ', array_keys($changedSettings)) . ')',
+                'details_ar' => 'تم تحديث إعدادات سوق الموسيقى (' . implode(', ', array_keys($changedSettings)) . ')',
+                'old_values' => array_map(fn($v) => $v['old'], $changedSettings),
+                'new_values' => array_map(fn($v) => $v['new'], $changedSettings),
+            ]);
         }
 
         $allowedFormats = MusicSetting::getAllowedAudioFormats();
@@ -173,6 +216,11 @@ class AdminMusicSettingController extends Controller
             'offer_rent_enabled' => MusicSetting::isOfferTypeEnabled('rent'),
             'offer_sale_enabled' => MusicSetting::isOfferTypeEnabled('sale'),
             'default_rental_duration_days' => (int) MusicSetting::get('default_rental_duration_days', 7),
+            'music_vat_enabled' => MusicSetting::isVatEnabled(),
+            'music_vat_rate' => MusicSetting::getVatRate(),
+            'music_checkout_enabled' => MusicSetting::isCheckoutEnabled(),
+            'music_price_display_mode' => MusicSetting::getPriceDisplayMode(),
+            'music_tax_policy_status' => MusicSetting::getTaxPolicyStatus(),
         ];
 
         $runtime = [

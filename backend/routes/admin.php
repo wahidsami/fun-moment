@@ -26,6 +26,12 @@ Route::middleware(['setlang'])->group(function(){
     Route::post('/music-moderation-json/{id}/approve', 'AdminMusicModerationController@approve')->name('admin.music.moderation.json.approve');
     Route::post('/music-moderation-json/{id}/reject', 'AdminMusicModerationController@reject')->name('admin.music.moderation.json.reject');
     Route::post('/music-moderation-json/{id}/suspend', 'AdminMusicModerationController@suspend')->name('admin.music.moderation.json.suspend');
+    // Music Marketplace Orders & Financial Auditing (Phase 5)
+    Route::get('/music-orders-json', 'AdminMusicOrderController@index')->name('admin.music.orders.json');
+    Route::get('/music/orders-json', 'AdminMusicOrderController@index')->name('admin.music.orders.json.alias');
+    Route::get('/music-orders-json/{id}', 'AdminMusicOrderController@show')->name('admin.music.orders.json.show');
+    Route::post('/music-orders-json/{id}/refund', 'AdminMusicOrderController@refund')->name('admin.music.orders.json.refund');
+    Route::post('/music-orders-json/refund-attempts/{attemptId}/reconcile', 'AdminMusicOrderController@reconcileAttempt')->name('admin.music.orders.json.reconcile');
     Route::get('/dark-mode-toggle', 'AdminDashboardController@dark_mode_toggle')->name('admin.dark.mode.toggle');
     Route::get('/feature-flags', 'AdminFeatureFlagController@index')->name('admin.feature.flags');
     Route::post('/feature-flags/{module}', 'AdminFeatureFlagController@update')->name('admin.feature.flags.update');

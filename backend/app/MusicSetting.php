@@ -76,6 +76,11 @@ class MusicSetting extends Model
             'offer_rent_enabled' => '1',
             'offer_sale_enabled' => '1',
             'default_rental_duration_days' => '7',
+            'music_vat_enabled' => '0',
+            'music_vat_rate' => '15.00',
+            'music_checkout_enabled' => '0',
+            'music_price_display_mode' => 'exclusive',
+            'music_tax_policy_status' => 'unapproved',
         ];
     }
 
@@ -179,12 +184,57 @@ class MusicSetting extends Model
     }
 
     /**
-     * Safe, public, read-only configuration payload for future mobile app consumption.
+     * Whether commercial checkout is administratively enabled.
+     * Default false until an administrator explicitly confirms checkout and tax readiness.
+     */
+    public static function isCheckoutEnabled(): bool
+    {
+        return (bool) (int) self::get('music_checkout_enabled', 0);
+    }
+
+    /**
+     * Whether applicable VAT calculation is active.
+     */
+    public static function isVatEnabled(): bool
+    {
+        return (bool) (int) self::get('music_vat_enabled', 0);
+    }
+
+    /**
+     * Get the configured platform VAT rate percentage.
+     */
+    public static function getVatRate(): float
+    {
+        return (float) self::get('music_vat_rate', 15.00);
+    }
+
+    /**
+     * Get the price display mode ('exclusive' or 'inclusive').
+     */
+    public static function getPriceDisplayMode(): string
+    {
+        return (string) self::get('music_price_display_mode', 'exclusive');
+    }
+
+    /**
+     * Get the tax policy configuration status.
+     */
+    public static function getTaxPolicyStatus(): string
+    {
+        return (string) self::get('music_tax_policy_status', 'unapproved');
+    }
+
+    /**
+     * Safe, public, read-only configuration payload for mobile app consumption.
      */
     public static function toPublicConfig(): array
     {
         return [
             'marketplace_enabled' => self::isMarketplaceEnabled(),
+            'checkout_enabled' => self::isCheckoutEnabled(),
+            'vat_enabled' => self::isVatEnabled(),
+            'vat_rate' => self::getVatRate(),
+            'price_display_mode' => self::getPriceDisplayMode(),
             'paid_preview_duration_seconds' => self::getPaidPreviewDurationSeconds(),
             'allowed_audio_formats' => self::getAllowedAudioFormats(),
             'offers' => [
@@ -238,6 +288,11 @@ class MusicSetting extends Model
             'offer_rent_enabled' => 'required|in:0,1',
             'offer_sale_enabled' => 'required|in:0,1',
             'default_rental_duration_days' => 'required|integer|min:1|max:365',
+            'music_vat_enabled' => 'required|in:0,1',
+            'music_vat_rate' => 'required|numeric|min:0|max:100',
+            'music_checkout_enabled' => 'required|in:0,1',
+            'music_price_display_mode' => 'required|in:exclusive,inclusive',
+            'music_tax_policy_status' => 'required|in:unapproved,pending_zatca_review,approved',
         ];
     }
 

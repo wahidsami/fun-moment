@@ -49,6 +49,13 @@ export default function MusicSettingsView({ language, activeRole }: MusicSetting
   const [offerSale, setOfferSale] = useState(true);
   const [rentalDays, setRentalDays] = useState(7);
 
+  // Phase 5 Commercial & VAT Configuration
+  const [checkoutEnabled, setCheckoutEnabled] = useState(false);
+  const [vatEnabled, setVatEnabled] = useState(false);
+  const [vatRate, setVatRate] = useState(15.0);
+  const [priceDisplayMode, setPriceDisplayMode] = useState<'exclusive' | 'inclusive'>('exclusive');
+  const [taxPolicyStatus, setTaxPolicyStatus] = useState<'unapproved' | 'pending_zatca_review' | 'approved'>('unapproved');
+
   // Governance & Moderation
   const [sellerSubmissions, setSellerSubmissions] = useState(true);
   const [sellerApproval, setSellerApproval] = useState(true);
@@ -96,6 +103,12 @@ export default function MusicSettingsView({ language, activeRole }: MusicSetting
       setOfferRent(data.offer_rent_enabled);
       setOfferSale(data.offer_sale_enabled);
       setRentalDays(data.default_rental_duration_days);
+
+      setCheckoutEnabled(data.music_checkout_enabled ?? false);
+      setVatEnabled(data.music_vat_enabled ?? false);
+      setVatRate(data.music_vat_rate ?? 15.0);
+      setPriceDisplayMode(data.music_price_display_mode ?? 'exclusive');
+      setTaxPolicyStatus(data.music_tax_policy_status ?? 'unapproved');
 
       if (res.runtime) {
         setRuntime(res.runtime);
@@ -170,6 +183,11 @@ export default function MusicSettingsView({ language, activeRole }: MusicSetting
         offer_rent_enabled: offerRent,
         offer_sale_enabled: offerSale,
         default_rental_duration_days: rentalDays,
+        music_checkout_enabled: checkoutEnabled,
+        music_vat_enabled: vatEnabled,
+        music_vat_rate: vatRate,
+        music_price_display_mode: priceDisplayMode,
+        music_tax_policy_status: taxPolicyStatus,
       };
 
       const res = await LaravelAPI.saveMusicSettings(payload);
@@ -701,6 +719,147 @@ export default function MusicSettingsView({ language, activeRole }: MusicSetting
                 />
                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 5: Saudi VAT & Commercial Checkout Governance (ZATCA 2026 Ready) */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-2xs overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-amber-500" />
+                {isRtl ? 'الحوكمة الضريبية وبوابة الشراء التجاري (متوافق مع هيئة الزكاة والضريبة 2026)' : 'Commercial Checkout & Saudi VAT Governance (ZATCA 2026 Ready)'}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {isRtl
+                  ? 'إدارة تفعيل الشراء التجاري، حساب ضريبة القيمة المضافة 15%، وحالة اعتماد اللوائح التنظيمية.'
+                  : 'Manage live checkout enablement, 15% Saudi VAT calculation, and tax policy readiness.'}
+              </p>
+            </div>
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-bold font-mono ${
+                taxPolicyStatus === 'approved'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {taxPolicyStatus.toUpperCase()}
+            </span>
+          </div>
+
+          <div className="p-5 space-y-4">
+            {/* ZATCA Legal Notice */}
+            <div className="p-4 bg-amber-50/70 border border-amber-200/70 rounded-xl flex items-start gap-3">
+              <Info className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+              <div className="text-[11px] text-amber-900 space-y-1">
+                <p className="font-bold">
+                  {isRtl
+                    ? 'إشعار الامتثال للوائح هيئة الزكاة والضريبة والجمارك (ZATCA - يناير 2026):'
+                    : 'ZATCA Marketplace Regulation Notice (Effective Jan 2026):'}
+                </p>
+                <p>
+                  {isRtl
+                    ? 'وفقاً لتعديلات اللائحة التنفيذية لضريبة القيمة المضافة للمنصات الإلكترونية، تُعامل المنصة كمورّد مفترض للبائعين المقيمين غير المسجلين بالضريبة. يجب إبقاء بوابة الشراء معطلة حتى اعتماد السياسة الضريبية والمالية رسمياً.'
+                    : 'Under ZATCA electronic marketplace regulations, the platform acts as deemed supplier for non-VAT registered Saudi sellers. Live customer checkout must remain paused until approved tax classification and accounting are configured.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="divide-y divide-slate-100 space-y-4 pt-1">
+              {/* Checkout Master Switch */}
+              <div className="flex items-center justify-between pt-2">
+                <div className="space-y-0.5 max-w-xl">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-bold text-slate-800">
+                      {isRtl ? 'تفعيل بوابة الشراء والدفع المباشر' : 'Enable Commercial Checkout'}
+                    </p>
+                    {!checkoutEnabled && (
+                      <span className="bg-rose-100 text-rose-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                        {isRtl ? 'معطل حالياً' : 'CHECKOUT PAUSED'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    {isRtl
+                      ? 'عند التعطيل، يُمنع إتمام أي طلبات شراء تجارية أو مدفوعات من تطبيق المشتري.'
+                      : 'When disabled, all paid checkout requests are strictly rejected by the server.'}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={checkoutEnabled}
+                    onChange={e => setCheckoutEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+
+              {/* VAT Calculation Switch */}
+              <div className="flex items-center justify-between pt-4">
+                <div className="space-y-0.5 max-w-xl">
+                  <p className="text-xs font-bold text-slate-800">
+                    {isRtl ? 'تفعيل احتساب ضريبة القيمة المضافة (VAT)' : 'Enable VAT Calculation'}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    {isRtl
+                      ? 'احتساب ضريبة القيمة المضافة بنسبة 15% وتوثيقها في الفاتورة وسجل المنصة.'
+                      : 'Enforce server-side 15% VAT calculation and audit records on eligible music supplies.'}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={vatEnabled}
+                    onChange={e => setVatEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                </label>
+              </div>
+
+              {/* VAT Rate & Display Mode */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-800">
+                    {isRtl ? 'نسبة ضريبة القيمة المضافة (%)' : 'Configured VAT Rate (%)'}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={vatRate}
+                      onChange={e => setVatRate(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                    />
+                    <span className="absolute inset-y-0 right-3 flex items-center text-xs text-slate-400 pointer-events-none font-mono">
+                      %
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-800">
+                    {isRtl ? 'طريقة عرض أسعار البائعين' : 'Price Display Convention'}
+                  </label>
+                  <select
+                    value={priceDisplayMode}
+                    onChange={e => setPriceDisplayMode(e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                  >
+                    <option value="exclusive">
+                      {isRtl ? 'غير شامل الضريبة (تُضاف 15% عند الدفع)' : 'Exclusive of VAT (15% added at checkout)'}
+                    </option>
+                    <option value="inclusive">
+                      {isRtl ? 'شامل الضريبة (السعر المعروض يتضمن 15%)' : 'Inclusive of VAT (Listed price includes VAT)'}
+                    </option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
         </div>

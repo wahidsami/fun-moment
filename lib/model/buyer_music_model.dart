@@ -66,6 +66,10 @@ class CatalogOfferModel {
     }
     return '${price.toStringAsFixed(2)} $currency';
   }
+
+  bool get isFree => offerType == 'free';
+  bool get isRent => offerType == 'rent';
+  bool get isSale => offerType == 'sale';
 }
 
 class CatalogSellerModel {
@@ -189,6 +193,8 @@ class CatalogTrackModel {
       releasedAt: json['released_at']?.toString(),
     );
   }
+
+  String get title => titleEn.trim().isNotEmpty ? titleEn : (titleAr.trim().isNotEmpty ? titleAr : 'Untitled Track');
 
   String displayTitle(bool isRtl) {
     if (isRtl && titleAr.trim().isNotEmpty) {

@@ -65,6 +65,12 @@ class User extends Authenticatable
         'seller_type',
         'business_registration',
         'otp_verified',
+        'vat_registered',
+        'vat_registration_number',
+        'vat_verification_status',
+        'tax_residence_country',
+        'tax_profile_verified_at',
+        'tax_profile_notes',
     ];
 
     protected $hidden = [
@@ -75,6 +81,8 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'user_type' => 'integer',
         'email_verified' => 'integer',
+        'vat_registered' => 'boolean',
+        'tax_profile_verified_at' => 'datetime',
     ];
 
     public static function boot()
@@ -227,5 +235,20 @@ class User extends Authenticatable
     public function favoriteMusicTracks()
     {
         return $this->belongsToMany(MusicTrack::class, 'music_favorites', 'user_id', 'track_id')->withTimestamps();
+    }
+
+    public function sellerMusicLedgerEntries()
+    {
+        return $this->hasMany(MusicSellerLedgerEntry::class, 'seller_id', 'id');
+    }
+
+    public function isVatRegistered(): bool
+    {
+        return (bool) $this->vat_registered && !empty($this->vat_registration_number);
+    }
+
+    public function isTaxVerified(): bool
+    {
+        return $this->vat_verification_status === 'verified';
     }
 }

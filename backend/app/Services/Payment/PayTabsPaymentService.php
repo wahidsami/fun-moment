@@ -402,16 +402,114 @@ class PayTabsPaymentService
     }
 
     /**
-     * Helper to extract order_id whether padded (12345{id}67890) or plain ({id}).
+     * Process an authentic refund request with PayTabs.
+     *
+     * @param string $tranRef Original PayTabs payment transaction reference
+     * @param float $amount Refund amount
+     * @param string $cartId Order invoice or reference
+     * @param string $reason Audit reason for refund
+     * @param string $currency Currency code (default SAR)
+     * @return array{
+     *     success: bool,
+     *     status: string, // 'success', 'declined', 'ambiguous', 'unconfigured'
+     *     refund_tran_ref: ?string,
+     *     response_code: ?string,
+     *     message: string,
+     *     raw_response: ?array
+     * }
      */
-    protected function extractOrderIdFromCartId(string $cartId): string
-    {
-        if (strlen($cartId) > 10 && ctype_digit($cartId)) {
-            $unpadded = substr($cartId, 5, -5);
-            if (!empty($unpadded) && ctype_digit($unpadded)) {
-                return $unpadded;
-            }
+    public function refundPayment(
+        string $tranRef,
+        float $amount,
+        string $cartId,
+        string $reason = 'Order refund',
+        string $currency = 'SAR'
+    ): array {
+        if (!$this->isConfigured()) {
+            return [
+                'success' => false,
+                'status' => 'unconfigured',
+                'refund_tran_ref' => null,
+                'response_code' => null,
+                'message' => 'PayTabs credentials are not configured.',
+                'raw_response' => null,
+            ];
         }
-        return $cartId;
+
+        $payload = [
+            'profile_id' => (int) $this->profileId,
+            'tran_type' => 'refund',
+            'tran_class' => 'ecom',
+            'cart_id' => (string) $cartId,
+            'cart_currency' => $currency,
+            'cart_amount' => round($amount, 2),
+            'cart_description' => mb_substr($reason ?: 'Order refund', 0, 200),
+            'tran_ref' => trim($tranRef),
+        ];
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $this->serverKey,
+                'Content-Type' => 'application/json',
+            ])->timeout(30)->post($this->baseUrl . '/payment/request', $payload);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $respStatus = $data['payment_result']['response_status'] ?? null;
+                $respCode = $data['payment_result']['response_code'] ?? null;
+                $respMessage = $data['payment_result']['response_message'] ?? ($data['message'] ?? 'Refund processed');
+                $refundTranRef = $data['tran_ref'] ?? null;
+
+                if ($respStatus === 'A') {
+                    Log::info("[PayTabs] Refund authorized: {$refundTranRef} for {$amount} {$currency} on original {$tranRef}");
+                    return [
+                        'success' => true,
+                        'status' => 'success',
+                        'refund_tran_ref' => $refundTranRef,
+                        'response_code' => $respCode,
+                        'message' => $respMessage,
+                        'raw_response' => $data,
+                    ];
+                }
+
+                Log::warning("[PayTabs] Refund declined: {$tranRef}", ['response' => $data]);
+                return [
+                    'success' => false,
+                    'status' => 'declined',
+                    'refund_tran_ref' => $refundTranRef,
+                    'response_code' => $respCode,
+                    'message' => $respMessage,
+                    'raw_response' => $data,
+                ];
+            }
+
+            Log::error("[PayTabs] Refund HTTP error", [
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'tran_ref' => $tranRef,
+            ]);
+
+            return [
+                'success' => false,
+                'status' => 'ambiguous',
+                'refund_tran_ref' => null,
+                'response_code' => (string) $response->status(),
+                'message' => 'PayTabs refund endpoint returned HTTP error. Status requires reconciliation.',
+                'raw_response' => $response->json(),
+            ];
+        } catch (\Throwable $e) {
+            Log::error("[PayTabs] Exception during refundPayment: " . $e->getMessage(), [
+                'tran_ref' => $tranRef,
+            ]);
+
+            return [
+                'success' => false,
+                'status' => 'ambiguous',
+                'refund_tran_ref' => null,
+                'response_code' => 'EXCEPTION',
+                'message' => 'Network/communication exception with PayTabs: ' . $e->getMessage(),
+                'raw_response' => null,
+            ];
+        }
     }
 }

@@ -385,6 +385,17 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
             Route::post('/favorites/toggle', [\App\Http\Controllers\Api\MusicFavoriteController::class, 'toggle'])->name('api.v1.music.favorites.toggle');
             Route::get('/favorites', [\App\Http\Controllers\Api\MusicFavoriteController::class, 'index'])->name('api.v1.music.favorites.index');
         });
+
+        // Phase 5: Commercial Orders & Checkout
+        Route::get('/orders/quote', [\App\Http\Controllers\Api\MusicOrderController::class, 'quote'])->name('api.v1.music.orders.quote');
+        Route::post('/payments/paytabs/callback', [\App\Http\Controllers\Api\MusicOrderController::class, 'handlePayTabsCallback'])->name('api.v1.music.payments.paytabs.callback');
+        Route::match(['get', 'post'], '/payments/paytabs/return', [\App\Http\Controllers\Api\MusicOrderController::class, 'handlePayTabsCallback'])->name('api.v1.music.payments.paytabs.return');
+
+        Route::group(['middleware' => 'auth:sanctum'], function () {
+            Route::get('/orders', [\App\Http\Controllers\Api\MusicOrderController::class, 'index'])->name('api.v1.music.orders.index');
+            Route::post('/orders', [\App\Http\Controllers\Api\MusicOrderController::class, 'store'])->name('api.v1.music.orders.store');
+            Route::get('/orders/{id}', [\App\Http\Controllers\Api\MusicOrderController::class, 'show'])->name('api.v1.music.orders.show');
+        });
     });
 
 

@@ -26,86 +26,404 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
     _track = widget.track;
   }
 
-  void _showPhase5Modal(BuildContext context, String offerType, String price) {
+  void _showCheckoutModal(BuildContext context, CatalogOfferModel offer) {
     final isArabic = Provider.of<RtlService>(context, listen: false).langSlug.startsWith('ar');
+    final buyerService = Provider.of<BuyerMusicService>(context, listen: false);
+    final playerService = Provider.of<MusicPlayerService>(context, listen: false);
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: FMColors.surfaceElevated,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(FMRadii.lg)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 48,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: FMColors.cyan.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.lock_clock_rounded,
-                  color: FMColors.cyan,
-                  size: 38,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                isArabic ? 'الدفع والشراء متاح قريباً في المرحلة الخامسة' : 'Checkout Available in Phase 5',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: FMColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                isArabic
-                    ? 'عرض ($offerType) بسعر $price معروض كبيانات تجارية معتمدة. سيتم تفعيل بوابات الدفع وشراء التراخيص بالكامل في المرحلة القادمة.'
-                    : 'The $offerType offer at $price is configured on the catalog. Real payment settlement and order processing will launch in Phase 5.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: FMColors.textMuted,
-                  fontSize: 14,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: FMColors.cyan,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(FMRadii.md),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+        String selectedGateway = 'wallet';
+        bool isSubmitting = false;
+        String? orderError;
+
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return FutureBuilder<Map<String, dynamic>?>(
+              future: buyerService.getQuote(offer.id),
+              builder: (quoteCtx, snapshot) {
+                final quoteLoading = snapshot.connectionState == ConnectionState.waiting;
+                final quoteData = snapshot.data;
+                final quote = quoteData?['quote'] as Map<String, dynamic>?;
+                final bool checkoutEnabled = quoteData?['checkout_enabled'] ?? false;
+
+                final subtotal = quote != null ? (quote['subtotal'] as num).toDouble() : offer.price;
+                final vatAmount = quote != null ? (quote['vat_amount'] as num).toDouble() : 0.0;
+                final totalAmount = quote != null ? (quote['total_amount'] as num).toDouble() : offer.price;
+                final currency = quote?['currency'] ?? 'SAR';
+
+                return Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    20,
+                    24,
+                    MediaQuery.of(ctx).viewInsets.bottom + 32,
                   ),
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text(
-                    isArabic ? 'حسناً، فهمت' : 'Got it',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Sheet drag handle
+                      Center(
+                        child: Container(
+                          width: 48,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: offer.isRent
+                                  ? FMColors.orange.withOpacity(0.15)
+                                  : FMColors.magenta.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(FMRadii.sm),
+                            ),
+                            child: Icon(
+                              offer.isRent ? Icons.timer_outlined : Icons.shopping_bag_outlined,
+                              color: offer.isRent ? FMColors.orange : FMColors.magenta,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  offer.isRent
+                                      ? (isArabic
+                                          ? 'استئجار (${offer.rentalDurationDays ?? 7} أيام)'
+                                          : 'Rental (${offer.rentalDurationDays ?? 7} Days)')
+                                      : (isArabic ? 'شراء استماع دائم' : 'Permanent Streaming Purchase'),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  _track.title,
+                                  style: const TextStyle(
+                                    color: FMColors.textMuted,
+                                    fontSize: 13,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Loading quote or breakdown
+                      if (quoteLoading)
+                        const Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Center(
+                            child: CircularProgressIndicator(color: FMColors.cyan),
+                          ),
+                        )
+                      else ...[
+                        // Gate: Checkout Paused Notice
+                        if (!checkoutEnabled)
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: FMColors.orange.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(FMRadii.md),
+                              border: Border.all(color: FMColors.orange.withOpacity(0.4)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline, color: FMColors.orange, size: 22),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    isArabic
+                                        ? 'الشراء التجاري معلق حالياً بانتظار مراجعة السياسات الضريبية (هيئة الزكاة والضريبة والجمارك 2026).'
+                                        : 'Commercial checkout is temporarily paused pending tax policy review.',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // Financial Breakdown Card
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: FMColors.surface,
+                            borderRadius: BorderRadius.circular(FMRadii.md),
+                            border: Border.all(color: FMColors.border),
+                          ),
+                          child: Column(
+                            children: [
+                              _quoteRow(
+                                isArabic ? 'السعر الأساسي' : 'Subtotal',
+                                '${subtotal.toStringAsFixed(2)} $currency',
+                              ),
+                              if (vatAmount > 0) ...[
+                                const SizedBox(height: 8),
+                                _quoteRow(
+                                  isArabic ? 'ضريبة القيمة المضافة (15%)' : 'VAT (15%)',
+                                  '${vatAmount.toStringAsFixed(2)} $currency',
+                                ),
+                              ],
+                              const Divider(color: FMColors.border, height: 20),
+                              _quoteRow(
+                                isArabic ? 'الإجمالي المستحق' : 'Total Payable',
+                                '${totalAmount.toStringAsFixed(2)} $currency',
+                                isTotal: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+
+                        // Gateway Selector (Wallet vs PayTabs)
+                        if (checkoutEnabled) ...[
+                          Text(
+                            isArabic ? 'طريقة الدفع' : 'Payment Method',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _gatewayOption(
+                                  title: isArabic ? 'المحفظة' : 'Wallet',
+                                  icon: Icons.account_balance_wallet_outlined,
+                                  isSelected: selectedGateway == 'wallet',
+                                  onTap: () => setModalState(() => selectedGateway = 'wallet'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _gatewayOption(
+                                  title: isArabic ? 'بطاقة بنكية' : 'Card / PayTabs',
+                                  icon: Icons.credit_card_outlined,
+                                  isSelected: selectedGateway == 'paytabs',
+                                  onTap: () => setModalState(() => selectedGateway = 'paytabs'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+
+                        // Licensing disclaimer
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.black26,
+                            borderRadius: BorderRadius.circular(FMRadii.sm),
+                          ),
+                          child: Text(
+                            isArabic
+                                ? 'ترخيص استماع وبث صوتي فقط داخل التطبيق. لا يشمل تنزيل الملفات الأصلية أو الاستخدام التجاري أو إعادة التوزيع.'
+                                : 'In-App Streaming Only. Master downloads, commercial-use, and redistribution rights are not included.',
+                            style: const TextStyle(
+                              color: FMColors.textMuted,
+                              fontSize: 11,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        if (orderError != null) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Text(
+                              orderError!,
+                              style: const TextStyle(color: FMColors.error, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+
+                        // Confirm Checkout Button
+                        SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: checkoutEnabled ? FMColors.cyan : Colors.white12,
+                              foregroundColor: checkoutEnabled ? Colors.black : Colors.white38,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(FMRadii.md),
+                              ),
+                            ),
+                            onPressed: (!checkoutEnabled || isSubmitting)
+                                ? null
+                                : () async {
+                                    setModalState(() {
+                                      isSubmitting = true;
+                                      orderError = null;
+                                    });
+
+                                    final res = await buyerService.createOrder(
+                                      offerId: offer.id,
+                                      paymentGateway: selectedGateway,
+                                    );
+
+                                    setModalState(() => isSubmitting = false);
+
+                                    if (res['success'] == true) {
+                                      Navigator.pop(ctx);
+                                      if (selectedGateway == 'wallet') {
+                                        // Auto-unlock playback
+                                        playerService.playTrack(_track);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            backgroundColor: FMColors.success,
+                                            content: Text(
+                                              isArabic
+                                                  ? 'تم الشراء بنجاح! بدأ الاستماع الآن.'
+                                                  : 'Order confirmed! Streaming unlocked.',
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            backgroundColor: FMColors.cyan,
+                                            content: Text(
+                                              isArabic
+                                                  ? 'تم تسجيل الطلب في انتظار استكمال الدفع.'
+                                                  : 'Order created, awaiting payment completion.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      setModalState(() {
+                                        orderError = isArabic
+                                            ? (res['message_ar'] ?? res['message_en'] ?? 'فشل إتمام الطلب.')
+                                            : (res['message_en'] ?? 'Failed to complete order.');
+                                      });
+                                    }
+                                  },
+                            child: isSubmitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                                    ),
+                                  )
+                                : Text(
+                                    checkoutEnabled
+                                        ? (isArabic ? 'تأكيد الدفع والاستماع' : 'Confirm & Play')
+                                        : (isArabic ? 'الشراء معلق حالياً' : 'Checkout Disabled'),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ),
-              ),
-            ],
-          ),
+                );
+              },
+            );
+          },
         );
       },
+    );
+  }
+
+  Widget _quoteRow(String label, String value, {bool isTotal = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: isTotal ? Colors.white : FMColors.textMuted,
+            fontSize: isTotal ? 14 : 13,
+            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: isTotal ? FMColors.cyan : Colors.white,
+            fontSize: isTotal ? 16 : 13,
+            fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _gatewayOption({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? FMColors.cyan.withOpacity(0.12) : FMColors.surface,
+          borderRadius: BorderRadius.circular(FMRadii.md),
+          border: Border.all(
+            color: isSelected ? FMColors.cyan : FMColors.border,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? FMColors.cyan : FMColors.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                color: isSelected ? Colors.white : FMColors.textSecondary,
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -596,10 +914,12 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               onPressed: () {
-                _showPhase5Modal(context, typeLabel, offer.formattedPrice);
+                _showCheckoutModal(context, offer);
               },
               child: Text(
-                isArabic ? 'المرحلة 5' : 'Phase 5',
+                offer.isRent
+                    ? (isArabic ? 'استئجار' : 'Rent')
+                    : (isArabic ? 'شراء' : 'Buy'),
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),

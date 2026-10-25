@@ -349,4 +349,83 @@ class BuyerMusicService extends ChangeNotifier {
       return false;
     }
   }
+
+  /// Phase 5: Fetch authoritative server quote for offer checkout
+  Future<Map<String, dynamic>?> getQuote(int offerId) async {
+    try {
+      final headers = await _getHeaders();
+      final url = Uri.parse('$baseApi/music/orders/quote?offer_id=$offerId');
+      final res = await http.get(url, headers: headers);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body['success'] == true) {
+          return body as Map<String, dynamic>;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('BuyerMusicService.getQuote error: $e');
+      return null;
+    }
+  }
+
+  /// Phase 5: Fetch buyer wallet balance
+  Future<double> fetchUserWalletBalance() async {
+    try {
+      final headers = await _getHeaders(requireAuth: true);
+      final url = Uri.parse('$baseApi/user/wallet/balance');
+      final res = await http.get(url, headers: headers);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body['success'] == true && body['data'] != null) {
+          final bal = body['data']['balance'];
+          if (bal != null) {
+            return (bal is num) ? bal.toDouble() : double.tryParse(bal.toString()) ?? 0.0;
+          }
+        }
+      }
+      return 0.0;
+    } catch (e) {
+      debugPrint('BuyerMusicService.fetchUserWalletBalance error: $e');
+      return 0.0;
+    }
+  }
+
+  /// Phase 5: Submit commercial order with wallet or paytabs gateway
+  Future<Map<String, dynamic>> createOrder({
+    required int offerId,
+    required String paymentGateway,
+    String? returnUrl,
+    String? idempotencyKey,
+  }) async {
+    try {
+      final headers = await _getHeaders(requireAuth: true);
+      final url = Uri.parse('$baseApi/music/orders');
+      final payload = {
+        'offer_id': offerId,
+        'payment_gateway': paymentGateway,
+        if (returnUrl != null) 'return_url': returnUrl,
+        if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      };
+
+      final res = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode(payload),
+      );
+
+      final body = jsonDecode(res.body);
+      return body is Map<String, dynamic>
+          ? body
+          : {'success': false, 'message_en': 'Invalid response format'};
+    } catch (e) {
+      debugPrint('BuyerMusicService.createOrder error: $e');
+      return {
+        'success': false,
+        'error_code': 'NETWORK_ERROR',
+        'message_en': 'Network connection error. Please try again.',
+        'message_ar': 'خطأ في الاتصال بالشبكة. يرجى المحاولة مرة أخرى.',
+      };
+    }
+  }
 }

@@ -758,6 +758,11 @@ export interface MusicMarketplaceSettings {
   offer_rent_enabled: boolean;
   offer_sale_enabled: boolean;
   default_rental_duration_days: number;
+  music_vat_enabled: boolean;
+  music_vat_rate: number;
+  music_checkout_enabled: boolean;
+  music_price_display_mode: 'exclusive' | 'inclusive';
+  music_tax_policy_status: 'unapproved' | 'pending_zatca_review' | 'approved';
 }
 
 export interface MusicMarketplaceRuntime {
