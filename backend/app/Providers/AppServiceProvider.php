@@ -19,7 +19,10 @@ class AppServiceProvider extends ServiceProvider
         Factory::guessFactoryNamesUsing(function ($class) {
             return 'Database\\Factories\\' . class_basename($class) . 'Factory';
         });
-       
+
+        $this->app->singleton(\App\Services\Music\AudioProcessorInterface::class, function ($app) {
+            return new \App\Services\Music\FFmpegAudioProcessor();
+        });
     }
 
     public function boot()

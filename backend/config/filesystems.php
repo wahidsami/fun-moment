@@ -70,6 +70,12 @@ return [
             'visibility' => 'private',
         ],
 
+        'music_private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/music_private'),
+            'visibility' => 'private',
+        ],
+
     ],
 
 ];

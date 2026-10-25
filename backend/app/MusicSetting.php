@@ -63,13 +63,69 @@ class MusicSetting extends Model
             'default_preview_duration' => '20',
             'max_audio_upload_mb' => '25',
             'platform_commission_rate' => '15.00',
-            'allowed_audio_formats' => 'mp3,wav,aac,flac',
+            'allowed_audio_formats' => 'mp3,wav,aac,flac,m4a',
             'seller_submissions_enabled' => '1',
             'seller_tracks_require_approval' => '1',
             'offer_free_enabled' => '1',
             'offer_rent_enabled' => '1',
             'offer_sale_enabled' => '1',
             'default_rental_duration_days' => '7',
+        ];
+    }
+
+    /**
+     * Get the array of authoritative allowed audio format tokens (lowercase).
+     * E.g. ['mp3', 'wav', 'aac', 'flac', 'm4a']
+     */
+    public static function getAllowedAudioFormats(): array
+    {
+        $raw = (string) self::get('allowed_audio_formats', 'mp3,wav,aac,flac,m4a');
+        $formats = array_map('strtolower', array_map('trim', explode(',', $raw)));
+        return array_values(array_unique(array_filter($formats)));
+    }
+
+    /**
+     * Check whether a specific audio format token or extension is administratively permitted.
+     * Note: 'aac' and 'm4a' are independent formats and are not cross-aliased.
+     */
+    public static function isAudioFormatAllowed(string $format): bool
+    {
+        $format = strtolower(trim($format));
+        $allowed = self::getAllowedAudioFormats();
+
+        return in_array($format, $allowed, true);
+    }
+
+    /**
+     * Update a music setting and trigger any necessary backend operational side-effects
+     * (e.g. queuing preview regeneration when paid_preview_duration_seconds changes).
+     *
+     * @param string $key Setting key
+     * @param mixed $value New setting value
+     * @param string|null $description Optional description
+     * @return array [MusicSetting $setting, int $dispatched_jobs]
+     */
+    public static function updateWithSideEffects(string $key, $value, ?string $description = null): array
+    {
+        $oldValue = self::get($key);
+        $setting = self::set($key, $value, $description);
+        $dispatchedJobs = 0;
+
+        if (
+            ($key === 'paid_preview_duration_seconds' || $key === 'default_preview_duration')
+            && (string) $oldValue !== (string) $value
+        ) {
+            try {
+                $processingService = app(\App\Services\Music\MusicAudioProcessingService::class);
+                $dispatchedJobs = $processingService->queuePreviewRegenerationForOutdatedTracks();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("Failed to trigger preview regeneration on setting update: " . $e->getMessage());
+            }
+        }
+
+        return [
+            'setting' => $setting,
+            'dispatched_jobs' => $dispatchedJobs,
         ];
     }
 
@@ -90,6 +146,14 @@ class MusicSetting extends Model
     {
         $val = (int) (self::get('paid_preview_duration_seconds') ?: self::get('default_preview_duration', 20));
         return max(5, min(60, $val ?: 20));
+    }
+
+    /**
+     * Alias for getPaidPreviewDurationSeconds().
+     */
+    public static function getEffectivePaidPreviewDurationSeconds(): int
+    {
+        return self::getPaidPreviewDurationSeconds();
     }
 
     /**
@@ -116,7 +180,7 @@ class MusicSetting extends Model
         return [
             'marketplace_enabled' => self::isMarketplaceEnabled(),
             'paid_preview_duration_seconds' => self::getPaidPreviewDurationSeconds(),
-            'allowed_audio_formats' => array_filter(array_map('trim', explode(',', (string) self::get('allowed_audio_formats', 'mp3,wav,aac,flac')))),
+            'allowed_audio_formats' => self::getAllowedAudioFormats(),
             'offers' => [
                 'free' => self::isOfferTypeEnabled('free'),
                 'rent' => self::isOfferTypeEnabled('rent'),
@@ -196,6 +260,15 @@ class MusicSetting extends Model
         $phpCeiling = self::getPhpUploadMaxBytes();
 
         return $phpCeiling > 0 ? min($configuredBytes, $phpCeiling) : $configuredBytes;
+    }
+
+    /**
+     * Get the configured maximum audio upload size in bytes (before applying runtime PHP bounds).
+     */
+    public static function getConfiguredMaxUploadBytes(): int
+    {
+        $configuredMb = (int) self::get('max_audio_upload_mb', 25);
+        return $configuredMb * 1024 * 1024;
     }
 
     /**

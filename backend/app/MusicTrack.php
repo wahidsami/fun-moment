@@ -24,6 +24,11 @@ class MusicTrack extends Model
     public const STATUS_REJECTED = 'rejected';
     public const STATUS_SUSPENDED = 'suspended';
 
+    public const MEDIA_STATUS_PENDING = 'pending';
+    public const MEDIA_STATUS_PROCESSING = 'processing';
+    public const MEDIA_STATUS_READY = 'ready';
+    public const MEDIA_STATUS_FAILED = 'failed';
+
     public const RIGHTS_ORIGINAL = 'original_composition';
     public const RIGHTS_REMIX = 'licensed_remix';
     public const RIGHTS_PUBLIC_DOMAIN = 'public_domain';
@@ -32,6 +37,7 @@ class MusicTrack extends Model
         'title_en',
         'title_ar',
         'artist_name',
+        'original_filename',
         'owner_type',
         'seller_id',
         'submitted_by_user_id',
@@ -41,10 +47,19 @@ class MusicTrack extends Model
         'cover_image',
         'audio_path_original',
         'audio_path_preview',
+        'audio_path_stream',
+        'media_status',
+        'media_error',
         'duration_seconds',
         'preview_duration_seconds',
+        'preview_version',
         'file_size_bytes',
         'audio_format',
+        'audio_mime_type',
+        'audio_codec',
+        'audio_bitrate_kbps',
+        'audio_sample_rate',
+        'audio_channels',
         'bpm',
         'track_key',
         'description_en',
@@ -71,7 +86,11 @@ class MusicTrack extends Model
         'is_featured' => 'boolean',
         'duration_seconds' => 'integer',
         'preview_duration_seconds' => 'integer',
+        'preview_version' => 'integer',
         'file_size_bytes' => 'integer',
+        'audio_bitrate_kbps' => 'integer',
+        'audio_sample_rate' => 'integer',
+        'audio_channels' => 'integer',
         'bpm' => 'integer',
         'featured_order' => 'integer',
         'play_count' => 'integer',
@@ -207,8 +226,20 @@ class MusicTrack extends Model
     public function scopePublished($query)
     {
         return $query->where('status', self::STATUS_APPROVED)
+            ->where(function ($q) {
+                $q->where('media_status', self::MEDIA_STATUS_READY)
+                  ->orWhere(function ($sub) {
+                      $sub->whereNotNull('audio_path_original')
+                          ->where('media_status', '!=', self::MEDIA_STATUS_FAILED);
+                  });
+            })
             ->whereNotNull('released_at')
             ->where('released_at', '<=', now());
+    }
+
+    public function scopeMediaReady($query)
+    {
+        return $query->where('media_status', self::MEDIA_STATUS_READY);
     }
 
     public function scopeFeatured($query)
@@ -269,6 +300,11 @@ class MusicTrack extends Model
         return $this->title_en;
     }
 
+    public function getTitleAttribute(): string
+    {
+        return $this->getLocalizedTitle();
+    }
+
     public function hasActiveFreeOffer(): bool
     {
         return $this->activeOffers()->where('offer_type', MusicOffer::OFFER_TYPE_FREE)->exists();
@@ -322,6 +358,47 @@ class MusicTrack extends Model
         }
 
         return $count;
+    }
+
+    public function isMediaReady(): bool
+    {
+        return $this->media_status === self::MEDIA_STATUS_READY;
+    }
+
+    public function isMediaProcessing(): bool
+    {
+        return $this->media_status === self::MEDIA_STATUS_PROCESSING;
+    }
+
+    public function isMediaFailed(): bool
+    {
+        return $this->media_status === self::MEDIA_STATUS_FAILED;
+    }
+
+    public function markMediaProcessing(): void
+    {
+        $this->update([
+            'media_status' => self::MEDIA_STATUS_PROCESSING,
+            'media_error' => null,
+        ]);
+    }
+
+    public function markMediaReady(array $metadata = []): void
+    {
+        $payload = array_merge([
+            'media_status' => self::MEDIA_STATUS_READY,
+            'media_error' => null,
+        ], $metadata);
+
+        $this->update($payload);
+    }
+
+    public function markMediaFailed(string $error): void
+    {
+        $this->update([
+            'media_status' => self::MEDIA_STATUS_FAILED,
+            'media_error' => $error,
+        ]);
     }
 
     /**
