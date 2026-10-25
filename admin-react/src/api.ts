@@ -18,6 +18,9 @@ import {
   SellerVerificationDetail,
   LegalTerm,
   LegalTermVersion,
+  MusicMarketplaceSettings,
+  MusicMarketplaceRuntime,
+  MusicSettingsApiResponse,
 } from './types';
 
 export interface DashboardSettings {
@@ -966,6 +969,60 @@ export const LaravelAPI = {
     }
 
     throw new Error(payload?.message_en || 'Settings payload missing data');
+  },
+
+  // Music Marketplace Settings (Phase 3A)
+  async getMusicSettings(): Promise<MusicSettingsApiResponse> {
+    const response = await fetch('/admin-home/music-settings-json', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load music settings (${response.status})`);
+    }
+
+    const payload = await response.json();
+    if (payload?.success) {
+      return payload as MusicSettingsApiResponse;
+    }
+
+    throw new Error(payload?.message_en || 'Music settings payload missing data');
+  },
+
+  async saveMusicSettings(settings: Partial<MusicMarketplaceSettings>): Promise<MusicSettingsApiResponse> {
+    const response = await fetch('/admin-home/music-settings-json', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(settings),
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to save music settings (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) {
+          errMsg = errJson.message_en;
+        } else if (errJson?.errors) {
+          errMsg = Object.values(errJson.errors).flat().join(', ');
+        }
+      } catch {
+        // fallback
+      }
+      throw new Error(errMsg);
+    }
+
+    const payload = await response.json();
+    if (payload?.success) {
+      return payload as MusicSettingsApiResponse;
+    }
+
+    throw new Error(payload?.message_en || 'Music settings save failed');
   },
 
   // Activity log

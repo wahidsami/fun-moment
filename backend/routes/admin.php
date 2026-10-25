@@ -14,6 +14,11 @@ Route::middleware(['setlang'])->group(function(){
     Route::get('/dashboard-summary', 'AdminDashboardController@dashboardSummary')->name('admin.dashboard.summary');
     Route::get('/settings-json', 'AdminDashboardController@settingsJson')->name('admin.settings.json');
     Route::post('/settings-json', 'AdminDashboardController@updateSettingsJson')->name('admin.settings.json.update');
+    // Music Marketplace Settings (Phase 3A)
+    Route::get('/music-settings-json', 'AdminMusicSettingController@index')->name('admin.music.settings.json');
+    Route::post('/music-settings-json', 'AdminMusicSettingController@update')->name('admin.music.settings.json.update');
+    Route::get('/music/settings-json', 'AdminMusicSettingController@index')->name('admin.music.settings.json.alias');
+    Route::post('/music/settings-json', 'AdminMusicSettingController@update')->name('admin.music.settings.json.update.alias');
     Route::get('/dark-mode-toggle', 'AdminDashboardController@dark_mode_toggle')->name('admin.dark.mode.toggle');
     Route::get('/feature-flags', 'AdminFeatureFlagController@index')->name('admin.feature.flags');
     Route::post('/feature-flags/{module}', 'AdminFeatureFlagController@update')->name('admin.feature.flags.update');

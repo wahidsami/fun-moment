@@ -24,6 +24,20 @@ class MusicStreamController extends Controller
     }
 
     /**
+     * Get the public runtime music marketplace configuration.
+     *
+     * Enables client mobile apps to dynamically fetch marketplace availability
+     * and licensing parameters at runtime without requiring a mobile rebuild.
+     */
+    public function config(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => \App\MusicSetting::toPublicConfig(),
+        ]);
+    }
+
+    /**
      * Request an authorized, short-lived stream ticket for a music track.
      * Accessible by both authenticated users (full or preview stream based on entitlement)
      * and guest users (preview stream only).

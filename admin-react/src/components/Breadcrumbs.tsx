@@ -89,6 +89,11 @@ export default function Breadcrumbs({ currentView, language }: BreadcrumbsProps)
           { label: t.nav_marketplace_section, active: false },
           { label: t.nav_jobs, active: true }
         ];
+      case 'music-settings':
+        return [
+          { label: t.nav_marketplace_section, active: false },
+          { label: t.nav_music_settings || (isRtl ? 'سوق الموسيقى' : 'Music Marketplace'), active: true }
+        ];
       case 'subscription':
         return [
           { label: t.nav_monetization_section, active: false },

@@ -69,6 +69,11 @@ class Phase2MusicAudioTestRunner
 
 $runner = new Phase2MusicAudioTestRunner();
 
+// Reset music settings to canonical defaults for test isolation
+foreach (MusicSetting::getDefaults() as $dKey => $dVal) {
+    MusicSetting::set($dKey, $dVal);
+}
+
 echo "\n--- 1. Testing Audio Upload Validation & Anti-Spoofing ---\n";
 
 $validator = new AudioValidationService();
@@ -396,8 +401,9 @@ echo "\n--- 6. Testing Playback Authorization & Commercial Entitlements ---\n";
 
 $streamService = new MusicStreamService($storage);
 
-// Mark track as published/approved
+// Mark track as published/approved and enable marketplace for standard operation
 $track->update(['status' => MusicTrack::STATUS_APPROVED]);
+MusicSetting::set('music_marketplace_enabled', 1);
 
 // 1. Buyer with purchase entitlement gets full stream
 $accessBuyer = $streamService->resolvePlaybackAccess($buyer, $track);

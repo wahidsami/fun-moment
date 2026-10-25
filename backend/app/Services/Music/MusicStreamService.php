@@ -116,7 +116,19 @@ class MusicStreamService
             }
         }
 
-        // 4. If track is suspended or not approved, unentitled users cannot stream it (even preview)
+        // 4. Server-Side Marketplace Availability Enforcement:
+        // When the marketplace is disabled, new public access (free streaming and previews) is blocked.
+        // Existing paid entitlements (prior buyers and active renters) and owner/admin access are strictly preserved.
+        if (!\App\MusicSetting::isMarketplaceEnabled()) {
+            return [
+                'authorized' => false,
+                'mode' => 'denied',
+                'entitlement' => null,
+                'reason' => 'Music marketplace is currently disabled',
+            ];
+        }
+
+        // 5. If track is suspended or not approved, unentitled users cannot stream it (even preview)
         if ($track->isSuspended() || !$track->isApproved()) {
             return [
                 'authorized' => false,
@@ -157,7 +169,7 @@ class MusicStreamService
     /**
      * Check if user is the track owner or platform administrator.
      */
-    protected function isOwnerOrAdmin(?\Illuminate\Contracts\Auth\Authenticatable $user, MusicTrack $track): bool
+    public function isOwnerOrAdmin(?\Illuminate\Contracts\Auth\Authenticatable $user, MusicTrack $track): bool
     {
         if (!$user) {
             return false;

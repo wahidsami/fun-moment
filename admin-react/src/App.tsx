@@ -18,6 +18,7 @@ import CMSView from './components/CMSView';
 import LegalTermsView from './components/LegalTermsView';
 import LocalizationView from './components/LocalizationView';
 import SettingsView from './components/SettingsView';
+import MusicSettingsView from './components/MusicSettingsView';
 import AddonLockedView from './components/AddonLockedView';
 import AuditView from './components/AuditView';
 import WalletView from './components/WalletView';
@@ -252,6 +253,7 @@ export default function App() {
     'legal-terms': 'manage_cms',
     localization: 'manage_cms', // CMS control or translation key control
     settings: 'manage_settings',
+    'music-settings': 'manage_settings',
   };
 
   // Render view conditionally based on currentView state
@@ -285,6 +287,8 @@ export default function App() {
         return <LocalizationView language={language} />;
       case 'settings':
         return <SettingsView language={language} activeRole={activeRole} />;
+      case 'music-settings':
+        return <MusicSettingsView language={language} activeRole={activeRole} />;
       case 'audit':
         return <AuditView language={language} activeRole={activeRole} />;
       

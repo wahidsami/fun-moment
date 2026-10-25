@@ -353,8 +353,9 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
     Route::get('/terms-and-condition', [SliderController::class, 'terms_and_condition_page']);
     Route::get('/privacy-policy', [SliderController::class, 'privacy_policy_page']);
 
-    // Music Stream & Playback Authorization Endpoints (Phase 2)
+    // Music Stream & Playback Authorization Endpoints (Phase 2 & 3A)
     Route::group(['prefix' => 'music'], function () {
+        Route::get('/config', [\App\Http\Controllers\Api\MusicStreamController::class, 'config'])->name('api.v1.music.config');
         Route::get('/tracks/{id}/stream-ticket', [\App\Http\Controllers\Api\MusicStreamController::class, 'requestStreamTicket'])->name('api.v1.music.tracks.stream-ticket');
         Route::get('/tracks/{id}/stream', [\App\Http\Controllers\Api\MusicStreamController::class, 'stream'])->name('api.v1.music.tracks.stream');
     });

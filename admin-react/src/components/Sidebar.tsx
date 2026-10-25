@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Banknote,
   Scale,
+  Music,
   X
 } from 'lucide-react';
 import logo from '../../thelogo.png';
@@ -78,6 +79,7 @@ export default function Sidebar({
   // Marketplace
   const marketplaceItems = [
     { view: 'jobs', label: t.nav_jobs, icon: Hammer, moduleKey: 'jobs' as AddonModuleKey },
+    { view: 'music-settings', label: t.nav_music_settings || (isRtl ? 'سوق الموسيقى' : 'Music Marketplace'), icon: Music },
   ];
 
   // Monetization

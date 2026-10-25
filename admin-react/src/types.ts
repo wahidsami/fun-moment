@@ -744,3 +744,43 @@ export interface SliderLookupCategory {
   status?: number;
   display_label?: string;
 }
+
+export interface MusicMarketplaceSettings {
+  music_marketplace_enabled: boolean;
+  paid_preview_duration_seconds: number;
+  max_audio_upload_mb: number;
+  platform_commission_rate: number;
+  allowed_audio_formats: string[];
+  allowed_audio_formats_raw?: string;
+  seller_submissions_enabled: boolean;
+  seller_tracks_require_approval: boolean;
+  offer_free_enabled: boolean;
+  offer_rent_enabled: boolean;
+  offer_sale_enabled: boolean;
+  default_rental_duration_days: number;
+}
+
+export interface MusicMarketplaceRuntime {
+  php_upload_max_filesize: string;
+  php_post_max_size: string;
+  php_max_upload_mb: number;
+  effective_max_upload_mb: number;
+  configured_max_upload_bytes: number;
+  effective_max_upload_bytes: number;
+  server_clamped_preview_min: number;
+  server_clamped_preview_max: number;
+  supported_system_formats: string[];
+}
+
+export interface MusicSettingsApiResponse {
+  success: boolean;
+  message_en: string;
+  message_ar: string;
+  data: MusicMarketplaceSettings;
+  runtime?: MusicMarketplaceRuntime;
+  dispatched_regeneration_jobs?: Record<string, number>;
+  total_dispatched_jobs?: number;
+  meta?: {
+    can_manage: boolean;
+  };
+}

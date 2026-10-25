@@ -231,8 +231,12 @@ class MusicAudioProcessingService
         $count = 0;
 
         foreach ($tracks as $track) {
-            \App\Jobs\RegenerateMusicPreviewJob::dispatch($track, $force);
-            $count++;
+            try {
+                \App\Jobs\RegenerateMusicPreviewJob::dispatch($track, $force);
+                $count++;
+            } catch (\Throwable $e) {
+                Log::warning("Skipped regenerating preview for track #{$track->id}: " . $e->getMessage());
+            }
         }
 
         return $count;

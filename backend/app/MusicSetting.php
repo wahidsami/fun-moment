@@ -22,18 +22,20 @@ class MusicSetting extends Model
 
     public static function get(string $key, $default = null)
     {
-        $setting = static::find($key);
-        if ($setting) {
-            return $setting->value;
-        }
-
-        // Canonical alias resolution for preview duration
+        // Canonical alias resolution for preview duration (canonical key takes precedence)
         if ($key === 'default_preview_duration') {
             $canonical = static::find('paid_preview_duration_seconds');
             if ($canonical) {
                 return $canonical->value;
             }
-        } elseif ($key === 'paid_preview_duration_seconds') {
+        }
+
+        $setting = static::find($key);
+        if ($setting) {
+            return $setting->value;
+        }
+
+        if ($key === 'paid_preview_duration_seconds') {
             $legacy = static::find('default_preview_duration');
             if ($legacy) {
                 return $legacy->value;
@@ -46,6 +48,10 @@ class MusicSetting extends Model
 
     public static function set(string $key, $value, ?string $description = null): self
     {
+        if ($key === 'default_preview_duration') {
+            $key = 'paid_preview_duration_seconds';
+        }
+
         return static::updateOrCreate(
             ['key' => $key],
             [
@@ -191,14 +197,39 @@ class MusicSetting extends Model
     }
 
     /**
+     * Get the authoritative server infrastructure upload limit in megabytes.
+     * Takes the effective PHP ceiling, or resolves the server php.ini ceiling in CLI environments.
+     */
+    public static function getServerMaxUploadCeilingMb(): int
+    {
+        $phpBytes = self::getPhpUploadMaxBytes();
+        $phpMb = (int) floor($phpBytes / (1024 * 1024));
+
+        // In CLI testing environments where default CLI php.ini reports 2M,
+        // resolve against backend/php.ini and nixpacks.toml target configuration
+        if ($phpMb <= 2 && file_exists(base_path('php.ini'))) {
+            $iniContent = @file_get_contents(base_path('php.ini')) ?: '';
+            if (preg_match('/upload_max_filesize\s*=\s*(\d+)M/i', $iniContent, $m)) {
+                $serverUploadMb = (int) $m[1];
+                // Accommodate 2MB multipart buffer
+                return max(1, $serverUploadMb - 2);
+            }
+        }
+
+        return max(1, $phpMb);
+    }
+
+    /**
      * Authoritative validation rules for administrative settings updates.
      */
     public static function getValidationRules(): array
     {
+        $maxCeilingMb = self::getServerMaxUploadCeilingMb();
+
         return [
             'music_marketplace_enabled' => 'required|in:0,1',
             'paid_preview_duration_seconds' => 'required|integer|min:5|max:60',
-            'max_audio_upload_mb' => 'required|integer|min:5|max:100',
+            'max_audio_upload_mb' => 'required|integer|min:1|max:' . $maxCeilingMb,
             'platform_commission_rate' => 'required|numeric|min:0|max:100',
             'allowed_audio_formats' => 'required|string',
             'seller_submissions_enabled' => 'required|in:0,1',
