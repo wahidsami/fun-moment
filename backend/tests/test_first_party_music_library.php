@@ -827,6 +827,183 @@ class FirstPartyMusicLibraryTestRunner
             $this->assert($deleteAlbumRes->status() === 200, 'Album deletion returns HTTP 200');
             $this->assert(!Storage::disk('public')->exists('music_covers/temp_cover_to_delete.jpg'), 'Cover was removed from public disk upon album deletion');
 
+            // =========================================================================
+            // 13. End-to-End Deletion & Relationship Safety Tests
+            // =========================================================================
+            echo "--- 13. End-to-End Deletion & Relationship Safety Tests ---\n";
+
+            // 13.1 Album Deletion preserves associated tracks and unlinks them safely
+            $relAlbum = MusicAlbum::create([
+                'title_en' => 'Relationship Safety Album',
+                'artist_name' => 'Preservation Artist',
+                'genre_id' => $genre->id,
+                'status' => 'published',
+                'owner_type' => 'admin',
+                'admin_id' => $admin->id,
+                'cover_image' => 'music_covers/preserve_album.jpg',
+            ]);
+            Storage::disk('public')->put('music_covers/preserve_album.jpg', 'preserve cover data');
+
+            $trackA = MusicTrack::create([
+                'title_en' => 'Preserved Track A',
+                'artist_name' => 'Preservation Artist',
+                'album_id' => $relAlbum->id,
+                'track_number' => 1,
+                'genre_id' => $genre->id,
+                'status' => 'published',
+                'media_status' => 'ready',
+                'owner_type' => 'admin',
+                'admin_id' => $admin->id,
+                'audio_path_original' => 'music_audio/track_a.mp3',
+            ]);
+
+            $trackB = MusicTrack::create([
+                'title_en' => 'Preserved Track B',
+                'artist_name' => 'Preservation Artist',
+                'album_id' => $relAlbum->id,
+                'track_number' => 2,
+                'genre_id' => $genre->id,
+                'status' => 'published',
+                'media_status' => 'ready',
+                'owner_type' => 'admin',
+                'admin_id' => $admin->id,
+                'audio_path_original' => 'music_audio/track_b.mp3',
+            ]);
+
+            // Delete album via POST /delete endpoint
+            $delAlbumReq = Request::create("/admin-home/music-albums-json/{$relAlbum->id}/delete", 'POST');
+            $delAlbumRes = $albumController->destroy($delAlbumReq, $relAlbum->id);
+            $this->assert($delAlbumRes->status() === 200, 'Album deletion via POST /delete returns HTTP 200');
+            $delAlbumJson = json_decode($delAlbumRes->getContent(), true);
+            $this->assert($delAlbumJson['success'] === true, 'Album deletion response indicates success');
+            $this->assert(!empty($delAlbumJson['message_en']), 'Album deletion returns bilingual English message');
+            $this->assert(!empty($delAlbumJson['message_ar']), 'Album deletion returns bilingual Arabic message');
+
+            // Verify album is deleted from DB
+            $this->assert(MusicAlbum::find($relAlbum->id) === null, 'Album record was deleted from database');
+
+            // Verify tracks STILL EXIST in database with nullified album associations
+            $freshTrackA = MusicTrack::find($trackA->id);
+            $freshTrackB = MusicTrack::find($trackB->id);
+            $this->assert($freshTrackA !== null, 'Track A was NOT destroyed when parent album was deleted');
+            $this->assert($freshTrackB !== null, 'Track B was NOT destroyed when parent album was deleted');
+            $this->assert($freshTrackA->album_id === null, 'Track A album_id safely set to null');
+            $this->assert($freshTrackA->track_number === null, 'Track A track_number safely set to null');
+            $this->assert($freshTrackB->album_id === null, 'Track B album_id safely set to null');
+            $this->assert($freshTrackB->track_number === null, 'Track B track_number safely set to null');
+            $this->assert(!Storage::disk('public')->exists('music_covers/preserve_album.jpg'), 'Album cover file cleaned up post-commit');
+
+            // 13.2 Track Deletion updates album track list and re-sequences track numbers
+            $reseqAlbum = MusicAlbum::create([
+                'title_en' => 'Resequencing Test Album',
+                'artist_name' => 'Sequencer Band',
+                'genre_id' => $genre->id,
+                'status' => 'published',
+                'owner_type' => 'admin',
+                'admin_id' => $admin->id,
+            ]);
+
+            $seqTrack1 = MusicTrack::create([
+                'title_en' => 'Sequence Track 1',
+                'artist_name' => 'Sequencer Band',
+                'album_id' => $reseqAlbum->id,
+                'track_number' => 1,
+                'genre_id' => $genre->id,
+                'status' => 'published',
+                'media_status' => 'ready',
+                'owner_type' => 'admin',
+                'admin_id' => $admin->id,
+                'audio_path_original' => 'music_audio/seq1.mp3',
+            ]);
+            $seqTrack2 = MusicTrack::create([
+                'title_en' => 'Sequence Track 2',
+                'artist_name' => 'Sequencer Band',
+                'album_id' => $reseqAlbum->id,
+                'track_number' => 2,
+                'genre_id' => $genre->id,
+                'status' => 'published',
+                'media_status' => 'ready',
+                'owner_type' => 'admin',
+                'admin_id' => $admin->id,
+                'audio_path_original' => 'music_audio/seq2.mp3',
+            ]);
+            $seqTrack3 = MusicTrack::create([
+                'title_en' => 'Sequence Track 3',
+                'artist_name' => 'Sequencer Band',
+                'album_id' => $reseqAlbum->id,
+                'track_number' => 3,
+                'genre_id' => $genre->id,
+                'status' => 'published',
+                'media_status' => 'ready',
+                'owner_type' => 'admin',
+                'admin_id' => $admin->id,
+                'audio_path_original' => 'music_audio/seq3.mp3',
+            ]);
+
+            // Delete middle track (Track 2) via POST /delete
+            $delTrackReq = Request::create("/admin-home/music-library-json/{$seqTrack2->id}/delete", 'POST');
+            $delTrackRes = $libraryController->destroy($delTrackReq, $seqTrack2->id);
+            $this->assert($delTrackRes->status() === 200, 'Track deletion via POST /delete returns HTTP 200');
+            $delTrackJson = json_decode($delTrackRes->getContent(), true);
+            $this->assert($delTrackJson['success'] === true, 'Track deletion response indicates success');
+            $this->assert(!empty($delTrackJson['message_en']), 'Track deletion returns bilingual English message');
+            $this->assert(!empty($delTrackJson['message_ar']), 'Track deletion returns bilingual Arabic message');
+
+            // Verify track 2 is deleted
+            $this->assert(MusicTrack::find($seqTrack2->id) === null, 'Track 2 record was deleted from database');
+
+            // Verify remaining tracks re-sequenced: Track 1 stays 1, Track 3 becomes 2
+            $freshTrack1 = MusicTrack::find($seqTrack1->id);
+            $freshTrack3 = MusicTrack::find($seqTrack3->id);
+            $this->assert($freshTrack1->track_number === 1, 'Track 1 maintains position 1 in album');
+            $this->assert($freshTrack3->track_number === 2, 'Track 3 re-sequenced from position 3 to position 2');
+
+            // 13.3 Test DELETE HTTP method support on base routes
+            $seqTrack4 = MusicTrack::create([
+                'title_en' => 'Sequence Track 4',
+                'artist_name' => 'Sequencer Band',
+                'genre_id' => $genre->id,
+                'status' => 'draft',
+                'media_status' => 'ready',
+                'owner_type' => 'admin',
+                'admin_id' => $admin->id,
+                'audio_path_original' => 'music_audio/seq4.mp3',
+            ]);
+            $delMethodReq = Request::create("/admin-home/music-library-json/{$seqTrack4->id}", 'DELETE');
+            $delMethodRes = $libraryController->destroy($delMethodReq, $seqTrack4->id);
+            $this->assert($delMethodRes->status() === 200, 'Track deletion via HTTP DELETE returns HTTP 200');
+            $this->assert(MusicTrack::find($seqTrack4->id) === null, 'Track 4 deleted via HTTP DELETE');
+
+            $albumToDeleteWithMethod = MusicAlbum::create([
+                'title_en' => 'Delete Method Album',
+                'artist_name' => 'Method Band',
+                'genre_id' => $genre->id,
+                'status' => 'draft',
+                'owner_type' => 'admin',
+                'admin_id' => $admin->id,
+            ]);
+            $delAlbumMethodReq = Request::create("/admin-home/music-albums-json/{$albumToDeleteWithMethod->id}", 'DELETE');
+            $delAlbumMethodRes = $albumController->destroy($delAlbumMethodReq, $albumToDeleteWithMethod->id);
+            $this->assert($delAlbumMethodRes->status() === 200, 'Album deletion via HTTP DELETE returns HTTP 200');
+            $this->assert(MusicAlbum::find($albumToDeleteWithMethod->id) === null, 'Album deleted via HTTP DELETE');
+
+            // 13.4 Missing records return 404 with structured error messages
+            $missingTrackReq = Request::create('/admin-home/music-library-json/999999/delete', 'POST');
+            $missingTrackRes = $libraryController->destroy($missingTrackReq, 999999);
+            $this->assert($missingTrackRes->status() === 404, 'Deleting missing track returns HTTP 404');
+            $missingTrackJson = json_decode($missingTrackRes->getContent(), true);
+            $this->assert($missingTrackJson['success'] === false, 'Missing track returns success: false');
+            $this->assert(!empty($missingTrackJson['message_en']), 'Missing track returns message_en');
+            $this->assert(!empty($missingTrackJson['message_ar']), 'Missing track returns message_ar');
+
+            $missingAlbumReq = Request::create('/admin-home/music-albums-json/999999/delete', 'POST');
+            $missingAlbumRes = $albumController->destroy($missingAlbumReq, 999999);
+            $this->assert($missingAlbumRes->status() === 404, 'Deleting missing album returns HTTP 404');
+            $missingAlbumJson = json_decode($missingAlbumRes->getContent(), true);
+            $this->assert($missingAlbumJson['success'] === false, 'Missing album returns success: false');
+            $this->assert(!empty($missingAlbumJson['message_en']), 'Missing album returns message_en');
+            $this->assert(!empty($missingAlbumJson['message_ar']), 'Missing album returns message_ar');
+
         } finally {
             DB::rollBack();
         }

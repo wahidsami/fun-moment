@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -673,6 +674,8 @@ class AdminMusicLibraryController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Platform music track not found',
+                'message_en' => 'Platform music track not found',
+                'message_ar' => 'المسار الموسيقي غير موجود في مكتبة المنصة.',
             ], 404);
         }
 
@@ -687,30 +690,68 @@ class AdminMusicLibraryController extends Controller
             return response()->json([
                 'success' => true,
                 'archived' => true,
-                'message_en' => "Track has historical purchase or entitlement records; safely suspended from catalog rather than hard-deleted.",
-                'message_ar' => "تم تعليق المسار بأمان لوجود سجلات طلبات ومشتريات مرتبطة به حفاظاً على سلامة البيانات.",
+                'message' => 'Track has historical purchase or entitlement records; safely suspended from catalog rather than hard-deleted.',
+                'message_en' => 'Track has historical purchase or entitlement records; safely suspended from catalog rather than hard-deleted.',
+                'message_ar' => 'تم تعليق المسار بأمان لوجود سجلات طلبات ومشتريات مرتبطة به حفاظاً على سلامة البيانات.',
             ]);
         }
 
-        // Otherwise perform clean deletion
-        try {
-            if (!empty($track->audio_path_original)) {
-                $this->storageService->deleteFile($track->audio_path_original);
+        $albumId = $track->album_id;
+        $filesToDelete = [];
+        if (!empty($track->audio_path_original)) {
+            $filesToDelete[] = $track->audio_path_original;
+        }
+        if (!empty($track->audio_path_preview)) {
+            $filesToDelete[] = $track->audio_path_preview;
+        }
+        if (!empty($track->audio_path_stream) && $track->audio_path_stream !== $track->audio_path_original) {
+            $filesToDelete[] = $track->audio_path_stream;
+        }
+        if (!empty($track->cover_image)) {
+            $album = $albumId ? MusicAlbum::find($albumId) : null;
+            if (!$album || $album->cover_image !== $track->cover_image) {
+                $sharedCount = MusicTrack::where('cover_image', $track->cover_image)->where('id', '!=', $track->id)->count();
+                if ($sharedCount === 0) {
+                    $filesToDelete[] = $track->cover_image;
+                }
             }
-            if (!empty($track->audio_path_preview)) {
-                $this->storageService->deleteFile($track->audio_path_preview);
-            }
-            if (!empty($track->audio_path_stream) && $track->audio_path_stream !== $track->audio_path_original) {
-                $this->storageService->deleteFile($track->audio_path_stream);
-            }
-        } catch (\Throwable $e) {
-            Log::warning("Notice deleting storage files for track #{$id}: " . $e->getMessage());
         }
 
-        $track->delete();
+        DB::transaction(function () use ($track, $albumId) {
+            $track->delete();
+
+            // Re-sequence remaining album tracks if this track was in an album
+            if ($albumId) {
+                $remainingTracks = MusicTrack::where('album_id', $albumId)
+                    ->orderBy('track_number', 'asc')
+                    ->get();
+                foreach ($remainingTracks as $idx => $t) {
+                    $newNum = $idx + 1;
+                    if ($t->track_number !== $newNum) {
+                        $t->update(['track_number' => $newNum]);
+                    }
+                }
+            }
+        });
+
+        // Delete physical files ONLY after successful database deletion
+        foreach ($filesToDelete as $file) {
+            try {
+                if (str_starts_with($file, 'music_covers/')) {
+                    if (Storage::disk('public')->exists($file)) {
+                        Storage::disk('public')->delete($file);
+                    }
+                } else {
+                    $this->storageService->deleteFile($file);
+                }
+            } catch (\Throwable $e) {
+                Log::warning("Notice deleting storage files for track #{$id}: " . $e->getMessage());
+            }
+        }
 
         return response()->json([
             'success' => true,
+            'message' => 'Platform track deleted successfully.',
             'message_en' => 'Platform track deleted successfully.',
             'message_ar' => 'تم حذف المسار بنجاح.',
         ]);

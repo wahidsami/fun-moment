@@ -389,23 +389,36 @@ class AdminMusicAlbumController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Music album not found',
+                'message_en' => 'Music album not found',
+                'message_ar' => 'الألبوم الموسيقي غير موجود.',
             ], 404);
         }
 
+        $coverToDelete = $album->cover_image;
+
         DB::transaction(function () use ($album) {
+            // Preserve all tracks and their audio files safely, clearing only album association
             MusicTrack::where('album_id', $album->id)->update([
                 'album_id' => null,
                 'track_number' => null,
             ]);
-            if (!empty($album->cover_image) && Storage::disk('public')->exists($album->cover_image)) {
-                Storage::disk('public')->delete($album->cover_image);
-            }
             $album->delete();
         });
+
+        // Cleanup album cover file ONLY after database deletion succeeded
+        if (!empty($coverToDelete) && Storage::disk('public')->exists($coverToDelete)) {
+            try {
+                Storage::disk('public')->delete($coverToDelete);
+            } catch (\Throwable $e) {
+                Log::warning("Notice deleting cover for album #{$id}: " . $e->getMessage());
+            }
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Music album deleted successfully.',
+            'message_en' => 'Music album deleted successfully.',
+            'message_ar' => 'تم حذف الألبوم الموسيقي بنجاح.',
         ]);
     }
 }

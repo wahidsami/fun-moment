@@ -1307,9 +1307,9 @@ export const LaravelAPI = {
     return response.json();
   },
 
-  async deleteMusicLibraryTrack(id: number): Promise<{ success: boolean; message_en: string; action: string }> {
-    const response = await fetchWithCsrf(`/admin-home/music-library-json/${id}`, {
-      method: 'DELETE',
+  async deleteMusicLibraryTrack(id: number): Promise<{ success: boolean; message?: string; message_en: string; message_ar?: string; action?: string; archived?: boolean }> {
+    const response = await fetchWithCsrf(`/admin-home/music-library-json/${id}/delete`, {
+      method: 'POST',
       headers: {
         'Accept': 'application/json',
       },
@@ -1320,6 +1320,7 @@ export const LaravelAPI = {
       try {
         const errJson = await response.json();
         if (errJson?.message_en) errMsg = errJson.message_en;
+        else if (errJson?.message) errMsg = errJson.message;
       } catch {}
       throw new Error(errMsg);
     }
@@ -1458,9 +1459,9 @@ export const LaravelAPI = {
     return response.json();
   },
 
-  async deleteMusicAlbum(id: number): Promise<{ success: boolean; message_en: string }> {
-    const response = await fetchWithCsrf(`/admin-home/music-albums-json/${id}`, {
-      method: 'DELETE',
+  async deleteMusicAlbum(id: number): Promise<{ success: boolean; message?: string; message_en: string; message_ar?: string }> {
+    const response = await fetchWithCsrf(`/admin-home/music-albums-json/${id}/delete`, {
+      method: 'POST',
       headers: {
         'Accept': 'application/json',
       },
@@ -1471,6 +1472,7 @@ export const LaravelAPI = {
       try {
         const errJson = await response.json();
         if (errJson?.message_en) errMsg = errJson.message_en;
+        else if (errJson?.message) errMsg = errJson.message;
       } catch {}
       throw new Error(errMsg);
     }

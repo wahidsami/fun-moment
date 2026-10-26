@@ -42,15 +42,17 @@ Route::middleware(['setlang'])->group(function(){
     Route::match(['post', 'put'], '/music-library-json/{id}', 'AdminMusicLibraryController@update')->name('admin.music.library.json.update')->where('id', '[0-9]+');
     Route::post('/music-library-json/{id}/publish', 'AdminMusicLibraryController@publish')->name('admin.music.library.json.publish')->where('id', '[0-9]+');
     Route::post('/music-library-json/{id}/unpublish', 'AdminMusicLibraryController@unpublish')->name('admin.music.library.json.unpublish')->where('id', '[0-9]+');
-    Route::post('/music-library-json/{id}/delete', 'AdminMusicLibraryController@destroy')->name('admin.music.library.json.delete')->where('id', '[0-9]+');
+    Route::match(['post', 'delete'], '/music-library-json/{id}/delete', 'AdminMusicLibraryController@destroy')->name('admin.music.library.json.delete')->where('id', '[0-9]+');
+    Route::delete('/music-library-json/{id}', 'AdminMusicLibraryController@destroy')->where('id', '[0-9]+');
     // First-Party Music Albums Management
     Route::get('/music-albums-json', 'AdminMusicAlbumController@index')->name('admin.music.albums.json');
     Route::post('/music-albums-json', 'AdminMusicAlbumController@store')->name('admin.music.albums.json.store');
-    Route::get('/music-albums-json/{id}', 'AdminMusicAlbumController@show')->name('admin.music.albums.json.show');
-    Route::post('/music-albums-json/{id}', 'AdminMusicAlbumController@update')->name('admin.music.albums.json.update');
-    Route::post('/music-albums-json/{id}/publish', 'AdminMusicAlbumController@publish')->name('admin.music.albums.json.publish');
-    Route::post('/music-albums-json/{id}/reorder-tracks', 'AdminMusicAlbumController@reorderTracks')->name('admin.music.albums.json.reorder');
-    Route::post('/music-albums-json/{id}/delete', 'AdminMusicAlbumController@destroy')->name('admin.music.albums.json.delete');
+    Route::get('/music-albums-json/{id}', 'AdminMusicAlbumController@show')->name('admin.music.albums.json.show')->where('id', '[0-9]+');
+    Route::match(['post', 'put'], '/music-albums-json/{id}', 'AdminMusicAlbumController@update')->name('admin.music.albums.json.update')->where('id', '[0-9]+');
+    Route::post('/music-albums-json/{id}/publish', 'AdminMusicAlbumController@publish')->name('admin.music.albums.json.publish')->where('id', '[0-9]+');
+    Route::post('/music-albums-json/{id}/reorder-tracks', 'AdminMusicAlbumController@reorderTracks')->name('admin.music.albums.json.reorder')->where('id', '[0-9]+');
+    Route::match(['post', 'delete'], '/music-albums-json/{id}/delete', 'AdminMusicAlbumController@destroy')->name('admin.music.albums.json.delete')->where('id', '[0-9]+');
+    Route::delete('/music-albums-json/{id}', 'AdminMusicAlbumController@destroy')->where('id', '[0-9]+');
     Route::get('/dark-mode-toggle', 'AdminDashboardController@dark_mode_toggle')->name('admin.dark.mode.toggle');
     Route::get('/feature-flags', 'AdminFeatureFlagController@index')->name('admin.feature.flags');
     Route::post('/feature-flags/{module}', 'AdminFeatureFlagController@update')->name('admin.feature.flags.update');

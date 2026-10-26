@@ -27,8 +27,8 @@ import {
   X,
   Volume2,
   Save,
-  Check,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import {
   Language,
@@ -88,6 +88,10 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
   const [showCreateAlbumModal, setShowCreateAlbumModal] = useState(false);
   const [showEditAlbumModal, setShowEditAlbumModal] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState<MusicAlbumItem | null>(null);
+
+  // Deletion pending states (prevent duplicate clicks/submissions)
+  const [deletingTrackId, setDeletingTrackId] = useState<number | null>(null);
+  const [deletingAlbumId, setDeletingAlbumId] = useState<number | null>(null);
 
   // Notification / Alert message
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -216,16 +220,31 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
     }
   };
 
-  const handleDeleteTrack = async (id: number) => {
-    if (!window.confirm(isRtl ? 'هل أنت متأكد من حذف أو أرشفة هذا المسار الموسيقي؟' : 'Are you sure you want to delete or archive this track?')) {
+  const handleDeleteTrack = async (track: MusicLibraryTrackItem) => {
+    if (deletingTrackId !== null) return;
+    const trackName = isRtl ? (track.title_ar || track.title_en) : track.title_en;
+    const confirmPrompt = isRtl
+      ? `هل أنت متأكد من حذف أو أرشفة المسار "${trackName}"؟ سيتم تحديث الألبومات المرتبطة به بأمان.`
+      : `Are you sure you want to delete or archive the track "${trackName}"? Any associated album counts will be safely updated.`;
+    if (!window.confirm(confirmPrompt)) {
       return;
     }
+    setDeletingTrackId(track.id);
     try {
-      const res = await api.deleteMusicLibraryTrack(id);
-      setAlert({ type: 'success', message: res.message_en });
+      const res = await api.deleteMusicLibraryTrack(track.id);
+      // Optimistically remove from state immediately
+      setTracks(prev => prev.filter(t => t.id !== track.id));
+      const successMsg = isRtl
+        ? (res.message_ar || res.message_en || res.message || 'تم حذف المسار بنجاح.')
+        : (res.message_en || res.message || 'Track deleted successfully.');
+      setAlert({ type: 'success', message: successMsg });
+      // Refresh dependent tracks and albums (for track counts)
       fetchTracks();
+      fetchAlbums();
     } catch (err: any) {
-      setAlert({ type: 'error', message: err.message });
+      setAlert({ type: 'error', message: err.message || 'Failed to delete track' });
+    } finally {
+      setDeletingTrackId(null);
     }
   };
 
@@ -240,16 +259,31 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
     }
   };
 
-  const handleDeleteAlbum = async (id: number) => {
-    if (!window.confirm(isRtl ? 'هل أنت متأكد من حذف هذا الألبوم؟' : 'Are you sure you want to delete this album?')) {
+  const handleDeleteAlbum = async (album: MusicAlbumItem) => {
+    if (deletingAlbumId !== null) return;
+    const albumTitle = isRtl ? (album.title_ar || album.title_en) : album.title_en;
+    const confirmPrompt = isRtl
+      ? `هل أنت متأكد من حذف الألبوم "${albumTitle}"؟ سيتم الاحتفاظ بجميع المسارات الصوتية بأمان وفك ارتباطها بالألبوم فقط دون حذفها.`
+      : `Are you sure you want to delete the album "${albumTitle}"? All associated tracks and audio files will be safely preserved and unlinked.`;
+    if (!window.confirm(confirmPrompt)) {
       return;
     }
+    setDeletingAlbumId(album.id);
     try {
-      const res = await api.deleteMusicAlbum(id);
-      setAlert({ type: 'success', message: res.message_en });
+      const res = await api.deleteMusicAlbum(album.id);
+      // Optimistically remove from state immediately
+      setAlbums(prev => prev.filter(a => a.id !== album.id));
+      const successMsg = isRtl
+        ? (res.message_ar || res.message_en || res.message || 'تم حذف الألبوم الموسيقي بنجاح.')
+        : (res.message_en || res.message || 'Album deleted successfully.');
+      setAlert({ type: 'success', message: successMsg });
+      // Refresh dependent albums and tracks (since album_id was unlinked)
       fetchAlbums();
+      fetchTracks();
     } catch (err: any) {
-      setAlert({ type: 'error', message: err.message });
+      setAlert({ type: 'error', message: err.message || 'Failed to delete album' });
+    } finally {
+      setDeletingAlbumId(null);
     }
   };
 
@@ -627,11 +661,16 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
                                 </button>
 
                                 <button
-                                  onClick={() => handleDeleteTrack(track.id)}
-                                  className="p-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-500/20 rounded transition-all cursor-pointer"
-                                  title="Delete or Archive Track"
+                                  onClick={() => handleDeleteTrack(track)}
+                                  disabled={deletingTrackId === track.id || deletingTrackId !== null}
+                                  className="p-1.5 bg-red-950/40 hover:bg-red-900/60 disabled:opacity-50 disabled:cursor-not-allowed text-red-300 border border-red-500/20 rounded transition-all cursor-pointer"
+                                  title={deletingTrackId === track.id ? (isRtl ? 'جاري الحذف...' : 'Deleting...') : (isRtl ? 'حذف أو أرشفة المسار' : 'Delete or Archive Track')}
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  {deletingTrackId === track.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" />
+                                  ) : (
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  )}
                                 </button>
                               </>
                             )}
@@ -746,10 +785,16 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
                         {isRtl ? 'تعديل' : 'Edit'}
                       </button>
                       <button
-                        onClick={() => handleDeleteAlbum(album.id)}
-                        className="px-2 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-500/20 rounded text-xs cursor-pointer"
+                        onClick={() => handleDeleteAlbum(album)}
+                        disabled={deletingAlbumId === album.id || deletingAlbumId !== null}
+                        className="px-2 py-1 bg-red-950/40 hover:bg-red-900/60 disabled:opacity-50 disabled:cursor-not-allowed text-red-300 border border-red-500/20 rounded text-xs cursor-pointer flex items-center justify-center min-w-[28px]"
+                        title={deletingAlbumId === album.id ? (isRtl ? 'جاري الحذف...' : 'Deleting...') : (isRtl ? 'حذف الألبوم' : 'Delete Album')}
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        {deletingAlbumId === album.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </div>
                   )}
