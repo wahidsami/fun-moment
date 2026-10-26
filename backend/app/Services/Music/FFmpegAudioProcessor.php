@@ -137,7 +137,9 @@ class FFmpegAudioProcessor implements AudioProcessorInterface
         }
 
         if ($result['exit_code'] !== 0 || empty($result['output'])) {
-            return AudioMetadata::failure("FFprobe failed to inspect audio file (exit code {$result['exit_code']})");
+            $diag = !empty($result['output']) ? ": " . substr($result['output'], 0, 500) : "";
+            Log::warning("FFmpegAudioProcessor::probeMetadata - FFprobe failed to inspect audio file (exit code {$result['exit_code']}){$diag}");
+            return AudioMetadata::failure("FFprobe failed to inspect audio file (exit code {$result['exit_code']}){$diag}");
         }
 
         $json = json_decode($result['output'], true);
@@ -298,7 +300,7 @@ class FFmpegAudioProcessor implements AudioProcessorInterface
      * @param int $timeoutSeconds Maximum allowed runtime in seconds (default 60s)
      * @return array{exit_code: int, output: string, timed_out: bool}
      */
-    protected function executeCommandWithTimeout(string $cmd, int $timeoutSeconds = 60): array
+    public function executeCommandWithTimeout(string $cmd, int $timeoutSeconds = 60): array
     {
         $descriptorSpec = [
             0 => ['pipe', 'r'],
@@ -320,29 +322,14 @@ class FFmpegAudioProcessor implements AudioProcessorInterface
         $errorOutput = '';
         $startTime = microtime(true);
         $timedOut = false;
+        $capturedExitCode = null;
 
         while (true) {
-            $read = [$pipes[1], $pipes[2]];
-            $write = null;
-            $except = null;
-
-            if (@stream_select($read, $write, $except, 0, 100000) > 0) {
-                if (in_array($pipes[1], $read, true)) {
-                    $chunk = fread($pipes[1], 4096);
-                    if ($chunk !== false) {
-                        $output .= $chunk;
-                    }
-                }
-                if (in_array($pipes[2], $read, true)) {
-                    $chunk = fread($pipes[2], 4096);
-                    if ($chunk !== false) {
-                        $errorOutput .= $chunk;
-                    }
-                }
-            }
-
             $status = proc_get_status($process);
             if (!$status['running']) {
+                if (isset($status['exitcode']) && $status['exitcode'] !== -1) {
+                    $capturedExitCode = (int) $status['exitcode'];
+                }
                 break;
             }
 
@@ -350,6 +337,28 @@ class FFmpegAudioProcessor implements AudioProcessorInterface
                 $timedOut = true;
                 proc_terminate($process, 9);
                 break;
+            }
+
+            // On POSIX systems, drain stream pipes incrementally to prevent buffer clogging on large output
+            if (PHP_OS_FAMILY !== 'Windows') {
+                $read = [$pipes[1], $pipes[2]];
+                $write = null;
+                $except = null;
+
+                if (@stream_select($read, $write, $except, 0, 50000) > 0) {
+                    if (in_array($pipes[1], $read, true)) {
+                        $chunk = fread($pipes[1], 4096);
+                        if ($chunk !== false) {
+                            $output .= $chunk;
+                        }
+                    }
+                    if (in_array($pipes[2], $read, true)) {
+                        $chunk = fread($pipes[2], 4096);
+                        if ($chunk !== false) {
+                            $errorOutput .= $chunk;
+                        }
+                    }
+                }
             }
 
             usleep(20000); // 20ms
@@ -361,9 +370,16 @@ class FFmpegAudioProcessor implements AudioProcessorInterface
         fclose($pipes[1]);
         fclose($pipes[2]);
 
-        $exitCode = proc_close($process);
+        $procCloseExit = proc_close($process);
+
         if ($timedOut) {
             $exitCode = 124;
+        } elseif ($procCloseExit !== -1) {
+            $exitCode = $procCloseExit;
+        } elseif ($capturedExitCode !== null) {
+            $exitCode = $capturedExitCode;
+        } else {
+            $exitCode = -1;
         }
 
         return [

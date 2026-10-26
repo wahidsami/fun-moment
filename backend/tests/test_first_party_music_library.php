@@ -400,6 +400,109 @@ class FirstPartyMusicLibraryTestRunner
             $this->assert(!$sellerTrack->isFirstParty(), 'Seller track is NOT first party');
             $this->assert($sellerTrack->admin_id === null, 'Seller track admin_id is null');
 
+            // -------------------------------------------------------------
+            // SECTION 9: Defect A — Music Library Genres Route & Structure
+            // -------------------------------------------------------------
+            echo "\n--- Section 9: Defect A — Music Library Genres Route & Structure ---\n";
+
+            // Ensure admin is logged in
+            Auth::guard('admin')->login($admin);
+
+            // Test genres endpoint directly on AdminMusicLibraryController
+            $libraryController = app(AdminMusicLibraryController::class);
+            $genresReq = Request::create('/admin-home/music-library-json/genres', 'GET');
+            $genresRes = $libraryController->genres($genresReq);
+
+            $this->assert($genresRes->status() === 200, 'Admin music library genres endpoint returns 200 OK');
+            $genresData = json_decode($genresRes->getContent(), true);
+            $this->assert($genresData['success'] === true, 'Genres response has success = true');
+            $this->assert(isset($genresData['genres']) && is_array($genresData['genres']), 'Genres response contains "genres" array');
+            $this->assert(isset($genresData['data']) && is_array($genresData['data']), 'Genres response contains "data" array for generic consumers');
+            $this->assert(count($genresData['genres']) > 0, 'Active genres list is populated');
+
+            // Verify route resolution: GET /admin-home/music-library-json/genres matches AdminMusicLibraryController@genres
+            $matchedGenresRoute = \Illuminate\Support\Facades\Route::getRoutes()->match($genresReq);
+            $this->assert(
+                str_contains($matchedGenresRoute->getActionName(), 'AdminMusicLibraryController@genres'),
+                'Route /admin-home/music-library-json/genres resolves to AdminMusicLibraryController@genres and NOT show/{id}'
+            );
+            $this->assert(
+                $matchedGenresRoute->getName() === 'admin.music.library.json.genres',
+                'Route name is admin.music.library.json.genres'
+            );
+
+            // Verify numeric track route: GET /admin-home/music-library-json/123 matches show
+            $trackIdReq = Request::create('/admin-home/music-library-json/123', 'GET');
+            $matchedTrackRoute = \Illuminate\Support\Facades\Route::getRoutes()->match($trackIdReq);
+            $this->assert(
+                str_contains($matchedTrackRoute->getActionName(), 'AdminMusicLibraryController@show'),
+                'Route /admin-home/music-library-json/{id} with numeric id resolves to AdminMusicLibraryController@show'
+            );
+            $this->assert(
+                $matchedTrackRoute->parameter('id') === '123',
+                'Route parameter id is correctly passed as numeric string'
+            );
+
+            // Auth guard: Unauthenticated access to genres
+            Auth::guard('admin')->logout();
+            $unauthReq = Request::create('/admin-home/music-library-json/genres', 'GET');
+            $unauthRes = $libraryController->genres($unauthReq);
+            $this->assert($unauthRes->status() === 401, 'Unauthenticated request to genres returns 401 UNAUTHENTICATED');
+
+            // Auth guard: Unauthorized non-admin user
+            Auth::guard('admin')->loginUsingId(999999);
+            $unauthRoleUser = new User(['id' => 8888, 'role_id' => 99, 'role' => 'buyer']);
+            Auth::setUser($unauthRoleUser);
+            $forbiddenRes = $libraryController->genres($unauthReq);
+            $this->assert(in_array($forbiddenRes->status(), [401, 403], true), 'Non-admin request to genres is rejected with 401 or 403');
+
+            // Re-authenticate admin
+            Auth::guard('admin')->login($admin);
+
+            // Verify index() response structure: contains both 'tracks' (with 'data' & pagination) and 'data'
+            $indexReq = Request::create('/admin-home/music-library-json', 'GET');
+            $indexRes = $libraryController->index($indexReq);
+            $this->assert($indexRes->status() === 200, 'Admin music library index returns 200 OK');
+            $indexPayload = json_decode($indexRes->getContent(), true);
+            $this->assert(isset($indexPayload['tracks']) && is_array($indexPayload['tracks']), 'Index payload contains "tracks" object');
+            $this->assert(isset($indexPayload['tracks']['data']) && is_array($indexPayload['tracks']['data']), 'Index payload contains "tracks.data" array');
+            $this->assert(isset($indexPayload['data']) && is_array($indexPayload['data']), 'Index payload contains root "data" array');
+
+            // -------------------------------------------------------------
+            // SECTION 10: Defect B — Process Exit Code Handling & FFprobe
+            // -------------------------------------------------------------
+            echo "\n--- Section 10: Defect B — FFprobe Process Exit Code Handling ---\n";
+
+            $ffmpegProc = new FFmpegAudioProcessor();
+
+            // 1. Successful command execution returns exit code 0
+            $phpBinary = PHP_BINARY;
+            $successCmd = sprintf('%s -r "exit(0);"', escapeshellarg($phpBinary));
+            $resSuccess = $ffmpegProc->executeCommandWithTimeout($successCmd, 10);
+            $this->assert($resSuccess['exit_code'] === 0, 'executeCommandWithTimeout reports exit code 0 for successful process');
+            $this->assert($resSuccess['timed_out'] === false, 'timed_out is false for successful process');
+
+            // 2. Command with genuine nonzero exit code returns that exit code
+            $failCmd = sprintf('%s -r "fwrite(STDERR, \"Intentional test error\"); exit(42);"', escapeshellarg($phpBinary));
+            $resFail = $ffmpegProc->executeCommandWithTimeout($failCmd, 10);
+            $this->assert($resFail['exit_code'] === 42, "executeCommandWithTimeout captures genuine nonzero exit code 42 (actual: {$resFail['exit_code']})");
+            $this->assert($resFail['timed_out'] === false, 'timed_out is false for failed process');
+            $this->assert(str_contains($resFail['output'], 'Intentional test error'), 'Stderr output captured in result');
+
+            // 3. Process timeout returns exit code 124 and timed_out = true
+            $timeoutScript = sprintf('%s -r "sleep(3); exit(0);"', escapeshellarg($phpBinary));
+            $resTimeout = $ffmpegProc->executeCommandWithTimeout($timeoutScript, 1);
+            $this->assert($resTimeout['timed_out'] === true, 'executeCommandWithTimeout correctly marks timed_out = true');
+            $this->assert($resTimeout['exit_code'] === 124, "Timed-out process returns exit code 124 (actual: {$resTimeout['exit_code']})");
+
+            // 4. FFprobe metadata inspection on corrupt/empty/invalid file reports failure and diagnostics
+            $tempCorruptFile = sys_get_temp_dir() . '/corrupt_test_' . uniqid() . '.wav';
+            file_put_contents($tempCorruptFile, 'NOT_A_VALID_AUDIO_FILE_GARBAGE_HEADER_123456');
+            $corruptMeta = $ffmpegProc->probeMetadata($tempCorruptFile);
+            $this->assert($corruptMeta->isValid === false, 'Corrupt audio file probe fails validation');
+            $this->assert(!empty($corruptMeta->error), "Failure message is populated: {$corruptMeta->error}");
+            @unlink($tempCorruptFile);
+
         } finally {
             DB::rollBack();
         }

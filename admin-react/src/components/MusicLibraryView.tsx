@@ -101,8 +101,12 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
     api.getMusicGenres().then(res => {
       if (res?.success && Array.isArray(res.genres)) {
         setGenres(res.genres);
+      } else if (res && !res.success && res.message) {
+        setAlert({ type: 'error', message: res.message });
       }
-    }).catch(() => {});
+    }).catch(err => {
+      setAlert({ type: 'error', message: err?.message || 'Failed to load music genres' });
+    });
   }, []);
 
   // Fetch Tracks
@@ -114,12 +118,18 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
         status: statusFilter,
         media_status: mediaFilter,
       });
-      if (res.success) {
-        setTracks(res.tracks.data || []);
-        setCounts(res.counts);
+      if (res && res.success) {
+        const trackList = res.tracks?.data || (Array.isArray((res as any)?.data) ? (res as any).data : []);
+        setTracks(trackList);
+        if (res.counts) {
+          setCounts(res.counts);
+        }
+      } else {
+        const errorMsg = (res as any)?.message_en || (res as any)?.message || 'Failed to load tracks from server';
+        setAlert({ type: 'error', message: errorMsg });
       }
     } catch (err: any) {
-      setAlert({ type: 'error', message: err.message || 'Failed to load tracks' });
+      setAlert({ type: 'error', message: err?.message || 'Failed to load tracks' });
     } finally {
       setTracksLoading(false);
     }
@@ -130,11 +140,15 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
     setAlbumsLoading(true);
     try {
       const res = await api.getMusicAlbums({ search: albumSearch });
-      if (res.success) {
-        setAlbums(res.albums || []);
+      if (res && res.success) {
+        const albumList = res.albums || (Array.isArray((res as any)?.data) ? (res as any).data : []);
+        setAlbums(albumList);
+      } else {
+        const errorMsg = (res as any)?.message_en || (res as any)?.message || 'Failed to load albums from server';
+        setAlert({ type: 'error', message: errorMsg });
       }
     } catch (err: any) {
-      setAlert({ type: 'error', message: err.message || 'Failed to load albums' });
+      setAlert({ type: 'error', message: err?.message || 'Failed to load albums' });
     } finally {
       setAlbumsLoading(false);
     }

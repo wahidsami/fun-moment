@@ -126,9 +126,18 @@ class AdminMusicLibraryController extends Controller
         $perPage = max(5, min(100, (int) $request->input('per_page', 15)));
         $tracks = $query->orderBy('id', 'desc')->paginate($perPage);
 
+        $paginatedTracks = [
+            'data' => $tracks->items(),
+            'current_page' => $tracks->currentPage(),
+            'per_page' => $tracks->perPage(),
+            'total' => $tracks->total(),
+            'last_page' => $tracks->lastPage(),
+        ];
+
         return response()->json([
             'success' => true,
             'counts' => $counts,
+            'tracks' => $paginatedTracks,
             'data' => $tracks->items(),
             'meta' => [
                 'current_page' => $tracks->currentPage(),
@@ -136,6 +145,28 @@ class AdminMusicLibraryController extends Controller
                 'total' => $tracks->total(),
                 'last_page' => $tracks->lastPage(),
             ],
+        ]);
+    }
+
+    /**
+     * Get list of active genres for administrative music catalog selection.
+     */
+    public function genres(Request $request): JsonResponse
+    {
+        [$admin, $err] = $this->resolveAdmin($request);
+        if ($err) {
+            return $err;
+        }
+
+        $genres = MusicGenre::query()
+            ->active()
+            ->ordered()
+            ->get(['id', 'name_en', 'name_ar', 'slug', 'sort_order', 'icon']);
+
+        return response()->json([
+            'success' => true,
+            'genres' => $genres,
+            'data' => $genres,
         ]);
     }
 

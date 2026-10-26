@@ -1146,14 +1146,20 @@ export const LaravelAPI = {
   },
 
   // First-Party Music Library (FUN MOMENT Originals)
-  async getMusicGenres(): Promise<{ success: boolean; genres: Array<{ id: number; name_en: string; name_ar: string; slug: string }> }> {
+  async getMusicGenres(): Promise<{ success: boolean; genres: Array<{ id: number; name_en: string; name_ar: string; slug: string }>; message?: string }> {
     const response = await fetch('/admin-home/music-library-json/genres', {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
       credentials: 'include',
     });
     if (!response.ok) {
-      return { success: false, genres: [] };
+      let errorMsg = `Failed to load music genres (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) errorMsg = errJson.message_en;
+        else if (errJson?.message) errorMsg = errJson.message;
+      } catch {}
+      return { success: false, genres: [], message: errorMsg };
     }
     return response.json();
   },

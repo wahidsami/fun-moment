@@ -34,12 +34,15 @@ Route::middleware(['setlang'])->group(function(){
     Route::post('/music-orders-json/refund-attempts/{attemptId}/reconcile', 'AdminMusicOrderController@reconcileAttempt')->name('admin.music.orders.json.reconcile');
     // First-Party Music Library & FUN MOMENT Originals
     Route::get('/music-library-json', 'AdminMusicLibraryController@index')->name('admin.music.library.json');
+    Route::get('/music/library-json', 'AdminMusicLibraryController@index')->name('admin.music.library.json.alias');
+    Route::get('/music-library-json/genres', 'AdminMusicLibraryController@genres')->name('admin.music.library.json.genres');
+    Route::get('/music/library-json/genres', 'AdminMusicLibraryController@genres')->name('admin.music.library.json.genres.alias');
     Route::post('/music-library-json', 'AdminMusicLibraryController@store')->name('admin.music.library.json.store');
-    Route::get('/music-library-json/{id}', 'AdminMusicLibraryController@show')->name('admin.music.library.json.show');
-    Route::post('/music-library-json/{id}', 'AdminMusicLibraryController@update')->name('admin.music.library.json.update');
-    Route::post('/music-library-json/{id}/publish', 'AdminMusicLibraryController@publish')->name('admin.music.library.json.publish');
-    Route::post('/music-library-json/{id}/unpublish', 'AdminMusicLibraryController@unpublish')->name('admin.music.library.json.unpublish');
-    Route::post('/music-library-json/{id}/delete', 'AdminMusicLibraryController@destroy')->name('admin.music.library.json.delete');
+    Route::get('/music-library-json/{id}', 'AdminMusicLibraryController@show')->name('admin.music.library.json.show')->where('id', '[0-9]+');
+    Route::match(['post', 'put'], '/music-library-json/{id}', 'AdminMusicLibraryController@update')->name('admin.music.library.json.update')->where('id', '[0-9]+');
+    Route::post('/music-library-json/{id}/publish', 'AdminMusicLibraryController@publish')->name('admin.music.library.json.publish')->where('id', '[0-9]+');
+    Route::post('/music-library-json/{id}/unpublish', 'AdminMusicLibraryController@unpublish')->name('admin.music.library.json.unpublish')->where('id', '[0-9]+');
+    Route::post('/music-library-json/{id}/delete', 'AdminMusicLibraryController@destroy')->name('admin.music.library.json.delete')->where('id', '[0-9]+');
     // First-Party Music Albums Management
     Route::get('/music-albums-json', 'AdminMusicAlbumController@index')->name('admin.music.albums.json');
     Route::post('/music-albums-json', 'AdminMusicAlbumController@store')->name('admin.music.albums.json.store');
