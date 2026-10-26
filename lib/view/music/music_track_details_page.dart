@@ -5,6 +5,7 @@ import 'package:funmoments/service/buyer_music_service.dart';
 import 'package:funmoments/service/music_player_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
+import 'package:funmoments/view/music/components/music_artwork_widget.dart';
 
 class MusicTrackDetailsPage extends StatefulWidget {
   final CatalogTrackModel track;
@@ -488,30 +489,21 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
             Center(
               child: Hero(
                 tag: 'track-art-${_track.id}',
-                child: Container(
+                child: MusicArtworkWidget(
+                  imageUrl: _track.coverArtUrl,
                   width: 260,
                   height: 260,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(FMRadii.lg),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black87,
-                        blurRadius: 24,
-                        offset: Offset(0, 10),
-                      ),
-                    ],
-                    border: Border.all(color: FMColors.border),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(FMRadii.lg),
-                    child: _track.coverArtUrl != null && _track.coverArtUrl!.isNotEmpty
-                        ? Image.network(
-                            _track.coverArtUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _artFallback(),
-                          )
-                        : _artFallback(),
-                  ),
+                  borderRadius: FMRadii.lg,
+                  placeholderIconSize: 64,
+                  showLoadingIndicator: true,
+                  border: Border.all(color: FMColors.border),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black87,
+                      blurRadius: 24,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -838,14 +830,6 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
     );
   }
 
-  Widget _artFallback() {
-    return Container(
-      color: FMColors.surfaceElevated,
-      child: const Center(
-        child: Icon(Icons.music_note_rounded, color: FMColors.cyan, size: 64),
-      ),
-    );
-  }
 
   Widget _metaRow(String label, String value) {
     return Padding(

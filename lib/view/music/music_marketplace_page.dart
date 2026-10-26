@@ -6,6 +6,7 @@ import 'package:funmoments/service/music_player_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/music/components/mini_player_bar.dart';
+import 'package:funmoments/view/music/components/music_artwork_widget.dart';
 import 'package:funmoments/view/music/music_track_details_page.dart';
 import 'package:funmoments/view/music/my_music_favorites_page.dart';
 
@@ -333,6 +334,7 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
                   child: Image.network(
                     track.coverArtUrl!,
                     fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   ),
                 ),
               ),
@@ -342,28 +344,13 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
               child: Row(
                 children: [
                   // Cover thumbnail
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(FMRadii.md),
-                    child: Container(
-                      width: 110,
-                      height: 110,
-                      color: FMColors.surface,
-                      child: track.coverArtUrl != null && track.coverArtUrl!.isNotEmpty
-                          ? Image.network(
-                              track.coverArtUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.music_note,
-                                color: FMColors.cyan,
-                                size: 36,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.music_note,
-                              color: FMColors.cyan,
-                              size: 36,
-                            ),
-                    ),
+                  MusicArtworkWidget(
+                    imageUrl: track.coverArtUrl,
+                    width: 110,
+                    height: 110,
+                    borderRadius: FMRadii.md,
+                    placeholderIconSize: 36,
+                    placeholderBackgroundColor: FMColors.surface,
                   ),
                   const SizedBox(width: 16),
                   // Details
@@ -728,23 +715,13 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
             leading: Stack(
               alignment: Alignment.center,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(FMRadii.sm),
-                  child: Container(
-                    width: 52,
-                    height: 52,
-                    color: FMColors.surfaceElevated,
-                    child: track.coverArtUrl != null && track.coverArtUrl!.isNotEmpty
-                        ? Image.network(
-                            track.coverArtUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.music_note,
-                              color: FMColors.cyan,
-                            ),
-                          )
-                        : const Icon(Icons.music_note, color: FMColors.cyan),
-                  ),
+                MusicArtworkWidget(
+                  imageUrl: track.coverArtUrl,
+                  width: 52,
+                  height: 52,
+                  borderRadius: FMRadii.sm,
+                  placeholderIconSize: 24,
+                  placeholderBackgroundColor: FMColors.surfaceElevated,
                 ),
                 GestureDetector(
                   onTap: () {

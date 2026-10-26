@@ -4,6 +4,7 @@ import 'package:funmoments/model/buyer_music_model.dart';
 import 'package:funmoments/service/music_player_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
+import 'package:funmoments/view/music/components/music_artwork_widget.dart';
 import 'package:funmoments/view/music/music_track_details_page.dart';
 
 class MiniPlayerBar extends StatelessWidget {
@@ -75,28 +76,13 @@ class MiniPlayerBar extends StatelessWidget {
                     child: Row(
                       children: [
                         // Cover artwork
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(FMRadii.sm),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            color: FMColors.surface,
-                            child: track.coverArtUrl != null && track.coverArtUrl!.isNotEmpty
-                                ? Image.network(
-                                    track.coverArtUrl!,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.music_note,
-                                      color: FMColors.cyan,
-                                      size: 24,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.music_note,
-                                    color: FMColors.cyan,
-                                    size: 24,
-                                  ),
-                          ),
+                        MusicArtworkWidget(
+                          imageUrl: track.coverArtUrl,
+                          width: 44,
+                          height: 44,
+                          borderRadius: FMRadii.sm,
+                          placeholderIconSize: 22,
+                          placeholderBackgroundColor: FMColors.surface,
                         ),
                         const SizedBox(width: 12),
                         // Track title & artist

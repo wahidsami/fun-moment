@@ -6,6 +6,7 @@ import 'package:funmoments/service/music_player_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/music/components/mini_player_bar.dart';
+import 'package:funmoments/view/music/components/music_artwork_widget.dart';
 import 'package:funmoments/view/music/music_track_details_page.dart';
 
 class MyMusicFavoritesPage extends StatefulWidget {
@@ -136,26 +137,13 @@ class _MyMusicFavoritesPageState extends State<MyMusicFavoritesPage> {
                             ),
                             child: ListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(FMRadii.sm),
-                                child: Container(
-                                  width: 50,
-                                  height: 50,
-                                  color: FMColors.surfaceElevated,
-                                  child: track.coverArtUrl != null && track.coverArtUrl!.isNotEmpty
-                                      ? Image.network(
-                                          track.coverArtUrl!,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => const Icon(
-                                            Icons.music_note,
-                                            color: FMColors.cyan,
-                                          ),
-                                        )
-                                      : const Icon(
-                                          Icons.music_note,
-                                          color: FMColors.cyan,
-                                        ),
-                                ),
+                              leading: MusicArtworkWidget(
+                                imageUrl: track.coverArtUrl,
+                                width: 50,
+                                height: 50,
+                                borderRadius: FMRadii.sm,
+                                placeholderIconSize: 24,
+                                placeholderBackgroundColor: FMColors.surfaceElevated,
                               ),
                               title: Text(
                                 track.displayTitle(isArabic),

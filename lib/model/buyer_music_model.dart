@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:funmoments/view/utils/others_helper.dart';
 
 class CatalogGenreModel {
   final int id;
@@ -112,13 +113,15 @@ class CatalogAlbumModel {
   });
 
   factory CatalogAlbumModel.fromJson(Map<String, dynamic> json) {
+    final rawCover = json['cover_image_url'] ?? json['cover_image'];
+    final resolvedCover = CatalogTrackModel.resolveCoverUrl(rawCover);
     return CatalogAlbumModel(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       title: json['title']?.toString() ?? json['title_en']?.toString() ?? '',
       titleEn: json['title_en']?.toString() ?? '',
       titleAr: json['title_ar']?.toString() ?? '',
       artistName: json['artist_name']?.toString(),
-      coverImageUrl: json['cover_image_url']?.toString(),
+      coverImageUrl: resolvedCover,
       tracksCount: json['tracks_count'] is int
           ? json['tracks_count']
           : int.tryParse(json['tracks_count']?.toString() ?? '0') ?? 0,
@@ -161,7 +164,8 @@ class CatalogTrackModel {
   final int previewDurationSeconds;
   final int? bpm;
   final String? musicalKey;
-  final String? coverArtUrl;
+  final String? coverImageUrl;
+  String? get coverArtUrl => coverImageUrl;
   final String? waveformUrl;
   final String streamTicketUrl;
   bool isFavorite;
@@ -187,7 +191,8 @@ class CatalogTrackModel {
     required this.previewDurationSeconds,
     this.bpm,
     this.musicalKey,
-    this.coverArtUrl,
+    String? coverImageUrl,
+    String? coverArtUrl,
     this.waveformUrl,
     required this.streamTicketUrl,
     this.isFavorite = false,
@@ -203,7 +208,26 @@ class CatalogTrackModel {
     this.album,
     this.trackNumber,
     this.originalTrack,
-  });
+  }) : coverImageUrl = (coverImageUrl != null && coverImageUrl.isNotEmpty)
+            ? coverImageUrl
+            : ((coverArtUrl != null && coverArtUrl.isNotEmpty) ? coverArtUrl : null);
+
+  static String? resolveCoverUrl(dynamic rawUrl, {String? albumCover}) {
+    String? raw = rawUrl?.toString().trim();
+    if (raw == null || raw.isEmpty) {
+      raw = albumCover?.toString().trim();
+    }
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return raw;
+    }
+    final clean = raw.startsWith('/') ? raw.substring(1) : raw;
+    final path = clean.startsWith('storage/') ? clean : 'storage/$clean';
+    final origin = baseApi.replaceAll(RegExp(r'/api/v1/?$'), '');
+    return '$origin/$path';
+  }
 
   factory CatalogTrackModel.fromJson(Map<String, dynamic> json) {
     CatalogGenreModel? primary;
@@ -247,6 +271,9 @@ class CatalogTrackModel {
         ? CatalogOriginalTrackModel.fromJson(json['original_track'])
         : null;
 
+    final rawCover = json['cover_image_url'] ?? json['cover_art_url'] ?? json['cover_image'];
+    final resolvedCover = CatalogTrackModel.resolveCoverUrl(rawCover, albumCover: album?.coverImageUrl);
+
     return CatalogTrackModel(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       titleEn: json['title_en']?.toString() ?? '',
@@ -260,7 +287,7 @@ class CatalogTrackModel {
           : int.tryParse(json['preview_duration_seconds']?.toString() ?? '30') ?? 30,
       bpm: json['bpm'] != null ? int.tryParse(json['bpm'].toString()) : null,
       musicalKey: json['key']?.toString(),
-      coverArtUrl: json['cover_art_url']?.toString(),
+      coverImageUrl: resolvedCover,
       waveformUrl: json['waveform_url']?.toString(),
       streamTicketUrl: json['stream_ticket_url']?.toString() ?? '',
       isFavorite: json['is_favorite'] == true || json['is_favorite'] == 1,
@@ -336,6 +363,8 @@ class CatalogTrackModel {
     int? playCount,
     bool? isFirstParty,
     String? badge,
+    String? coverImageUrl,
+    String? coverArtUrl,
     CatalogAlbumModel? album,
     int? trackNumber,
     CatalogOriginalTrackModel? originalTrack,
@@ -349,7 +378,7 @@ class CatalogTrackModel {
       previewDurationSeconds: previewDurationSeconds,
       bpm: bpm,
       musicalKey: musicalKey,
-      coverArtUrl: coverArtUrl,
+      coverImageUrl: coverImageUrl ?? coverArtUrl ?? this.coverImageUrl,
       waveformUrl: waveformUrl,
       streamTicketUrl: streamTicketUrl,
       isFavorite: isFavorite ?? this.isFavorite,
