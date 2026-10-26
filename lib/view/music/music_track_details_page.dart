@@ -6,6 +6,7 @@ import 'package:funmoments/service/music_player_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/music/components/music_artwork_widget.dart';
+import 'package:funmoments/view/music/components/player_queue_sheet.dart';
 
 class MusicTrackDetailsPage extends StatefulWidget {
   final CatalogTrackModel track;
@@ -18,6 +19,7 @@ class MusicTrackDetailsPage extends StatefulWidget {
 
 class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
   late CatalogTrackModel _track;
+  bool _isFollowingPlayer = false;
   bool _isSeeking = false;
   double _dragPosition = 0.0;
 
@@ -435,7 +437,14 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
     final musicService = Provider.of<BuyerMusicService>(context);
     final player = Provider.of<MusicPlayerService>(context);
 
-    final bool isThisTrackActive = player.currentTrack?.id == _track.id;
+    final bool isThisTrackActive = player.hasActiveTrack && player.currentTrack?.id == _track.id;
+    if (isThisTrackActive) {
+      _isFollowingPlayer = true;
+    }
+    if (_isFollowingPlayer && player.hasActiveTrack && player.currentTrack != null && player.currentTrack!.id != _track.id) {
+      _track = player.currentTrack!;
+    }
+
     final Duration currentPos = isThisTrackActive ? player.position : Duration.zero;
     final Duration totalDur = isThisTrackActive && player.duration > Duration.zero
         ? player.duration
@@ -465,6 +474,47 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
         ),
         centerTitle: true,
         actions: [
+          // Queue sheet launcher
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.queue_music_rounded, color: Colors.white),
+                tooltip: isArabic ? 'قائمة التشغيل' : 'Play Queue',
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => const PlayerQueueSheet(),
+                  );
+                },
+              ),
+              if (player.queue.isNotEmpty)
+                Positioned(
+                  top: 8,
+                  right: isArabic ? null : 8,
+                  left: isArabic ? 8 : null,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: FMColors.cyan,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      '${player.queue.length}',
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           IconButton(
             icon: Icon(
               _track.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -665,44 +715,213 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
 
             const SizedBox(height: 16),
 
-            // Controls: Big Play Button
-            Center(
-              child: GestureDetector(
-                onTap: () {
-                  if (isThisTrackActive) {
-                    player.togglePlayPause();
-                  } else {
-                    player.playTrack(_track);
-                  }
-                },
-                child: Container(
-                  width: 68,
-                  height: 68,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: FMGradients.funGradient,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x66FF4FB3),
-                        blurRadius: 18,
-                        offset: Offset(0, 4),
+            // Playback Controls Row: Shuffle · Previous · Play/Pause · Next · Repeat
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // 1. Shuffle
+                  IconButton(
+                    iconSize: 26,
+                    padding: const EdgeInsets.all(8),
+                    tooltip: isArabic ? 'تشغيل عشوائي' : 'Shuffle',
+                    icon: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.shuffle_rounded,
+                          color: player.isShuffle ? FMColors.cyan : Colors.white38,
+                          size: 24,
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: player.isShuffle ? FMColors.cyan : Colors.transparent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    onPressed: () => player.toggleShuffle(),
+                  ),
+
+                  // 2. Previous
+                  IconButton(
+                    iconSize: 38,
+                    padding: const EdgeInsets.all(4),
+                    tooltip: isArabic ? 'السابق' : 'Previous',
+                    icon: Icon(
+                      Icons.skip_previous_rounded,
+                      color: player.hasPrevious ? Colors.white : Colors.white24,
+                      size: 38,
+                    ),
+                    onPressed: player.hasPrevious
+                        ? () {
+                            _isFollowingPlayer = true;
+                            player.playPrevious();
+                          }
+                        : null,
+                  ),
+
+                  // 3. Play / Pause (Hero control)
+                  GestureDetector(
+                    onTap: () {
+                      _isFollowingPlayer = true;
+                      if (isThisTrackActive) {
+                        player.togglePlayPause();
+                      } else {
+                        player.playTrack(_track);
+                      }
+                    },
+                    child: Container(
+                      width: 68,
+                      height: 68,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: FMGradients.funGradient,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color(0x66FF4FB3),
+                            blurRadius: 18,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: (isThisTrackActive && (player.isLoadingTicket || player.isBuffering))
+                            ? const SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : Icon(
+                                (isThisTrackActive && player.isPlaying)
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                color: Colors.white,
+                                size: 40,
+                              ),
+                      ),
+                    ),
+                  ),
+
+                  // 4. Next
+                  IconButton(
+                    iconSize: 38,
+                    padding: const EdgeInsets.all(4),
+                    tooltip: isArabic ? 'التالي' : 'Next',
+                    icon: Icon(
+                      Icons.skip_next_rounded,
+                      color: player.hasNext ? Colors.white : Colors.white24,
+                      size: 38,
+                    ),
+                    onPressed: player.hasNext
+                        ? () {
+                            _isFollowingPlayer = true;
+                            player.playNext();
+                          }
+                        : null,
+                  ),
+
+                  // 5. Repeat Mode
+                  IconButton(
+                    iconSize: 26,
+                    padding: const EdgeInsets.all(8),
+                    tooltip: player.repeatMode == RepeatMode.off
+                        ? (isArabic ? 'تكرار: متوقف' : 'Repeat: Off')
+                        : (player.repeatMode == RepeatMode.all
+                            ? (isArabic ? 'تكرار: الكل' : 'Repeat: All')
+                            : (isArabic ? 'تكرار: مسار واحد' : 'Repeat: One')),
+                    icon: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          player.repeatMode == RepeatMode.one
+                              ? Icons.repeat_one_rounded
+                              : Icons.repeat_rounded,
+                          color: player.repeatMode == RepeatMode.off
+                              ? Colors.white38
+                              : (player.repeatMode == RepeatMode.one ? FMColors.magenta : FMColors.cyan),
+                          size: 24,
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: player.repeatMode == RepeatMode.off
+                                ? Colors.transparent
+                                : (player.repeatMode == RepeatMode.one ? FMColors.magenta : FMColors.cyan),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    onPressed: () => player.toggleRepeatMode(),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // Queue quick launcher
+            InkWell(
+              onTap: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const PlayerQueueSheet(),
+                );
+              },
+              borderRadius: BorderRadius.circular(FMRadii.pill),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                decoration: BoxDecoration(
+                  color: FMColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(FMRadii.pill),
+                  border: Border.all(color: FMColors.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.queue_music_rounded, color: FMColors.cyan, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      isArabic ? 'قائمة التشغيل' : 'Play Queue',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (player.queue.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: FMColors.cyan.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${player.queue.length}',
+                          style: const TextStyle(
+                            color: FMColors.cyan,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
-                  ),
-                  child: Center(
-                    child: (isThisTrackActive && (player.isLoadingTicket || player.isBuffering))
-                        ? const CircularProgressIndicator(
-                            strokeWidth: 3,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          )
-                        : Icon(
-                            (isThisTrackActive && player.isPlaying)
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 38,
-                          ),
-                  ),
+                  ],
                 ),
               ),
             ),

@@ -167,6 +167,19 @@ class MiniPlayerBar extends StatelessWidget {
                             onPressed: () => player.togglePlayPause(),
                           ),
                         const SizedBox(width: 4),
+                        // Next track button
+                        IconButton(
+                          icon: Icon(
+                            Icons.skip_next_rounded,
+                            color: player.hasNext ? Colors.white : Colors.white24,
+                            size: 26,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          tooltip: isRtl ? 'التالي' : 'Next',
+                          onPressed: player.hasNext ? () => player.playNext() : null,
+                        ),
+                        const SizedBox(width: 8),
                         // Close button
                         IconButton(
                           icon: const Icon(Icons.close_rounded, color: FMColors.textMuted, size: 20),
