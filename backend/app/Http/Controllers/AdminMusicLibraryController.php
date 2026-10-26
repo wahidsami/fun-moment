@@ -526,6 +526,12 @@ class AdminMusicLibraryController extends Controller
 
         if ($request->has('album_id')) {
             $updates['album_id'] = $request->input('album_id') ? (int) $request->input('album_id') : null;
+            if ($updates['album_id'] && empty($track->cover_image) && !$request->hasFile('cover_image')) {
+                $album = MusicAlbum::find($updates['album_id']);
+                if ($album && !empty($album->cover_image)) {
+                    $updates['cover_image'] = $album->cover_image;
+                }
+            }
         }
         if ($request->has('track_number')) {
             $updates['track_number'] = $request->input('track_number') ? (int) $request->input('track_number') : null;

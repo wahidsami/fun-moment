@@ -27,7 +27,8 @@ import {
   X,
   Volume2,
   Save,
-  Check
+  Check,
+  Image as ImageIcon
 } from 'lucide-react';
 import {
   Language,
@@ -475,6 +476,17 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
                       <tr key={track.id} className="hover:bg-slate-800/30 transition-colors">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
+                            {track.cover_image_url || track.cover_image ? (
+                              <img
+                                src={track.cover_image_url || (track.cover_image?.startsWith('http') ? track.cover_image : `/storage/${track.cover_image}`)}
+                                alt=""
+                                className="w-10 h-10 rounded-lg object-cover border border-slate-700 bg-slate-800 flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 flex-shrink-0">
+                                <Music className="w-5 h-5 text-slate-500" />
+                              </div>
+                            )}
                             <button
                               onClick={() => handleTogglePlay(track)}
                               disabled={track.media_status !== 'ready' || audioLoading}
@@ -888,12 +900,69 @@ function UploadTrackModal({
   const [trackKey, setTrackKey] = useState<string>('');
   const [descriptionEn, setDescriptionEn] = useState('');
   const [descriptionAr, setDescriptionAr] = useState('');
-  const [rightsType, setRightsType] = useState('original_work');
+  const [rightsType, setRightsType] = useState('original_composition');
   const [rightsAccepted, setRightsAccepted] = useState(true);
   const [rightsNotes, setRightsNotes] = useState('FUN MOMENT First-party official library production.');
 
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (coverPreview) {
+        URL.revokeObjectURL(coverPreview);
+      }
+    };
+  }, [coverPreview]);
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      setError(
+        isRtl
+          ? 'صيغة الغلاف غير مدعومة. يرجى اختيار ملف صورة بتنسيق JPG أو PNG أو WebP'
+          : 'Unsupported cover format. Please select a JPG, PNG, or WebP image.'
+      );
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError(
+        isRtl
+          ? 'حجم صورة الغلاف يتجاوز الحد الأقصى (٥ ميجابايت)'
+          : 'Cover image exceeds the maximum allowed size (5MB).'
+      );
+      return;
+    }
+
+    setError(null);
+    setCoverFile(file);
+    if (coverPreview) {
+      URL.revokeObjectURL(coverPreview);
+    }
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveCover = () => {
+    setCoverFile(null);
+    if (coverPreview) {
+      URL.revokeObjectURL(coverPreview);
+      setCoverPreview(null);
+    }
+  };
+
+  const handleOriginalTrackChange = (newTrackId: string) => {
+    setOriginalTrackId(newTrackId);
+    if (newTrackId) {
+      setRightsType('licensed_remix');
+    } else if (rightsType === 'licensed_remix') {
+      setRightsType('original_composition');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1020,6 +1089,81 @@ function UploadTrackModal({
             </div>
           </div>
 
+          {/* Cover Artwork Upload Card */}
+          <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-amber-400" />
+                <label className="text-xs font-semibold text-white">
+                  {isRtl ? 'صورة الغلاف (اختياري)' : 'Cover Artwork (Optional)'}
+                </label>
+              </div>
+              <span className="text-[11px] text-slate-400">JPG, PNG, WebP (Max 5MB)</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {coverPreview ? (
+                <div className="relative group w-20 h-20 rounded-xl overflow-hidden border border-amber-500/40 bg-slate-950 flex-shrink-0 shadow-md">
+                  <img src={coverPreview} alt="Cover Preview" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={handleRemoveCover}
+                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-rose-400 hover:text-rose-300"
+                    title={isRtl ? 'إزالة الغلاف' : 'Remove Cover'}
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-xl border border-dashed border-slate-600 bg-slate-900/60 flex flex-col items-center justify-center text-slate-500 flex-shrink-0">
+                  <ImageIcon className="w-6 h-6 mb-1 text-slate-600" />
+                  <span className="text-[10px]">{isRtl ? 'لا يوجد غلاف' : 'No artwork'}</span>
+                </div>
+              )}
+
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    id="track-cover-upload"
+                    accept="image/jpeg,image/png,image/webp,image/jpg"
+                    className="hidden"
+                    onChange={handleCoverChange}
+                  />
+                  <label
+                    htmlFor="track-cover-upload"
+                    className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-600 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-amber-400" />
+                    <span>
+                      {coverPreview
+                        ? (isRtl ? 'استبدال الغلاف' : 'Replace Artwork')
+                        : (isRtl ? 'اختيار صورة الغلاف' : 'Upload Cover Artwork')}
+                    </span>
+                  </label>
+                  {coverPreview && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveCover}
+                      className="px-2.5 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs transition-colors"
+                    >
+                      {isRtl ? 'إزالة' : 'Remove'}
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {albumId
+                    ? (isRtl
+                        ? 'إذا تُرك فارغاً، سيرث المسار صورة غلاف الألبوم المختار تلقائياً.'
+                        : 'If left blank, track will inherit the selected album artwork.')
+                    : (isRtl
+                        ? 'يُعرض في تطبيق المستمعين والمشغل الموسيقي وقوائم التشغيل.'
+                        : 'Displayed in mobile catalog, player drawer, and public playlists.')}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Audio Upload File */}
           <div className="p-4 rounded-xl bg-slate-800/60 border border-dashed border-slate-600 space-y-2">
             <label className="block text-xs font-semibold text-amber-300">
@@ -1082,7 +1226,7 @@ function UploadTrackModal({
             </label>
             <select
               value={originalTrackId}
-              onChange={(e) => setOriginalTrackId(e.target.value)}
+              onChange={(e) => handleOriginalTrackChange(e.target.value)}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500"
             >
               <option value="">— Not a remix (Original Master) —</option>
@@ -1121,16 +1265,24 @@ function UploadTrackModal({
           <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-2">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span className="text-xs font-semibold text-white">Platform Rights Declaration</span>
+              <span className="text-xs font-semibold text-white">
+                {isRtl ? 'إقرار حقوق الملكية للمنصة' : 'Platform Rights Declaration'}
+              </span>
             </div>
             <select
               value={rightsType}
               onChange={(e) => setRightsType(e.target.value)}
               className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200"
             >
-              <option value="original_work">Original Work (Platform Owned)</option>
-              <option value="work_for_hire">Work for Hire (Commissioned)</option>
-              <option value="licensed_exclusive">Licensed Exclusive Master</option>
+              <option value="original_composition">
+                {isRtl ? 'عمل موسيقي أصلي (مملوك لـ FUN MOMENT بالكامل)' : 'Original Composition (FUN MOMENT Platform-Owned)'}
+              </option>
+              <option value="licensed_remix">
+                {isRtl ? 'ريمكس مرخّص (منسوب لمسار رئيسي)' : 'Licensed Remix (Attributed to Master Track)'}
+              </option>
+              <option value="public_domain">
+                {isRtl ? 'ملكية عامة / مصرح حقوقياً' : 'Public Domain / Rights-Cleared Composition'}
+              </option>
             </select>
             <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer pt-1">
               <input
@@ -1139,7 +1291,11 @@ function UploadTrackModal({
                 onChange={(e) => setRightsAccepted(e.target.checked)}
                 className="rounded text-amber-500 focus:ring-0"
               />
-              <span>I certify that FUN MOMENT holds all required publishing and streaming rights for this asset.</span>
+              <span>
+                {isRtl
+                  ? 'أقر بأن FUN MOMENT تمتلك جميع حقوق النشر والتوزيع والبث لهذا المسار الموسيقي.'
+                  : 'I certify that FUN MOMENT holds all required publishing and streaming rights for this asset.'}
+              </span>
             </label>
           </div>
 
@@ -1186,6 +1342,7 @@ function EditTrackModal({
   onClose: () => void;
   onSuccess: (msg: string) => void;
 }) {
+  const isRtl = language === 'ar';
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1200,28 +1357,97 @@ function EditTrackModal({
   const [trackKey, setTrackKey] = useState<string>(track.track_key || '');
   const [descriptionEn, setDescriptionEn] = useState(track.description_en || '');
   const [descriptionAr, setDescriptionAr] = useState(track.description_ar || '');
+  const [rightsType, setRightsType] = useState<string>(
+    track.rights_declaration_type && ['original_composition', 'licensed_remix', 'public_domain'].includes(track.rights_declaration_type)
+      ? track.rights_declaration_type
+      : (track.original_track_id ? 'licensed_remix' : 'original_composition')
+  );
+
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(
+    track.cover_image_url || (track.cover_image ? (track.cover_image.startsWith('http') ? track.cover_image : `/storage/${track.cover_image}`) : null)
+  );
+
+  useEffect(() => {
+    return () => {
+      if (coverPreview && coverPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(coverPreview);
+      }
+    };
+  }, [coverPreview]);
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      setError(
+        isRtl
+          ? 'صيغة الغلاف غير مدعومة. يرجى اختيار ملف صورة بتنسيق JPG أو PNG أو WebP'
+          : 'Unsupported cover format. Please select a JPG, PNG, or WebP image.'
+      );
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError(
+        isRtl
+          ? 'حجم صورة الغلاف يتجاوز الحد الأقصى (٥ ميجابايت)'
+          : 'Cover image exceeds the maximum allowed size (5MB).'
+      );
+      return;
+    }
+
+    setError(null);
+    setCoverFile(file);
+    if (coverPreview && coverPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(coverPreview);
+    }
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveCover = () => {
+    setCoverFile(null);
+    if (coverPreview && coverPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(coverPreview);
+    }
+    setCoverPreview(track.cover_image_url || (track.cover_image ? (track.cover_image.startsWith('http') ? track.cover_image : `/storage/${track.cover_image}`) : null));
+  };
+
+  const handleOriginalTrackChange = (newTrackId: string) => {
+    setOriginalTrackId(newTrackId);
+    if (newTrackId) {
+      setRightsType('licensed_remix');
+    } else if (rightsType === 'licensed_remix') {
+      setRightsType('original_composition');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
 
-    const payload: any = {
-      title_en: titleEn,
-      title_ar: titleAr,
-      artist_name: artistName,
-      genre_id: genreId ? Number(genreId) : null,
-      album_id: albumId ? Number(albumId) : null,
-      track_number: trackNumber ? Number(trackNumber) : null,
-      original_track_id: originalTrackId ? Number(originalTrackId) : null,
-      bpm: bpm ? Number(bpm) : null,
-      track_key: trackKey || null,
-      description_en: descriptionEn,
-      description_ar: descriptionAr,
-    };
+    const formData = new FormData();
+    formData.append('title_en', titleEn);
+    if (titleAr) formData.append('title_ar', titleAr);
+    if (artistName) formData.append('artist_name', artistName);
+    if (genreId) formData.append('genre_id', genreId);
+    if (albumId) formData.append('album_id', albumId);
+    if (trackNumber) formData.append('track_number', trackNumber);
+    if (originalTrackId) formData.append('original_track_id', originalTrackId);
+    if (bpm) formData.append('bpm', bpm);
+    if (trackKey) formData.append('track_key', trackKey);
+    if (descriptionEn) formData.append('description_en', descriptionEn);
+    if (descriptionAr) formData.append('description_ar', descriptionAr);
+    formData.append('rights_declaration_type', rightsType);
+    if (coverFile) {
+      formData.append('cover_image', coverFile);
+    }
 
     try {
-      const res = await api.updateMusicLibraryTrack(track.id, payload);
+      const res = await api.updateMusicLibraryTrack(track.id, formData);
       onSuccess(res.message_en);
     } catch (err: any) {
       setError(err.message || 'Update failed');
@@ -1249,6 +1475,79 @@ function EditTrackModal({
               {error}
             </div>
           )}
+
+          {/* Cover Artwork Card */}
+          <div className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-amber-400" />
+                <label className="text-xs font-semibold text-white">
+                  {isRtl ? 'صورة الغلاف' : 'Cover Artwork'}
+                </label>
+              </div>
+              <span className="text-[11px] text-slate-400">JPG, PNG, WebP (Max 5MB)</span>
+            </div>
+
+            <div className="flex items-center gap-3.5">
+              {coverPreview ? (
+                <div className="relative group w-16 h-16 rounded-xl overflow-hidden border border-amber-500/40 bg-slate-950 flex-shrink-0 shadow-md">
+                  <img src={coverPreview} alt="Cover Preview" className="w-full h-full object-cover" />
+                  {coverFile && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveCover}
+                      className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-rose-400 hover:text-rose-300"
+                      title={isRtl ? 'إلغاء الصورة الجديدة' : 'Revert Image'}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-xl border border-dashed border-slate-600 bg-slate-900/60 flex flex-col items-center justify-center text-slate-500 flex-shrink-0">
+                  <ImageIcon className="w-5 h-5 mb-1 text-slate-600" />
+                  <span className="text-[9px]">{isRtl ? 'لا يوجد غلاف' : 'No artwork'}</span>
+                </div>
+              )}
+
+              <div className="flex-1 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    id="track-edit-cover-upload"
+                    accept="image/jpeg,image/png,image/webp,image/jpg"
+                    className="hidden"
+                    onChange={handleCoverChange}
+                  />
+                  <label
+                    htmlFor="track-edit-cover-upload"
+                    className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-600 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-amber-400" />
+                    <span>
+                      {coverPreview
+                        ? (isRtl ? 'استبدال الغلاف' : 'Replace Artwork')
+                        : (isRtl ? 'اختيار صورة الغلاف' : 'Upload Cover Artwork')}
+                    </span>
+                  </label>
+                  {coverFile && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveCover}
+                      className="px-2.5 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs transition-colors"
+                    >
+                      {isRtl ? 'تراجع' : 'Revert'}
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {coverFile
+                    ? (isRtl ? 'تم تحديد صورة جديدة سيتم حفظها عند النقر على حفظ.' : 'New image selected. Click Save Changes to apply.')
+                    : (isRtl ? 'يمكنك استبدال صورة الغلاف الحالية بأي وقت.' : 'Replace or update the current track artwork at any time.')}
+                </p>
+              </div>
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1331,7 +1630,7 @@ function EditTrackModal({
             <label className="block text-xs font-semibold text-slate-300 mb-1">Remix Source Track</label>
             <select
               value={originalTrackId}
-              onChange={(e) => setOriginalTrackId(e.target.value)}
+              onChange={(e) => handleOriginalTrackChange(e.target.value)}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500"
             >
               <option value="">— None (Original Track) —</option>
@@ -1340,6 +1639,54 @@ function EditTrackModal({
                   #{t.id} {t.title_en} ({t.artist_name})
                 </option>
               ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">BPM</label>
+              <input
+                type="number"
+                value={bpm}
+                onChange={(e) => setBpm(e.target.value)}
+                placeholder="128"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Musical Key</label>
+              <input
+                type="text"
+                value={trackKey}
+                onChange={(e) => setTrackKey(e.target.value)}
+                placeholder="Am"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+          </div>
+
+          {/* Rights Declaration */}
+          <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-2">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-semibold text-white">
+                {isRtl ? 'إقرار حقوق الملكية للمنصة' : 'Platform Rights Declaration'}
+              </span>
+            </div>
+            <select
+              value={rightsType}
+              onChange={(e) => setRightsType(e.target.value)}
+              className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200"
+            >
+              <option value="original_composition">
+                {isRtl ? 'عمل موسيقي أصلي (مملوك لـ FUN MOMENT بالكامل)' : 'Original Composition (FUN MOMENT Platform-Owned)'}
+              </option>
+              <option value="licensed_remix">
+                {isRtl ? 'ريمكس مرخّص (منسوب لمسار رئيسي)' : 'Licensed Remix (Attributed to Master Track)'}
+              </option>
+              <option value="public_domain">
+                {isRtl ? 'ملكية عامة / مصرح حقوقياً' : 'Public Domain / Rights-Cleared Composition'}
+              </option>
             </select>
           </div>
 

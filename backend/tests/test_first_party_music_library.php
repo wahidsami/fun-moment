@@ -39,6 +39,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class FirstPartyMusicLibraryTestRunner
@@ -502,6 +503,209 @@ class FirstPartyMusicLibraryTestRunner
             $this->assert($corruptMeta->isValid === false, 'Corrupt audio file probe fails validation');
             $this->assert(!empty($corruptMeta->error), "Failure message is populated: {$corruptMeta->error}");
             @unlink($tempCorruptFile);
+
+            // -------------------------------------------------------------
+            // SECTION 11: First-Party Upload Validation, Rights & Cover Artwork
+            // -------------------------------------------------------------
+            echo "\n--- Section 11: First-Party Upload Validation, Rights & Cover Artwork ---\n";
+
+            // Prepare a valid audio file fixture
+            $validMp3Header = "ID3\x04\x00\x00\x00\x00\x00\x20" . str_repeat("\x00", 32) . "\xFF\xFB\x90\x64" . str_repeat("\xAA", 1000);
+            $tempAudioPath = sys_get_temp_dir() . '/test_valid_audio_' . uniqid() . '.mp3';
+            file_put_contents($tempAudioPath, $validMp3Header);
+
+            // Re-authenticate admin
+            Auth::guard('admin')->login($admin);
+
+            // 1. Rejection of invalid rights declaration type ('original_work' from reported bug)
+            $invalidRightsReq = Request::create(
+                '/admin-home/music-library-json',
+                'POST',
+                [
+                    'title_en' => 'Invalid Rights Track',
+                    'artist_name' => 'FUN MOMENT Originals',
+                    'genre_id' => $genre->id,
+                    'rights_declaration_type' => 'original_work',
+                ],
+                [],
+                [
+                    'audio_file' => new UploadedFile($tempAudioPath, 'test_song.mp3', 'audio/mpeg', null, true),
+                ]
+            );
+            $invalidRightsRes = $libraryController->store($invalidRightsReq);
+            $this->assert($invalidRightsRes->status() === 422, 'Invalid rights_declaration_type "original_work" returns HTTP 422');
+            $invalidRightsJson = json_decode($invalidRightsRes->getContent(), true);
+            $this->assert(
+                isset($invalidRightsJson['errors']['rights_declaration_type']),
+                'Validation error explicitly flags "rights_declaration_type"'
+            );
+
+            // 2. Rejection of invalid image format (e.g. non-image document)
+            $invalidImageReq = Request::create(
+                '/admin-home/music-library-json',
+                'POST',
+                [
+                    'title_en' => 'Invalid Image Track',
+                    'artist_name' => 'FUN MOMENT Originals',
+                    'genre_id' => $genre->id,
+                    'rights_declaration_type' => 'original_composition',
+                ],
+                [],
+                [
+                    'audio_file' => new UploadedFile($tempAudioPath, 'test_song.mp3', 'audio/mpeg', null, true),
+                    'cover_image' => UploadedFile::fake()->create('exploit.exe', 100, 'application/x-msdownload'),
+                ]
+            );
+            $invalidImageRes = $libraryController->store($invalidImageReq);
+            $this->assert($invalidImageRes->status() === 422, 'Invalid cover_image format returns HTTP 422');
+            $invalidImageJson = json_decode($invalidImageRes->getContent(), true);
+            $this->assert(
+                isset($invalidImageJson['errors']['cover_image']),
+                'Validation error explicitly flags "cover_image" format'
+            );
+
+            // 3. Rejection of oversized cover image (> 5120 KB)
+            $oversizedImageReq = Request::create(
+                '/admin-home/music-library-json',
+                'POST',
+                [
+                    'title_en' => 'Oversized Image Track',
+                    'artist_name' => 'FUN MOMENT Originals',
+                    'genre_id' => $genre->id,
+                    'rights_declaration_type' => 'original_composition',
+                ],
+                [],
+                [
+                    'audio_file' => new UploadedFile($tempAudioPath, 'test_song.mp3', 'audio/mpeg', null, true),
+                    'cover_image' => UploadedFile::fake()->image('huge_cover.jpg', 4000, 4000)->size(6000),
+                ]
+            );
+            $oversizedImageRes = $libraryController->store($oversizedImageReq);
+            $this->assert($oversizedImageRes->status() === 422, 'Oversized cover_image (>5MB) returns HTTP 422');
+            $oversizedImageJson = json_decode($oversizedImageRes->getContent(), true);
+            $this->assert(
+                isset($oversizedImageJson['errors']['cover_image']),
+                'Validation error flags oversized cover image'
+            );
+
+            // 4. Successful first-party upload with original_composition and valid cover image
+            Storage::fake('public');
+            $validUploadReq = Request::create(
+                '/admin-home/music-library-json',
+                'POST',
+                [
+                    'title_en' => 'Sunlight Symphony',
+                    'title_ar' => 'سيمفونية ضوء الشمس',
+                    'artist_name' => 'FUN MOMENT Originals',
+                    'genre_id' => $genre->id,
+                    'bpm' => 124,
+                    'track_key' => 'F#m',
+                    'rights_declaration_type' => 'original_composition',
+                    'rights_notes' => 'Platform owned original composition',
+                ],
+                [],
+                [
+                    'audio_file' => new UploadedFile($tempAudioPath, 'sunlight_symphony.mp3', 'audio/mpeg', null, true),
+                    'cover_image' => UploadedFile::fake()->image('sunlight_cover.webp', 800, 800)->size(800),
+                ]
+            );
+            $validUploadRes = $libraryController->store($validUploadReq);
+            $this->assert($validUploadRes->status() === 201, 'Valid first-party track upload returns HTTP 201 Created');
+            $validUploadJson = json_decode($validUploadRes->getContent(), true);
+            $this->assert($validUploadJson['success'] === true, 'Upload response indicates success');
+            $createdTrackId = $validUploadJson['data']['id'] ?? null;
+            $this->assert($createdTrackId !== null, 'Created track id is returned');
+
+            $freshTrack = MusicTrack::find($createdTrackId);
+            $this->assert($freshTrack !== null, 'Track found in database');
+            $this->assert($freshTrack->rights_declaration_type === 'original_composition', 'Track has rights_declaration_type = original_composition');
+            $this->assert(!empty($freshTrack->cover_image), 'Track cover_image is populated');
+            $this->assert(str_starts_with($freshTrack->cover_image, 'music_covers/cover_'), 'Cover image stored under music_covers/ with cover_ prefix');
+            $this->assert(Storage::disk('public')->exists($freshTrack->cover_image), 'Cover artwork file exists on public disk');
+            $this->assert(!empty($freshTrack->cover_image_url), 'Track cover_image_url accessor is populated');
+            $this->assert(str_contains($freshTrack->cover_image_url, 'music_covers/cover_'), 'cover_image_url contains public storage path');
+
+            // 5. Successful remix upload with licensed_remix and original_track_id
+            $remixUploadReq = Request::create(
+                '/admin-home/music-library-json',
+                'POST',
+                [
+                    'title_en' => 'Sunlight Symphony (Club Remix)',
+                    'title_ar' => 'سيمفونية ضوء الشمس (ريمكس النادي)',
+                    'artist_name' => 'DJ Horizon',
+                    'genre_id' => $genre->id,
+                    'original_track_id' => $freshTrack->id,
+                    'rights_declaration_type' => 'licensed_remix',
+                ],
+                [],
+                [
+                    'audio_file' => new UploadedFile($tempAudioPath, 'sunlight_remix.mp3', 'audio/mpeg', null, true),
+                ]
+            );
+            $remixUploadRes = $libraryController->store($remixUploadReq);
+            $this->assert($remixUploadRes->status() === 201, 'Licensed remix upload returns HTTP 201 Created');
+            $remixTrackJson = json_decode($remixUploadRes->getContent(), true);
+            $remixTrack = MusicTrack::find($remixTrackJson['data']['id']);
+            $this->assert($remixTrack->rights_declaration_type === 'licensed_remix', 'Remix has rights_declaration_type = licensed_remix');
+            $this->assert($remixTrack->original_track_id === $freshTrack->id, 'Remix preserves original_track_id relationship');
+
+            // 6. Album cover inheritance when cover_image is omitted
+            $albumWithCover = MusicAlbum::create([
+                'title_en' => 'Summer Odyssey 2026',
+                'artist_name' => 'FUN MOMENT Originals',
+                'genre_id' => $genre->id,
+                'cover_image' => 'music_covers/album_master_cover.jpg',
+                'status' => MusicAlbum::STATUS_PUBLISHED,
+                'owner_type' => MusicAlbum::OWNER_TYPE_ADMIN,
+                'admin_id' => $admin->id,
+            ]);
+            $albumTrackReq = Request::create(
+                '/admin-home/music-library-json',
+                'POST',
+                [
+                    'title_en' => 'Summer Breeze',
+                    'artist_name' => 'FUN MOMENT Originals',
+                    'genre_id' => $genre->id,
+                    'album_id' => $albumWithCover->id,
+                    'rights_declaration_type' => 'original_composition',
+                ],
+                [],
+                [
+                    'audio_file' => new UploadedFile($tempAudioPath, 'summer_breeze.mp3', 'audio/mpeg', null, true),
+                ]
+            );
+            $albumTrackRes = $libraryController->store($albumTrackReq);
+            $this->assert($albumTrackRes->status() === 201, 'Track with album assignment returns HTTP 201');
+            $albumTrackJson = json_decode($albumTrackRes->getContent(), true);
+            $albumTrack = MusicTrack::find($albumTrackJson['data']['id']);
+            $this->assert(
+                $albumTrack->cover_image === 'music_covers/album_master_cover.jpg',
+                'Track without cover inherits album cover_image'
+            );
+
+            // 7. Update track cover artwork and metadata via AdminMusicLibraryController::update()
+            $newCoverFile = UploadedFile::fake()->image('replaced_cover.png', 500, 500)->size(300);
+            $updateReq = Request::create(
+                "/admin-home/music-library-json/{$freshTrack->id}",
+                'POST',
+                [
+                    'title_en' => 'Sunlight Symphony (Remastered 2026)',
+                    'rights_declaration_type' => 'public_domain',
+                ],
+                [],
+                [
+                    'cover_image' => $newCoverFile,
+                ]
+            );
+            $updateRes = $libraryController->update($updateReq, $freshTrack->id);
+            $this->assert($updateRes->status() === 200, 'Track update with new artwork returns HTTP 200');
+            $updatedTrack = $freshTrack->fresh();
+            $this->assert($updatedTrack->title_en === 'Sunlight Symphony (Remastered 2026)', 'Track title updated');
+            $this->assert($updatedTrack->rights_declaration_type === 'public_domain', 'Track rights updated to public_domain');
+            $this->assert(str_ends_with($updatedTrack->cover_image, '.png'), 'Updated cover has .png extension');
+            $this->assert(Storage::disk('public')->exists($updatedTrack->cover_image), 'Updated cover exists on public disk');
+
+            @unlink($tempAudioPath);
 
         } finally {
             DB::rollBack();

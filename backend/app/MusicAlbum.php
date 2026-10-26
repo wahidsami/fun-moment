@@ -41,6 +41,10 @@ class MusicAlbum extends Model
         'released_at' => 'datetime',
     ];
 
+    protected $appends = [
+        'cover_image_url',
+    ];
+
     public function genre(): BelongsTo
     {
         return $this->belongsTo(MusicGenre::class, 'genre_id', 'id');

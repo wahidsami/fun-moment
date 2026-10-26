@@ -106,6 +106,26 @@ class MusicTrack extends Model
         'released_at' => 'datetime',
     ];
 
+    protected $appends = [
+        'cover_image_url',
+    ];
+
+    /**
+     * Get public asset URL for track cover image.
+     */
+    public function getCoverImageUrlAttribute(): ?string
+    {
+        if (empty($this->cover_image)) {
+            return null;
+        }
+
+        if (filter_var($this->cover_image, FILTER_VALIDATE_URL)) {
+            return $this->cover_image;
+        }
+
+        return asset('storage/' . ltrim($this->cover_image, '/'));
+    }
+
     /*--------------------------------------------------------------------------
      * Review A: Genre Relationships (Primary vs Secondary Consistency)
      *--------------------------------------------------------------------------*/

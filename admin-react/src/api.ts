@@ -1221,8 +1221,13 @@ export const LaravelAPI = {
       let errMsg = `Failed to upload track (${response.status})`;
       try {
         const errJson = await response.json();
-        if (errJson?.message_en) errMsg = errJson.message_en;
-        else if (errJson?.errors) errMsg = Object.values(errJson.errors).flat().join(', ');
+        if (errJson?.errors && typeof errJson.errors === 'object') {
+          errMsg = Object.values(errJson.errors).flat().join(' | ');
+        } else if (errJson?.message_en) {
+          errMsg = errJson.message_en;
+        } else if (errJson?.message) {
+          errMsg = errJson.message;
+        }
       } catch {}
       throw new Error(errMsg);
     }
@@ -1231,21 +1236,27 @@ export const LaravelAPI = {
   },
 
   async updateMusicLibraryTrack(id: number, data: any): Promise<{ success: boolean; message_en: string; track: MusicLibraryTrackItem }> {
+    const isFormData = data instanceof FormData;
     const response = await fetchWithCsrf(`/admin-home/music-library-json/${id}`, {
-      method: 'PUT',
-      headers: {
+      method: 'POST',
+      headers: isFormData ? { 'Accept': 'application/json' } : {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: isFormData ? data : JSON.stringify(data),
     });
 
     if (!response.ok) {
       let errMsg = `Failed to update track (${response.status})`;
       try {
         const errJson = await response.json();
-        if (errJson?.message_en) errMsg = errJson.message_en;
-        else if (errJson?.errors) errMsg = Object.values(errJson.errors).flat().join(', ');
+        if (errJson?.errors && typeof errJson.errors === 'object') {
+          errMsg = Object.values(errJson.errors).flat().join(' | ');
+        } else if (errJson?.message_en) {
+          errMsg = errJson.message_en;
+        } else if (errJson?.message) {
+          errMsg = errJson.message;
+        }
       } catch {}
       throw new Error(errMsg);
     }
