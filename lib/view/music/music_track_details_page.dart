@@ -7,6 +7,7 @@ import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/music/components/music_artwork_widget.dart';
 import 'package:funmoments/view/music/components/player_queue_sheet.dart';
+import 'package:funmoments/view/music/music_album_details_page.dart';
 
 class MusicTrackDetailsPage extends StatefulWidget {
   final CatalogTrackModel track;
@@ -989,7 +990,23 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
                   ],
                   _metaRow(isArabic ? 'المدة الإجمالية' : 'Duration', _track.formattedDuration),
                   if (_track.album != null)
-                    _metaRow(isArabic ? 'الألبوم' : 'Album', _track.album!.title),
+                    _metaRow(
+                      isArabic ? 'الألبوم' : 'Album',
+                      _track.album!.displayTitle(isArabic),
+                      onTap: _track.album!.id > 0
+                          ? () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => MusicAlbumDetailsPage(
+                                    albumId: _track.album!.id,
+                                    initialAlbum: _track.album,
+                                  ),
+                                ),
+                              );
+                            }
+                          : null,
+                    ),
                   if (_track.trackNumber != null)
                     _metaRow(isArabic ? 'رقم المسار' : 'Track #', '#${_track.trackNumber}'),
                   if (_track.originalTrack != null)
@@ -1064,17 +1081,42 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
   }
 
 
-  Widget _metaRow(String label, String value) {
-    return Padding(
+  Widget _metaRow(String label, String value, {VoidCallback? onTap}) {
+    final rowContent = Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: FMColors.textMuted, fontSize: 13)),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: onTap != null ? FMColors.cyan : Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (onTap != null) ...[
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_forward_ios_rounded, color: FMColors.cyan, size: 12),
+              ],
+            ],
+          ),
         ],
       ),
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: rowContent,
+      );
+    }
+    return rowContent;
   }
 
   String _formatRights(String rights, bool isArabic) {

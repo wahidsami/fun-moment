@@ -9,11 +9,14 @@ class BuyerMusicService extends ChangeNotifier {
   bool isLoading = false;
   bool isCatalogLoading = false;
   bool isReleasesLoading = false;
+  bool isAlbumsLoading = false;
   bool isFavoritesLoading = false;
   String? errorMessage;
+  String? albumsError;
   bool isMarketplaceEnabled = true;
 
   List<CatalogTrackModel> latestReleases = [];
+  List<CatalogAlbumModel> albums = [];
   List<CatalogTrackModel> catalogTracks = [];
   List<CatalogTrackModel> favoriteTracks = [];
   List<CatalogGenreModel> genres = [];
@@ -100,6 +103,65 @@ class BuyerMusicService extends ChangeNotifier {
       isReleasesLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Fetch published catalog albums
+  Future<void> fetchAlbums({int limit = 10, bool isRefresh = false}) async {
+    if (isRefresh) {
+      albums.clear();
+      albumsError = null;
+    }
+    isAlbumsLoading = true;
+    notifyListeners();
+
+    try {
+      final headers = await _getHeaders();
+      final url = Uri.parse('$baseApi/music/catalog/albums?limit=$limit');
+      final res = await http.get(url, headers: headers);
+
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body['success'] == true && body['data'] != null) {
+          final dynamic dataField = body['data'];
+          final List rawList = dataField is Map<String, dynamic> && dataField['data'] is List
+              ? dataField['data'] as List
+              : (dataField is List ? dataField : []);
+
+          albums = rawList
+              .whereType<Map<String, dynamic>>()
+              .map((a) => CatalogAlbumModel.fromJson(a))
+              .toList();
+          albumsError = null;
+        }
+      } else {
+        albumsError = 'Failed to load albums (${res.statusCode})';
+      }
+    } catch (e) {
+      debugPrint('BuyerMusicService.fetchAlbums error: $e');
+      albumsError = e.toString();
+    } finally {
+      isAlbumsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Fetch full album details including tracklist
+  Future<CatalogAlbumModel?> getAlbumDetails(int albumId) async {
+    try {
+      final headers = await _getHeaders();
+      final url = Uri.parse('$baseApi/music/catalog/albums/$albumId');
+      final res = await http.get(url, headers: headers);
+
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body['success'] == true && body['data'] is Map<String, dynamic>) {
+          return CatalogAlbumModel.fromJson(body['data'] as Map<String, dynamic>);
+        }
+      }
+    } catch (e) {
+      debugPrint('BuyerMusicService.getAlbumDetails error: $e');
+    }
+    return null;
   }
 
   /// Browse and search catalog tracks

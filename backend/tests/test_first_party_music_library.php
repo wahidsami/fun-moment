@@ -707,6 +707,126 @@ class FirstPartyMusicLibraryTestRunner
 
             @unlink($tempAudioPath);
 
+            // =====================================================================
+            // Section 12: Album Cover Artwork Upload, Replacement, Removal & Validation
+            // =====================================================================
+            echo "\n--- Section 12: Album Cover Artwork Management ---\n";
+            $albumController = app(AdminMusicAlbumController::class);
+
+            // 1. Rejection of invalid album cover format
+            $badAlbumCover = UploadedFile::fake()->create('document.pdf', 500, 'application/pdf');
+            $badAlbumReq = Request::create(
+                '/admin-home/music-albums-json',
+                'POST',
+                [
+                    'title_en' => 'Invalid Cover Album',
+                    'genre_id' => $genre->id,
+                ],
+                [],
+                ['cover_image' => $badAlbumCover]
+            );
+            $badAlbumRes = $albumController->store($badAlbumReq);
+            $this->assert($badAlbumRes->status() === 422, 'Invalid album cover format returns HTTP 422');
+            $badAlbumJson = json_decode($badAlbumRes->getContent(), true);
+            $this->assert(isset($badAlbumJson['errors']['cover_image']), 'Validation error flags album cover_image format');
+
+            // 2. Rejection of oversized album cover (>5MB)
+            $hugeAlbumCover = UploadedFile::fake()->image('huge_album.jpg', 800, 800)->size(6000);
+            $hugeAlbumReq = Request::create(
+                '/admin-home/music-albums-json',
+                'POST',
+                [
+                    'title_en' => 'Oversized Cover Album',
+                    'genre_id' => $genre->id,
+                ],
+                [],
+                ['cover_image' => $hugeAlbumCover]
+            );
+            $hugeAlbumRes = $albumController->store($hugeAlbumReq);
+            $this->assert($hugeAlbumRes->status() === 422, 'Oversized album cover (>5MB) returns HTTP 422');
+            $hugeAlbumJson = json_decode($hugeAlbumRes->getContent(), true);
+            $this->assert(isset($hugeAlbumJson['errors']['cover_image']), 'Validation error flags oversized album cover');
+
+            // 3. Successful Album Creation with Cover Artwork
+            $validAlbumCover = UploadedFile::fake()->image('original_album_art.jpg', 600, 600)->size(400);
+            $createAlbumReq = Request::create(
+                '/admin-home/music-albums-json',
+                'POST',
+                [
+                    'title_en' => 'Symphony of the Sands',
+                    'title_ar' => 'سيمفونية الرمال',
+                    'artist_name' => 'FUN MOMENT Originals',
+                    'genre_id' => $genre->id,
+                    'status' => 'published',
+                ],
+                [],
+                ['cover_image' => $validAlbumCover]
+            );
+            $createAlbumRes = $albumController->store($createAlbumReq);
+            $this->assert($createAlbumRes->status() === 201, 'Album creation with artwork returns HTTP 201');
+            $createAlbumJson = json_decode($createAlbumRes->getContent(), true);
+            $this->assert($createAlbumJson['success'] === true, 'Album creation success = true');
+            $createdAlbum = MusicAlbum::find($createAlbumJson['album']['id']);
+            $this->assert(!empty($createdAlbum->cover_image), 'Album cover_image is stored');
+            $this->assert(str_starts_with($createdAlbum->cover_image, 'music_covers/album_cover_'), 'Album cover path has album_cover_ prefix');
+            $this->assert(Storage::disk('public')->exists($createdAlbum->cover_image), 'Album cover file exists on public disk');
+            $this->assert(!empty($createdAlbum->cover_image_url), 'Album cover_image_url accessor is populated');
+            $this->assert(str_contains($createdAlbum->cover_image_url, 'storage/music_covers/'), 'Album cover_image_url contains public storage URL');
+
+            // 4. Update Album with Replaced Artwork (WebP)
+            $oldCoverPath = $createdAlbum->cover_image;
+            $replacementCover = UploadedFile::fake()->image('replaced_album_art.webp', 600, 600)->size(350);
+            $updateAlbumReq = Request::create(
+                "/admin-home/music-albums-json/{$createdAlbum->id}",
+                'POST',
+                [
+                    'title_en' => 'Symphony of the Sands (Deluxe)',
+                ],
+                [],
+                ['cover_image' => $replacementCover]
+            );
+            $updateAlbumRes = $albumController->update($updateAlbumReq, $createdAlbum->id);
+            $this->assert($updateAlbumRes->status() === 200, 'Album update with replaced artwork returns HTTP 200');
+            $updatedAlbum = $createdAlbum->fresh();
+            $this->assert($updatedAlbum->cover_image !== $oldCoverPath, 'Album cover_image path updated to new file');
+            $this->assert(str_ends_with($updatedAlbum->cover_image, '.webp'), 'Replaced album cover has .webp extension');
+            $this->assert(Storage::disk('public')->exists($updatedAlbum->cover_image), 'New album cover file exists on public disk');
+            $this->assert(!Storage::disk('public')->exists($oldCoverPath), 'Old album cover file was deleted from disk');
+
+            // 5. Update Album to Remove/Clear Artwork
+            $currentCoverPath = $updatedAlbum->cover_image;
+            $removeCoverReq = Request::create(
+                "/admin-home/music-albums-json/{$updatedAlbum->id}",
+                'POST',
+                [
+                    'remove_cover' => '1',
+                ]
+            );
+            $removeCoverRes = $albumController->update($removeCoverReq, $updatedAlbum->id);
+            $this->assert($removeCoverRes->status() === 200, 'Album cover removal returns HTTP 200');
+            $clearedAlbum = $updatedAlbum->fresh();
+            $this->assert($clearedAlbum->cover_image === null, 'Album cover_image is set to null');
+            $this->assert($clearedAlbum->cover_image_url === null, 'Album cover_image_url is null when no cover exists');
+            $this->assert(!Storage::disk('public')->exists($currentCoverPath), 'Removed album cover was deleted from disk');
+
+            // 6. Delete Album Cleans Up Stored Cover
+            $albumWithCoverToDelete = MusicAlbum::create([
+                'title_en' => 'Temporary Album',
+                'artist_name' => 'Ephemeral Artist',
+                'genre_id' => $genre->id,
+                'status' => 'draft',
+                'owner_type' => 'admin',
+                'admin_id' => $admin->id,
+                'cover_image' => 'music_covers/temp_cover_to_delete.jpg',
+            ]);
+            Storage::disk('public')->put('music_covers/temp_cover_to_delete.jpg', 'fake image binary data');
+            $this->assert(Storage::disk('public')->exists('music_covers/temp_cover_to_delete.jpg'), 'Temporary cover exists before deletion');
+
+            $deleteAlbumReq = Request::create("/admin-home/music-albums-json/{$albumWithCoverToDelete->id}/delete", 'POST');
+            $deleteAlbumRes = $albumController->destroy($deleteAlbumReq, $albumWithCoverToDelete->id);
+            $this->assert($deleteAlbumRes->status() === 200, 'Album deletion returns HTTP 200');
+            $this->assert(!Storage::disk('public')->exists('music_covers/temp_cover_to_delete.jpg'), 'Cover was removed from public disk upon album deletion');
+
         } finally {
             DB::rollBack();
         }

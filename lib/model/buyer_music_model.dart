@@ -47,11 +47,11 @@ class CatalogGenreModel {
     final idVal = json['id'] is int
         ? json['id'] as int
         : int.tryParse(json['id']?.toString() ?? '0') ?? 0;
-    final nameVal = json['name']?.toString()?.trim();
-    final nameEnVal = (json['name_en'] ?? json['nameEn'])?.toString()?.trim();
-    final nameArVal = (json['name_ar'] ?? json['nameAr'])?.toString()?.trim();
-    final slugVal = json['slug']?.toString()?.trim() ?? '';
-    final iconVal = json['icon']?.toString()?.trim();
+    final nameVal = json['name']?.toString().trim();
+    final nameEnVal = (json['name_en'] ?? json['nameEn'])?.toString().trim();
+    final nameArVal = (json['name_ar'] ?? json['nameAr'])?.toString().trim();
+    final slugVal = json['slug']?.toString().trim() ?? '';
+    final iconVal = json['icon']?.toString().trim();
     final sortVal = json['sort_order'] is int
         ? json['sort_order'] as int
         : int.tryParse(json['sort_order']?.toString() ?? '0') ?? 0;
@@ -152,6 +152,11 @@ class CatalogAlbumModel {
   final String? artistName;
   final String? coverImageUrl;
   final int tracksCount;
+  final String? descriptionEn;
+  final String? descriptionAr;
+  final String? releasedAt;
+  final CatalogGenreModel? genre;
+  final List<CatalogTrackModel> tracks;
 
   CatalogAlbumModel({
     required this.id,
@@ -161,22 +166,82 @@ class CatalogAlbumModel {
     this.artistName,
     this.coverImageUrl,
     this.tracksCount = 0,
+    this.descriptionEn,
+    this.descriptionAr,
+    this.releasedAt,
+    this.genre,
+    this.tracks = const [],
   });
 
   factory CatalogAlbumModel.fromJson(Map<String, dynamic> json) {
     final rawCover = json['cover_image_url'] ?? json['cover_image'];
     final resolvedCover = CatalogTrackModel.resolveCoverUrl(rawCover);
+
+    List<CatalogTrackModel> parsedTracks = [];
+    if (json['tracks'] is List) {
+      parsedTracks = (json['tracks'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map((t) => CatalogTrackModel.fromJson(t))
+          .toList()
+        ..sort((a, b) => (a.trackNumber ?? 0).compareTo(b.trackNumber ?? 0));
+    }
+
+    CatalogGenreModel? parsedGenre;
+    if (json['genre'] is Map<String, dynamic>) {
+      parsedGenre = CatalogGenreModel.fromJson(json['genre'] as Map<String, dynamic>);
+    }
+
+    final dynamic rawCount = json['tracks_count'] ?? json['tracksCount'];
+    final int resolvedCount = parsedTracks.isNotEmpty
+        ? parsedTracks.length
+        : (rawCount is int ? rawCount : int.tryParse(rawCount?.toString() ?? '0') ?? 0);
+
+    final String? effectiveCover = resolvedCover ??
+        (parsedTracks.isNotEmpty ? parsedTracks.first.coverArtUrl : null);
+
     return CatalogAlbumModel(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       title: json['title']?.toString() ?? json['title_en']?.toString() ?? '',
       titleEn: json['title_en']?.toString() ?? '',
       titleAr: json['title_ar']?.toString() ?? '',
       artistName: json['artist_name']?.toString(),
-      coverImageUrl: resolvedCover,
-      tracksCount: json['tracks_count'] is int
-          ? json['tracks_count']
-          : int.tryParse(json['tracks_count']?.toString() ?? '0') ?? 0,
+      coverImageUrl: effectiveCover,
+      tracksCount: resolvedCount,
+      descriptionEn: json['description_en']?.toString(),
+      descriptionAr: json['description_ar']?.toString(),
+      releasedAt: json['released_at']?.toString(),
+      genre: parsedGenre,
+      tracks: parsedTracks,
     );
+  }
+
+  String displayTitle(bool isArabic) {
+    if (isArabic && titleAr.isNotEmpty) return titleAr;
+    if (titleEn.isNotEmpty) return titleEn;
+    if (title.isNotEmpty) return title;
+    return titleAr;
+  }
+
+  String displayDescription(bool isArabic) {
+    if (isArabic && (descriptionAr?.isNotEmpty ?? false)) return descriptionAr!;
+    if (descriptionEn?.isNotEmpty ?? false) return descriptionEn!;
+    return '';
+  }
+
+  String get displayArtist =>
+      (artistName != null && artistName!.isNotEmpty) ? artistName! : 'FUN MOMENT Originals';
+
+  int get totalDurationSeconds {
+    if (tracks.isEmpty) return 0;
+    return tracks.fold<int>(0, (sum, t) => sum + t.durationSeconds);
+  }
+
+  String get formattedTotalDuration {
+    final totalSec = totalDurationSeconds;
+    if (totalSec <= 0) return '';
+    final m = totalSec ~/ 60;
+    final s = totalSec % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 }
 

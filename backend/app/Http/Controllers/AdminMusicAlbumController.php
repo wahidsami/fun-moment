@@ -226,6 +226,7 @@ class AdminMusicAlbumController extends Controller
             'is_featured' => 'nullable|boolean',
             'status' => 'nullable|string|in:draft,published,archived',
             'cover_image' => 'nullable|file|image|mimes:jpeg,png,webp,jpg|max:5120',
+            'remove_cover' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -247,10 +248,18 @@ class AdminMusicAlbumController extends Controller
             $updates['is_featured'] = filter_var($request->input('is_featured'), FILTER_VALIDATE_BOOLEAN);
         }
 
-        if ($request->hasFile('cover_image')) {
+        if ($request->boolean('remove_cover')) {
+            if (!empty($album->cover_image) && Storage::disk('public')->exists($album->cover_image)) {
+                Storage::disk('public')->delete($album->cover_image);
+            }
+            $updates['cover_image'] = null;
+        } elseif ($request->hasFile('cover_image')) {
             $coverFile = $request->file('cover_image');
             $coverExt = $coverFile->getClientOriginalExtension() ?: 'jpg';
             $coverName = 'album_cover_' . Str::uuid()->toString() . '.' . $coverExt;
+            if (!empty($album->cover_image) && Storage::disk('public')->exists($album->cover_image)) {
+                Storage::disk('public')->delete($album->cover_image);
+            }
             $updates['cover_image'] = $coverFile->storeAs('music_covers', $coverName, 'public');
         }
 
@@ -388,6 +397,9 @@ class AdminMusicAlbumController extends Controller
                 'album_id' => null,
                 'track_number' => null,
             ]);
+            if (!empty($album->cover_image) && Storage::disk('public')->exists($album->cover_image)) {
+                Storage::disk('public')->delete($album->cover_image);
+            }
             $album->delete();
         });
 

@@ -686,20 +686,35 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
             ) : (
               albums.map((album) => (
                 <div key={album.id} className="bg-slate-800/40 rounded-xl border border-slate-700/60 p-4 space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-bold text-white text-base">{album.title_en}</h3>
-                      <p className="text-xs text-slate-400">{album.title_ar}</p>
+                  <div className="flex items-start gap-3">
+                    {album.cover_image_url || album.cover_image ? (
+                      <img
+                        src={album.cover_image_url || (album.cover_image?.startsWith('http') ? album.cover_image : `/storage/${album.cover_image}`)}
+                        alt={album.title_en}
+                        className="w-12 h-12 rounded-lg object-cover border border-slate-700 bg-slate-900 flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg border border-slate-700 bg-slate-900 flex items-center justify-center flex-shrink-0 text-slate-500">
+                        <Disc className="w-6 h-6 text-amber-500/60" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-white text-base truncate">{album.title_en}</h3>
+                          <p className="text-xs text-slate-400 truncate">{album.title_ar}</p>
+                        </div>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded font-semibold flex-shrink-0 ${
+                            album.status === 'published'
+                              ? 'bg-emerald-500/20 text-emerald-300'
+                              : 'bg-amber-500/20 text-amber-300'
+                          }`}
+                        >
+                          {album.status}
+                        </span>
+                      </div>
                     </div>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded font-semibold ${
-                        album.status === 'published'
-                          ? 'bg-emerald-500/20 text-emerald-300'
-                          : 'bg-amber-500/20 text-amber-300'
-                      }`}
-                    >
-                      {album.status}
-                    </span>
                   </div>
 
                   <p className="text-xs text-slate-300 line-clamp-2">
@@ -1737,20 +1752,73 @@ function CreateAlbumModal({
   const [descriptionEn, setDescriptionEn] = useState('');
   const [descriptionAr, setDescriptionAr] = useState('');
 
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const isRtl = language === 'ar';
+
+  useEffect(() => {
+    return () => {
+      if (coverPreview) {
+        URL.revokeObjectURL(coverPreview);
+      }
+    };
+  }, [coverPreview]);
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      setError(
+        isRtl
+          ? 'صيغة الغلاف غير مدعومة. يرجى اختيار ملف صورة بتنسيق JPG أو PNG أو WebP'
+          : 'Unsupported cover format. Please select a JPG, PNG, or WebP image.'
+      );
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError(
+        isRtl
+          ? 'حجم صورة الغلاف يتجاوز الحد الأقصى (٥ ميجابايت)'
+          : 'Cover image exceeds the maximum allowed size (5MB).'
+      );
+      return;
+    }
+
+    setError(null);
+    setCoverFile(file);
+    if (coverPreview) {
+      URL.revokeObjectURL(coverPreview);
+    }
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveCover = () => {
+    setCoverFile(null);
+    if (coverPreview) {
+      URL.revokeObjectURL(coverPreview);
+      setCoverPreview(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
 
     try {
-      const res = await api.createMusicAlbum({
-        title_en: titleEn,
-        title_ar: titleAr,
-        artist_name: artistName,
-        genre_id: genreId ? Number(genreId) : null,
-        description_en: descriptionEn,
-        description_ar: descriptionAr,
-      });
+      const formData = new FormData();
+      formData.append('title_en', titleEn.trim());
+      if (titleAr.trim()) formData.append('title_ar', titleAr.trim());
+      if (artistName.trim()) formData.append('artist_name', artistName.trim());
+      if (genreId) formData.append('genre_id', genreId);
+      if (descriptionEn.trim()) formData.append('description_en', descriptionEn.trim());
+      if (descriptionAr.trim()) formData.append('description_ar', descriptionAr.trim());
+      if (coverFile) formData.append('cover_image', coverFile);
+
+      const res = await api.createMusicAlbum(formData);
       onSuccess(res.message_en);
     } catch (err: any) {
       setError(err.message || 'Creation failed');
@@ -1761,8 +1829,8 @@ function CreateAlbumModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl">
-        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-slate-900 px-6 py-4 border-b border-slate-800 flex justify-between items-center z-10">
           <div className="flex items-center gap-2">
             <Disc className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-bold text-white">Create New Album / Collection</h2>
@@ -1829,6 +1897,99 @@ function CreateAlbumModal({
             </div>
           </div>
 
+          {/* Album Cover Artwork Upload */}
+          <div className="p-3.5 rounded-xl border border-slate-700/80 bg-slate-800/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-amber-400" />
+                <label className="text-xs font-semibold text-slate-200">
+                  {isRtl ? 'غلاف الألبوم' : 'Album Cover Artwork'}
+                </label>
+              </div>
+              <span className="text-[11px] text-slate-400">JPG, PNG, WebP (Max 5MB)</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {coverPreview ? (
+                <div className="relative group w-20 h-20 rounded-xl overflow-hidden border border-amber-500/40 bg-slate-950 flex-shrink-0 shadow-md">
+                  <img src={coverPreview} alt="Cover Preview" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={handleRemoveCover}
+                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-rose-400 hover:text-rose-300"
+                    title={isRtl ? 'إزالة الغلاف' : 'Remove Cover'}
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-xl border border-dashed border-slate-600 bg-slate-900/60 flex flex-col items-center justify-center text-slate-500 flex-shrink-0">
+                  <ImageIcon className="w-6 h-6 mb-1 text-slate-600" />
+                  <span className="text-[10px]">{isRtl ? 'لا يوجد غلاف' : 'No artwork'}</span>
+                </div>
+              )}
+
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    id="album-create-cover-upload"
+                    accept="image/jpeg,image/png,image/webp,image/jpg"
+                    className="hidden"
+                    onChange={handleCoverChange}
+                  />
+                  <label
+                    htmlFor="album-create-cover-upload"
+                    className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-600 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-amber-400" />
+                    <span>
+                      {coverPreview
+                        ? (isRtl ? 'استبدال الغلاف' : 'Replace Artwork')
+                        : (isRtl ? 'اختيار صورة الغلاف' : 'Upload Cover Artwork')}
+                    </span>
+                  </label>
+                  {coverPreview && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveCover}
+                      className="px-2.5 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs transition-colors"
+                    >
+                      {isRtl ? 'إزالة' : 'Remove'}
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {isRtl
+                    ? 'يُعرض في واجهة المتجر ومكتبة الألبومات وتطبيق المستمعين.'
+                    : 'Displayed in store collections, player carousel, and mobile album view.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Description (English)</label>
+            <textarea
+              rows={2}
+              value={descriptionEn}
+              onChange={(e) => setDescriptionEn(e.target.value)}
+              placeholder="Album description and curator notes..."
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Description (Arabic)</label>
+            <textarea
+              rows={2}
+              value={descriptionAr}
+              onChange={(e) => setDescriptionAr(e.target.value)}
+              placeholder="وصف الألبوم وملاحظات الإشراف الفني..."
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500 text-right"
+            />
+          </div>
+
           <div className="flex justify-end gap-2 pt-4 border-t border-slate-800">
             <button
               type="button"
@@ -1878,20 +2039,94 @@ function EditAlbumModal({
   const [descriptionEn, setDescriptionEn] = useState(album.description_en || '');
   const [descriptionAr, setDescriptionAr] = useState(album.description_ar || '');
 
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [removeCover, setRemoveCover] = useState(false);
+  const [coverPreview, setCoverPreview] = useState<string | null>(
+    album.cover_image_url || (album.cover_image ? (album.cover_image.startsWith('http') ? album.cover_image : `/storage/${album.cover_image}`) : null)
+  );
+  const isRtl = language === 'ar';
+
+  useEffect(() => {
+    return () => {
+      if (coverPreview && coverPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(coverPreview);
+      }
+    };
+  }, [coverPreview]);
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      setError(
+        isRtl
+          ? 'صيغة الغلاف غير مدعومة. يرجى اختيار ملف صورة بتنسيق JPG أو PNG أو WebP'
+          : 'Unsupported cover format. Please select a JPG, PNG, or WebP image.'
+      );
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError(
+        isRtl
+          ? 'حجم صورة الغلاف يتجاوز الحد الأقصى (٥ ميجابايت)'
+          : 'Cover image exceeds the maximum allowed size (5MB).'
+      );
+      return;
+    }
+
+    setError(null);
+    setCoverFile(file);
+    setRemoveCover(false);
+    if (coverPreview && coverPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(coverPreview);
+    }
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveCover = () => {
+    if (coverPreview && coverPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(coverPreview);
+    }
+    setCoverFile(null);
+    setCoverPreview(null);
+    setRemoveCover(true);
+  };
+
+  const handleResetCover = () => {
+    if (coverPreview && coverPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(coverPreview);
+    }
+    setCoverFile(null);
+    setRemoveCover(false);
+    setCoverPreview(
+      album.cover_image_url || (album.cover_image ? (album.cover_image.startsWith('http') ? album.cover_image : `/storage/${album.cover_image}`) : null)
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
 
     try {
-      const res = await api.updateMusicAlbum(album.id, {
-        title_en: titleEn,
-        title_ar: titleAr,
-        artist_name: artistName,
-        genre_id: genreId ? Number(genreId) : null,
-        description_en: descriptionEn,
-        description_ar: descriptionAr,
-      });
+      const formData = new FormData();
+      formData.append('title_en', titleEn.trim());
+      if (titleAr.trim()) formData.append('title_ar', titleAr.trim());
+      if (artistName.trim()) formData.append('artist_name', artistName.trim());
+      if (genreId) formData.append('genre_id', genreId);
+      if (descriptionEn.trim()) formData.append('description_en', descriptionEn.trim());
+      if (descriptionAr.trim()) formData.append('description_ar', descriptionAr.trim());
+
+      if (coverFile) {
+        formData.append('cover_image', coverFile);
+      } else if (removeCover) {
+        formData.append('remove_cover', '1');
+      }
+
+      const res = await api.updateMusicAlbum(album.id, formData);
       onSuccess(res.message_en);
     } catch (err: any) {
       setError(err.message || 'Update failed');
@@ -1902,8 +2137,8 @@ function EditAlbumModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl">
-        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-slate-900 px-6 py-4 border-b border-slate-800 flex justify-between items-center z-10">
           <div className="flex items-center gap-2">
             <Disc className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-bold text-white">Edit Album #{album.id}</h2>
@@ -1966,6 +2201,117 @@ function EditAlbumModal({
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Album Cover Artwork Upload / Replace / Remove */}
+          <div className="p-3.5 rounded-xl border border-slate-700/80 bg-slate-800/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-amber-400" />
+                <label className="text-xs font-semibold text-slate-200">
+                  {isRtl ? 'غلاف الألبوم' : 'Album Cover Artwork'}
+                </label>
+              </div>
+              <span className="text-[11px] text-slate-400">JPG, PNG, WebP (Max 5MB)</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {coverPreview ? (
+                <div className="relative group w-20 h-20 rounded-xl overflow-hidden border border-amber-500/40 bg-slate-950 flex-shrink-0 shadow-md">
+                  <img src={coverPreview} alt="Cover Preview" className="w-full h-full object-cover" />
+                  {coverFile && (
+                    <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 text-[9px] font-bold">
+                      {isRtl ? 'جديد' : 'NEW'}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleRemoveCover}
+                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-rose-400 hover:text-rose-300"
+                    title={isRtl ? 'إزالة الغلاف' : 'Remove Cover'}
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-xl border border-dashed border-slate-600 bg-slate-900/60 flex flex-col items-center justify-center text-slate-500 flex-shrink-0">
+                  <ImageIcon className="w-6 h-6 mb-1 text-slate-600" />
+                  <span className="text-[10px]">
+                    {removeCover
+                      ? (isRtl ? 'سيتم الحذف' : 'Marked for deletion')
+                      : (isRtl ? 'لا يوجد غلاف' : 'No artwork')}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    id="album-edit-cover-upload"
+                    accept="image/jpeg,image/png,image/webp,image/jpg"
+                    className="hidden"
+                    onChange={handleCoverChange}
+                  />
+                  <label
+                    htmlFor="album-edit-cover-upload"
+                    className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-600 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-amber-400" />
+                    <span>
+                      {coverPreview
+                        ? (isRtl ? 'استبدال الغلاف' : 'Replace Artwork')
+                        : (isRtl ? 'رفع غلاف جديد' : 'Upload Cover Artwork')}
+                    </span>
+                  </label>
+                  {(coverFile || removeCover) && (
+                    <button
+                      type="button"
+                      onClick={handleResetCover}
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-800 text-xs transition-colors"
+                    >
+                      {isRtl ? 'تراجع' : 'Reset'}
+                    </button>
+                  )}
+                  {coverPreview && !coverFile && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveCover}
+                      className="px-2.5 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs transition-colors"
+                    >
+                      {isRtl ? 'إزالة الغلاف' : 'Remove Cover'}
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {isRtl
+                    ? 'تحديث غلاف الألبوم لن يغير الأغلفة المخصصة للمسارات الفردية.'
+                    : 'Updating the album artwork does not overwrite existing custom track covers.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Description (English)</label>
+            <textarea
+              rows={2}
+              value={descriptionEn}
+              onChange={(e) => setDescriptionEn(e.target.value)}
+              placeholder="Album description and curator notes..."
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Description (Arabic)</label>
+            <textarea
+              rows={2}
+              value={descriptionAr}
+              onChange={(e) => setDescriptionAr(e.target.value)}
+              placeholder="وصف الألبوم وملاحظات الإشراف الفني..."
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500 text-right"
+            />
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t border-slate-800">

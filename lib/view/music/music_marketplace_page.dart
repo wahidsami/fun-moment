@@ -7,6 +7,7 @@ import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/music/components/mini_player_bar.dart';
 import 'package:funmoments/view/music/components/music_artwork_widget.dart';
+import 'package:funmoments/view/music/music_album_details_page.dart';
 import 'package:funmoments/view/music/music_track_details_page.dart';
 import 'package:funmoments/view/music/my_music_favorites_page.dart';
 
@@ -30,6 +31,7 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
       final svc = Provider.of<BuyerMusicService>(context, listen: false);
       svc.fetchGenres();
       svc.fetchLatestReleases();
+      svc.fetchAlbums();
       svc.fetchCatalog(isRefresh: true);
     });
 
@@ -52,6 +54,7 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
     final svc = Provider.of<BuyerMusicService>(context, listen: false);
     await Future.wait([
       svc.fetchLatestReleases(),
+      svc.fetchAlbums(isRefresh: true),
       svc.fetchCatalog(isRefresh: true),
     ]);
   }
@@ -131,6 +134,10 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
 
                     // Latest Releases Carousel
                     _buildLatestReleasesSection(musicService, isArabic),
+                    const SizedBox(height: 24),
+
+                    // Albums & Collections Carousel
+                    _buildAlbumsSection(musicService, isArabic),
                     const SizedBox(height: 24),
 
                     // Filter Chips: Genres
@@ -498,6 +505,204 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAlbumsSection(BuyerMusicService musicService, bool isArabic) {
+    final albums = musicService.albums;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isArabic ? 'الألبومات والمجموعات' : 'Albums & Collections',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (albums.isNotEmpty)
+                Text(
+                  isArabic ? '${albums.length} ألبوم' : '${albums.length} albums',
+                  style: const TextStyle(
+                    color: FMColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        if (musicService.isAlbumsLoading && albums.isEmpty)
+          Container(
+            height: 180,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: FMColors.surface,
+              borderRadius: BorderRadius.circular(FMRadii.md),
+              border: Border.all(color: FMColors.border),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(FMColors.cyan),
+              ),
+            ),
+          )
+        else if (musicService.albumsError != null && albums.isEmpty)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: FMColors.surface,
+              borderRadius: BorderRadius.circular(FMRadii.md),
+              border: Border.all(color: FMColors.magenta.withOpacity(0.4)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: FMColors.magenta, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    isArabic ? 'تعذر تحميل الألبومات' : 'Failed to load albums',
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => musicService.fetchAlbums(isRefresh: true),
+                  child: Text(
+                    isArabic ? 'إعادة' : 'Retry',
+                    style: const TextStyle(color: FMColors.cyan, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (albums.isEmpty)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            decoration: BoxDecoration(
+              color: FMColors.surface,
+              borderRadius: BorderRadius.circular(FMRadii.md),
+              border: Border.all(color: FMColors.border),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.album_outlined, color: FMColors.textMuted, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    isArabic
+                        ? 'لا توجد ألبومات معلنة حالياً في المكتبة.'
+                        : 'No albums published in the library at this moment.',
+                    style: const TextStyle(color: FMColors.textMuted, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          SizedBox(
+            height: 220,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              physics: const BouncingScrollPhysics(),
+              itemCount: albums.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 14),
+              itemBuilder: (context, index) {
+                final album = albums[index];
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MusicAlbumDetailsPage(
+                          albumId: album.id,
+                          initialAlbum: album,
+                        ),
+                      ),
+                    );
+                  },
+                  child: SizedBox(
+                    width: 140,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Album Cover
+                        Hero(
+                          tag: 'album-cover-${album.id}',
+                          child: MusicArtworkWidget(
+                            imageUrl: album.coverImageUrl,
+                            width: 140,
+                            height: 140,
+                            borderRadius: FMRadii.md,
+                            placeholderIcon: Icons.album_rounded,
+                            placeholderIconSize: 42,
+                            border: Border.all(color: FMColors.border),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black45,
+                                blurRadius: 8,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Title
+                        Text(
+                          album.displayTitle(isArabic),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+
+                        // Artist Name
+                        Text(
+                          album.displayArtist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: FMColors.textMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+
+                        // Tracks count badge
+                        Text(
+                          isArabic
+                              ? '${album.tracksCount} ${album.tracksCount == 1 ? "مقطع" : "مقاطع"}'
+                              : '${album.tracksCount} ${album.tracksCount == 1 ? "track" : "tracks"}',
+                          style: const TextStyle(
+                            color: FMColors.cyan,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 

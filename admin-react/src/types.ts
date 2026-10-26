@@ -866,6 +866,7 @@ export interface MusicAlbumItem {
   description_ar?: string | null;
   artist_name?: string | null;
   cover_image?: string | null;
+  cover_image_url?: string | null;
   genre_id?: number | null;
   genre_name?: string | null;
   genre?: {

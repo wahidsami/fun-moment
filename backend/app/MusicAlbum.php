@@ -130,9 +130,10 @@ class MusicAlbum extends Model
         if (empty($this->cover_image)) {
             return null;
         }
-        return str_starts_with($this->cover_image, 'http')
-            ? $this->cover_image
-            : url('storage/' . ltrim($this->cover_image, '/'));
+        if (filter_var($this->cover_image, FILTER_VALIDATE_URL)) {
+            return $this->cover_image;
+        }
+        return asset('storage/' . ltrim($this->cover_image, '/'));
     }
 
     public function getTotalDurationSecondsAttribute(): int

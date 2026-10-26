@@ -1390,13 +1390,16 @@ export const LaravelAPI = {
   },
 
   async updateMusicAlbum(id: number, data: any): Promise<{ success: boolean; message_en: string; album: MusicAlbumItem }> {
+    const isFormData = data instanceof FormData;
+    const headers: Record<string, string> = { 'Accept': 'application/json' };
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     const response = await fetchWithCsrf(`/admin-home/music-albums-json/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
+      method: 'POST',
+      headers,
+      body: isFormData ? data : JSON.stringify(data),
     });
 
     if (!response.ok) {
