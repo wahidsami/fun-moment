@@ -5,6 +5,7 @@ import 'package:funmoments/service/buyer_music_service.dart';
 import 'package:funmoments/service/music_player_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
+import 'package:funmoments/view/music/components/artwork_ambient_lighting_widget.dart';
 import 'package:funmoments/view/music/components/dj_visualizer_widget.dart';
 import 'package:funmoments/view/music/components/music_artwork_widget.dart';
 import 'package:funmoments/view/music/components/player_queue_sheet.dart';
@@ -219,45 +220,15 @@ class _NowPlayingVisualizerPageState extends State<NowPlayingVisualizerPage> {
 
                           const SizedBox(height: 12),
 
-                          // Center Stage: Album / Track Artwork with Neon Backlight
+                          // Center Stage: Album / Track Artwork with Animated Ambient Lighting Aura
                           Center(
                             child: Hero(
                               tag: 'track-art-${_track.id}',
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(FMRadii.xl),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: isThisTrackActive && player.isPlaying
-                                          ? FMColors.cyan.withOpacity(0.35)
-                                          : Colors.black87,
-                                      blurRadius: 36,
-                                      spreadRadius: 2,
-                                      offset: const Offset(0, 8),
-                                    ),
-                                    BoxShadow(
-                                      color: isThisTrackActive && player.isPlaying
-                                          ? FMColors.magenta.withOpacity(0.25)
-                                          : Colors.black45,
-                                      blurRadius: 24,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                                child: MusicArtworkWidget(
-                                  imageUrl: _track.coverArtUrl,
-                                  width: artworkSize,
-                                  height: artworkSize,
-                                  borderRadius: FMRadii.xl,
-                                  placeholderIconSize: 64,
-                                  showLoadingIndicator: true,
-                                  border: Border.all(
-                                    color: isThisTrackActive && player.isPlaying
-                                        ? FMColors.cyan.withOpacity(0.6)
-                                        : FMColors.border,
-                                    width: 1.5,
-                                  ),
-                                ),
+                              child: ArtworkAmbientLightingWidget(
+                                imageUrl: _track.coverArtUrl,
+                                size: artworkSize,
+                                borderRadius: FMRadii.xl,
+                                isPlaying: isThisTrackActive && player.isPlaying,
                               ),
                             ),
                           ),

@@ -5,6 +5,8 @@ import 'package:funmoments/service/buyer_music_service.dart';
 import 'package:funmoments/service/music_player_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
+import 'package:funmoments/view/music/components/artwork_ambient_lighting_widget.dart';
+import 'package:funmoments/view/music/components/dj_visualizer_widget.dart';
 import 'package:funmoments/view/music/components/music_artwork_widget.dart';
 import 'package:funmoments/view/music/components/player_queue_sheet.dart';
 import 'package:funmoments/view/music/music_album_details_page.dart';
@@ -550,7 +552,7 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Artwork (tappable to launch full-screen DJ Visualizer)
+            // Artwork with Dynamic Ambient Lighting (tappable to launch full-screen DJ Visualizer)
             Center(
               child: GestureDetector(
                 onTap: () {
@@ -563,21 +565,11 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
                 },
                 child: Hero(
                   tag: 'track-art-${_track.id}',
-                  child: MusicArtworkWidget(
+                  child: ArtworkAmbientLightingWidget(
                     imageUrl: _track.coverArtUrl,
-                    width: 260,
-                    height: 260,
+                    size: 260,
                     borderRadius: FMRadii.lg,
-                    placeholderIconSize: 64,
-                    showLoadingIndicator: true,
-                    border: Border.all(color: FMColors.border),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black87,
-                        blurRadius: 24,
-                        offset: Offset(0, 10),
-                      ),
-                    ],
+                    isPlaying: isThisTrackActive && player.isPlaying,
                   ),
                 ),
               ),
@@ -632,7 +624,30 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+
+            // Live Ambient DJ Equalizer in Main Details View
+            Container(
+              height: 48,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: FMColors.surfaceDark.withOpacity(0.55),
+                borderRadius: BorderRadius.circular(FMRadii.md),
+                border: Border.all(color: FMColors.border.withOpacity(0.4)),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(FMRadii.md),
+                child: DJVisualizerWidget(
+                  mode: DJVisualizerMode.neonSpectrum,
+                  isPlaying: isThisTrackActive && player.isPlaying,
+                  bpm: _track.bpm != null && _track.bpm! > 0 ? _track.bpm! : 124,
+                  position: currentPos,
+                  duration: totalDur,
+                  isCompact: true,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // Track title & artist
             Text(
