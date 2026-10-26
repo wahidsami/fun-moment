@@ -8,6 +8,7 @@ import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/music/components/music_artwork_widget.dart';
 import 'package:funmoments/view/music/components/player_queue_sheet.dart';
 import 'package:funmoments/view/music/music_album_details_page.dart';
+import 'package:funmoments/view/music/now_playing_visualizer_page.dart';
 
 class MusicTrackDetailsPage extends StatefulWidget {
   final CatalogTrackModel track;
@@ -516,6 +517,19 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
                 ),
             ],
           ),
+          // DJ Visualizer Launcher
+          IconButton(
+            icon: const Icon(Icons.equalizer_rounded, color: FMColors.cyan),
+            tooltip: isArabic ? 'مؤثرات الدي جي البصرية' : 'DJ Visualizer',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => NowPlayingVisualizerPage(track: _track),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: Icon(
               _track.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -536,29 +550,89 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Artwork
+            // Artwork (tappable to launch full-screen DJ Visualizer)
             Center(
-              child: Hero(
-                tag: 'track-art-${_track.id}',
-                child: MusicArtworkWidget(
-                  imageUrl: _track.coverArtUrl,
-                  width: 260,
-                  height: 260,
-                  borderRadius: FMRadii.lg,
-                  placeholderIconSize: 64,
-                  showLoadingIndicator: true,
-                  border: Border.all(color: FMColors.border),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black87,
-                      blurRadius: 24,
-                      offset: Offset(0, 10),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => NowPlayingVisualizerPage(track: _track),
                     ),
+                  );
+                },
+                child: Hero(
+                  tag: 'track-art-${_track.id}',
+                  child: MusicArtworkWidget(
+                    imageUrl: _track.coverArtUrl,
+                    width: 260,
+                    height: 260,
+                    borderRadius: FMRadii.lg,
+                    placeholderIconSize: 64,
+                    showLoadingIndicator: true,
+                    border: Border.all(color: FMColors.border),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black87,
+                        blurRadius: 24,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Full-Screen DJ Neon Visualizer Launcher Button
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => NowPlayingVisualizerPage(track: _track),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      FMColors.cyan.withOpacity(0.18),
+                      FMColors.magenta.withOpacity(0.18),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(FMRadii.pill),
+                  border: Border.all(color: FMColors.cyan.withOpacity(0.55)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: FMColors.cyan.withOpacity(0.15),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.flare_rounded, size: 16, color: FMColors.cyan),
+                    const SizedBox(width: 8),
+                    Text(
+                      isArabic ? 'تشغيل وضع الدي جي البصري (Full-Screen DJ)' : 'Open Full-Screen DJ Visualizer',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.arrow_forward_ios_rounded, size: 11, color: FMColors.cyan),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             // Track title & artist
             Text(

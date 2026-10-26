@@ -6,6 +6,7 @@ import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/music/components/music_artwork_widget.dart';
 import 'package:funmoments/view/music/music_track_details_page.dart';
+import 'package:funmoments/view/music/now_playing_visualizer_page.dart';
 
 class MiniPlayerBar extends StatelessWidget {
   const MiniPlayerBar({Key? key}) : super(key: key);
@@ -178,6 +179,22 @@ class MiniPlayerBar extends StatelessWidget {
                           constraints: const BoxConstraints(),
                           tooltip: isRtl ? 'التالي' : 'Next',
                           onPressed: player.hasNext ? () => player.playNext() : null,
+                        ),
+                        const SizedBox(width: 8),
+                        // DJ Visualizer Full-Screen Launcher
+                        IconButton(
+                          icon: const Icon(Icons.equalizer_rounded, color: FMColors.cyan, size: 22),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          tooltip: isRtl ? 'وضع الدي جي البصري' : 'DJ Visualizer',
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => NowPlayingVisualizerPage(track: track),
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(width: 8),
                         // Close button
