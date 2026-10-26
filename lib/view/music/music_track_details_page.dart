@@ -536,6 +536,46 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
                 fontWeight: FontWeight.w500,
               ),
             ),
+            if (_track.isFirstParty) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: FMColors.warning.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(FMRadii.sm),
+                  border: Border.all(color: FMColors.warning.withOpacity(0.4)),
+                ),
+                child: Text(
+                  _track.displayBadge(isArabic),
+                  style: const TextStyle(
+                    color: FMColors.warning,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+            if (_track.isRemix) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(FMRadii.sm),
+                  border: Border.all(color: Colors.purple.withOpacity(0.4)),
+                ),
+                child: Text(
+                  isArabic
+                      ? 'ريمكس من: ${_track.originalTrack?.title ?? "العمل الأصلي"}'
+                      : 'Remix of: ${_track.originalTrack?.title ?? "Original Track"}',
+                  style: const TextStyle(
+                    color: Colors.purpleAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
 
             // Mode Badge
             const SizedBox(height: 12),
@@ -723,6 +763,12 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
                     const SizedBox(height: 12),
                   ],
                   _metaRow(isArabic ? 'المدة الإجمالية' : 'Duration', _track.formattedDuration),
+                  if (_track.album != null)
+                    _metaRow(isArabic ? 'الألبوم' : 'Album', _track.album!.title),
+                  if (_track.trackNumber != null)
+                    _metaRow(isArabic ? 'رقم المسار' : 'Track #', '#${_track.trackNumber}'),
+                  if (_track.originalTrack != null)
+                    _metaRow(isArabic ? 'العمل الأصلي' : 'Original Track', _track.originalTrack!.title),
                   if (_track.bpm != null && _track.bpm! > 0)
                     _metaRow('BPM', '${_track.bpm}'),
                   if (_track.musicalKey != null && _track.musicalKey!.isNotEmpty)
@@ -736,6 +782,11 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
                     _metaRow(
                       isArabic ? 'مقدم المحتوى' : 'Uploaded by',
                       _track.seller!.name,
+                    ),
+                  if (_track.isFirstParty)
+                    _metaRow(
+                      isArabic ? 'ملكية العمل' : 'Ownership',
+                      isArabic ? 'أصلي من FUN MOMENT (المكتبة الرسمية)' : 'FUN MOMENT Official Original',
                     ),
                 ],
               ),

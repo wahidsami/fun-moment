@@ -857,3 +857,114 @@ export interface MusicModerationApiResponse {
     total: number;
   };
 }
+
+export interface MusicAlbumItem {
+  id: number;
+  title_en: string;
+  title_ar: string;
+  description_en?: string | null;
+  description_ar?: string | null;
+  artist_name?: string | null;
+  cover_image?: string | null;
+  genre_id?: number | null;
+  genre_name?: string | null;
+  genre?: {
+    id: number;
+    name_en: string;
+    name_ar: string;
+    slug: string;
+  } | null;
+  status: 'draft' | 'published' | 'archived';
+  is_featured: boolean;
+  released_at?: string | null;
+  owner_type: 'admin' | 'seller';
+  tracks_count?: number;
+  tracks?: MusicLibraryTrackItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MusicLibraryTrackItem {
+  id: number;
+  owner_type: 'admin';
+  admin_id?: number | null;
+  admin?: {
+    id: number;
+    name: string;
+    email: string;
+  } | null;
+  title_en: string;
+  title_ar: string;
+  artist_name: string;
+  description_en?: string | null;
+  description_ar?: string | null;
+  genre_id?: number | null;
+  genre_name?: string | null;
+  album_id?: number | null;
+  album_title?: string | null;
+  album?: MusicAlbumItem | null;
+  track_number?: number | null;
+  original_track_id?: number | null;
+  original_track?: {
+    id: number;
+    title_en: string;
+    title_ar: string;
+    artist_name: string;
+  } | null;
+  remixes_count?: number;
+  bpm?: number | null;
+  track_key?: string | null;
+  rights_declaration_type?: string | null;
+  rights_agreement_accepted?: boolean;
+  rights_notes?: string | null;
+  status: 'draft' | 'pending' | 'approved' | 'rejected' | 'suspended';
+  media_status: 'draft' | 'pending' | 'processing' | 'ready' | 'failed';
+  cover_image?: string | null;
+  cover_image_url?: string | null;
+  duration_seconds?: number | null;
+  preview_duration_seconds?: number | null;
+  file_size_bytes?: number | null;
+  audio_format?: string | null;
+  audio_bitrate_kbps?: number | null;
+  audio_sample_rate_hz?: number | null;
+  audio_channels?: number | null;
+  processing_error?: string | null;
+  is_featured?: boolean;
+  offers_count?: number;
+  active_offer?: {
+    id: number;
+    offer_type: string;
+    price: number;
+    currency: string;
+    is_active: boolean;
+  } | null;
+  created_at: string;
+  released_at?: string | null;
+  stream_url?: string | null;
+}
+
+export interface MusicLibraryCounts {
+  all: number;
+  ready: number;
+  processing: number;
+  failed: number;
+  draft: number;
+  published: number;
+}
+
+export interface MusicLibraryApiResponse {
+  success: boolean;
+  counts: MusicLibraryCounts;
+  tracks: {
+    data: MusicLibraryTrackItem[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}
+
+export interface MusicAlbumsApiResponse {
+  success: boolean;
+  albums: MusicAlbumItem[];
+}

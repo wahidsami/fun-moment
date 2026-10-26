@@ -376,6 +376,8 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         Route::get('/catalog', [\App\Http\Controllers\Api\MusicCatalogController::class, 'index'])->name('api.v1.music.catalog.index');
         Route::get('/catalog/latest-releases', [\App\Http\Controllers\Api\MusicCatalogController::class, 'latestReleases'])->name('api.v1.music.catalog.latest-releases');
         Route::get('/catalog/tracks/{id}', [\App\Http\Controllers\Api\MusicCatalogController::class, 'show'])->name('api.v1.music.catalog.show');
+        Route::get('/catalog/albums', [\App\Http\Controllers\Api\MusicCatalogController::class, 'albums'])->name('api.v1.music.catalog.albums');
+        Route::get('/catalog/albums/{id}', [\App\Http\Controllers\Api\MusicCatalogController::class, 'albumDetail'])->name('api.v1.music.catalog.album-detail');
 
         // Phase 4: Playback Analytics Ingestion
         Route::post('/analytics/playback-event', [\App\Http\Controllers\Api\MusicAnalyticsController::class, 'recordPlaybackEvent'])->name('api.v1.music.analytics.playback-event');

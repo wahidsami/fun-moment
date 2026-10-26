@@ -23,6 +23,10 @@ import {
   MusicSettingsApiResponse,
   MusicModerationTrackItem,
   MusicModerationApiResponse,
+  MusicAlbumItem,
+  MusicLibraryTrackItem,
+  MusicLibraryApiResponse,
+  MusicAlbumsApiResponse,
 } from './types';
 
 export interface DashboardSettings {
@@ -1134,6 +1138,319 @@ export const LaravelAPI = {
         if (errJson?.message_en) {
           errMsg = errJson.message_en;
         }
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  // First-Party Music Library (FUN MOMENT Originals)
+  async getMusicGenres(): Promise<{ success: boolean; genres: Array<{ id: number; name_en: string; name_ar: string; slug: string }> }> {
+    const response = await fetch('/admin-home/music-library-json/genres', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      return { success: false, genres: [] };
+    }
+    return response.json();
+  },
+
+  async getMusicLibraryTracks(params: {
+    status?: string;
+    media_status?: string;
+    search?: string;
+    page?: number;
+    per_page?: number;
+  } = {}): Promise<MusicLibraryApiResponse> {
+    const query = new URLSearchParams();
+    if (params.status && params.status !== 'all') query.set('status', params.status);
+    if (params.media_status && params.media_status !== 'all') query.set('media_status', params.media_status);
+    if (params.search) query.set('search', params.search);
+    if (params.page) query.set('page', String(params.page));
+    if (params.per_page) query.set('per_page', String(params.per_page));
+
+    const qs = query.toString();
+    const url = `/admin-home/music-library-json${qs ? `?${qs}` : ''}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load music library (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async getMusicLibraryTrack(id: number): Promise<{ success: boolean; track: MusicLibraryTrackItem; stream_ticket?: any; stream_url?: string }> {
+    const response = await fetch(`/admin-home/music-library-json/${id}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load track (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async uploadMusicLibraryTrack(formData: FormData): Promise<{ success: boolean; message_en: string; track: MusicLibraryTrackItem }> {
+    const response = await fetchWithCsrf('/admin-home/music-library-json', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to upload track (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) errMsg = errJson.message_en;
+        else if (errJson?.errors) errMsg = Object.values(errJson.errors).flat().join(', ');
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  async updateMusicLibraryTrack(id: number, data: any): Promise<{ success: boolean; message_en: string; track: MusicLibraryTrackItem }> {
+    const response = await fetchWithCsrf(`/admin-home/music-library-json/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to update track (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) errMsg = errJson.message_en;
+        else if (errJson?.errors) errMsg = Object.values(errJson.errors).flat().join(', ');
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  async publishMusicLibraryTrack(id: number): Promise<{ success: boolean; message_en: string; track: MusicLibraryTrackItem }> {
+    const response = await fetchWithCsrf(`/admin-home/music-library-json/${id}/publish`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to publish track (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) errMsg = errJson.message_en;
+        else if (errJson?.error) errMsg = errJson.error;
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  async unpublishMusicLibraryTrack(id: number): Promise<{ success: boolean; message_en: string; track: MusicLibraryTrackItem }> {
+    const response = await fetchWithCsrf(`/admin-home/music-library-json/${id}/unpublish`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to unpublish track (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) errMsg = errJson.message_en;
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  async deleteMusicLibraryTrack(id: number): Promise<{ success: boolean; message_en: string; action: string }> {
+    const response = await fetchWithCsrf(`/admin-home/music-library-json/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to delete track (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) errMsg = errJson.message_en;
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  // First-Party Albums Management
+  async getMusicAlbums(params: { search?: string; status?: string } = {}): Promise<MusicAlbumsApiResponse> {
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.status && params.status !== 'all') query.set('status', params.status);
+
+    const qs = query.toString();
+    const url = `/admin-home/music-albums-json${qs ? `?${qs}` : ''}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load music albums (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async getMusicAlbum(id: number): Promise<{ success: boolean; album: MusicAlbumItem }> {
+    const response = await fetch(`/admin-home/music-albums-json/${id}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load album (${response.status})`);
+    }
+
+    return response.json();
+  },
+
+  async createMusicAlbum(data: any): Promise<{ success: boolean; message_en: string; album: MusicAlbumItem }> {
+    const isFormData = data instanceof FormData;
+    const headers: Record<string, string> = { 'Accept': 'application/json' };
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    const response = await fetchWithCsrf('/admin-home/music-albums-json', {
+      method: 'POST',
+      headers,
+      body: isFormData ? data : JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to create album (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) errMsg = errJson.message_en;
+        else if (errJson?.errors) errMsg = Object.values(errJson.errors).flat().join(', ');
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  async updateMusicAlbum(id: number, data: any): Promise<{ success: boolean; message_en: string; album: MusicAlbumItem }> {
+    const response = await fetchWithCsrf(`/admin-home/music-albums-json/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to update album (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) errMsg = errJson.message_en;
+        else if (errJson?.errors) errMsg = Object.values(errJson.errors).flat().join(', ');
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  async publishMusicAlbum(id: number): Promise<{ success: boolean; message_en: string; album: MusicAlbumItem }> {
+    const response = await fetchWithCsrf(`/admin-home/music-albums-json/${id}/publish`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to publish album (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) errMsg = errJson.message_en;
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  async reorderAlbumTracks(albumId: number, tracks: { id: number; track_number: number }[]): Promise<{ success: boolean; message_en: string }> {
+    const response = await fetchWithCsrf(`/admin-home/music-albums-json/${albumId}/reorder-tracks`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ tracks }),
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to reorder tracks (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) errMsg = errJson.message_en;
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    return response.json();
+  },
+
+  async deleteMusicAlbum(id: number): Promise<{ success: boolean; message_en: string }> {
+    const response = await fetchWithCsrf(`/admin-home/music-albums-json/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      let errMsg = `Failed to delete album (${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message_en) errMsg = errJson.message_en;
       } catch {}
       throw new Error(errMsg);
     }

@@ -372,24 +372,66 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        if (track.genres.isNotEmpty)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 6),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: FMColors.cyan.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(FMRadii.sm),
-                              border: Border.all(color: FMColors.cyan.withOpacity(0.4)),
-                            ),
-                            child: Text(
-                              track.genres.first.name,
-                              style: const TextStyle(
-                                color: FMColors.cyan,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            if (track.isFirstParty)
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: FMColors.warning.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(FMRadii.sm),
+                                  border: Border.all(color: FMColors.warning.withOpacity(0.4)),
+                                ),
+                                child: Text(
+                                  track.displayBadge(isArabic),
+                                  style: const TextStyle(
+                                    color: FMColors.warning,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
+                            if (track.isRemix)
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(FMRadii.sm),
+                                  border: Border.all(color: Colors.purple.withOpacity(0.4)),
+                                ),
+                                child: Text(
+                                  isArabic ? 'ريمكس' : 'Remix',
+                                  style: const TextStyle(
+                                    color: Colors.purpleAccent,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            if (track.genres.isNotEmpty)
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: FMColors.cyan.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(FMRadii.sm),
+                                  border: Border.all(color: FMColors.cyan.withOpacity(0.4)),
+                                ),
+                                child: Text(
+                                  track.genres.first.name,
+                                  style: const TextStyle(
+                                    color: FMColors.cyan,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                         Text(
                           track.displayTitle(isArabic),
                           maxLines: 1,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\MusicAlbum;
 use App\MusicFavorite;
 use App\MusicOffer;
 use App\MusicSetting;
@@ -72,6 +73,8 @@ class MusicCatalogController extends Controller
             ->with([
                 'genre:id,name_en,name_ar,slug,icon',
                 'secondaryGenres:id,name_en,name_ar,slug',
+                'album:id,title_en,title_ar,artist_name,cover_image',
+                'originalTrack:id,title_en,title_ar,artist_name',
                 'offers' => function ($q) {
                     $q->where('is_active', true)
                       ->select(['id', 'track_id', 'offer_type', 'price', 'currency', 'rental_duration_days', 'license_type']);
@@ -190,6 +193,8 @@ class MusicCatalogController extends Controller
             ->with([
                 'genre:id,name_en,name_ar,slug,icon',
                 'secondaryGenres:id,name_en,name_ar,slug',
+                'album:id,title_en,title_ar,artist_name,cover_image',
+                'originalTrack:id,title_en,title_ar,artist_name',
                 'offers' => fn($q) => $q->where('is_active', true),
                 'seller:id,name,username,image',
             ])
@@ -234,6 +239,8 @@ class MusicCatalogController extends Controller
             ->with([
                 'genre:id,name_en,name_ar,slug,icon',
                 'secondaryGenres:id,name_en,name_ar,slug',
+                'album:id,title_en,title_ar,artist_name,cover_image',
+                'originalTrack:id,title_en,title_ar,artist_name',
                 'offers' => fn($q) => $q->where('is_active', true),
                 'seller:id,name,username,image',
             ])
@@ -321,6 +328,24 @@ class MusicCatalogController extends Controller
                 'username' => $track->seller->username,
                 'image_url' => $track->seller->image ? url('storage/' . ltrim($track->seller->image, '/')) : null,
             ] : null,
+            'is_first_party' => $track->isOwnedByAdmin(),
+            'owner_type' => $track->owner_type,
+            'badge' => $track->isOwnedByAdmin() ? 'FUN MOMENT Original' : null,
+            'badge_ar' => $track->isOwnedByAdmin() ? 'أصلي من FUN MOMENT' : null,
+            'album' => $track->album ? [
+                'id' => $track->album->id,
+                'title_en' => $track->album->title_en,
+                'title_ar' => $track->album->title_ar ?: $track->album->title_en,
+                'artist_name' => $track->album->artist_name,
+                'cover_image_url' => $track->album->cover_image_url,
+                'track_number' => $track->track_number,
+            ] : null,
+            'original_track' => $track->originalTrack ? [
+                'id' => $track->originalTrack->id,
+                'title_en' => $track->originalTrack->title_en,
+                'title_ar' => $track->originalTrack->title_ar ?: $track->originalTrack->title_en,
+                'artist_name' => $track->originalTrack->artist_name,
+            ] : null,
         ];
 
         if ($fullDetails) {
@@ -332,5 +357,79 @@ class MusicCatalogController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * Browse published albums.
+     */
+    public function albums(Request $request): JsonResponse
+    {
+        if (!MusicSetting::isMarketplaceEnabled()) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'MARKETPLACE_DISABLED',
+                'message' => 'Music marketplace is currently disabled.',
+                'data' => [],
+            ], 403);
+        }
+
+        $query = MusicAlbum::query()
+            ->published()
+            ->with(['genre:id,name_en,name_ar,slug', 'tracks' => fn($q) => $q->published()->mediaReady()->orderBy('track_number', 'asc')])
+            ->withCount(['tracks' => fn($q) => $q->published()->mediaReady()]);
+
+        if ($request->filled('genre_id')) {
+            $query->where('genre_id', (int) $request->input('genre_id'));
+        }
+
+        $perPage = min(50, max(1, (int) $request->input('per_page', 15)));
+        $paginated = $query->orderBy('released_at', 'desc')->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'current_page' => $paginated->currentPage(),
+                'data' => $paginated->items(),
+                'per_page' => $paginated->perPage(),
+                'total' => $paginated->total(),
+                'last_page' => $paginated->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
+     * View album details and track list.
+     */
+    public function albumDetail(Request $request, int $id): JsonResponse
+    {
+        if (!MusicSetting::isMarketplaceEnabled()) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'MARKETPLACE_DISABLED',
+                'message' => 'Music marketplace is currently disabled.',
+            ], 403);
+        }
+
+        $album = MusicAlbum::query()
+            ->published()
+            ->with([
+                'genre:id,name_en,name_ar,slug',
+                'tracks' => function ($q) {
+                    $q->published()->mediaReady()->orderBy('track_number', 'asc')->with(['genre', 'offers']);
+                },
+            ])
+            ->find($id);
+
+        if (!$album) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Album not found or not published.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $album,
+        ]);
     }
 }

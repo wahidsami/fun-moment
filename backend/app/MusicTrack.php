@@ -76,6 +76,9 @@ class MusicTrack extends Model
         'rejection_reason',
         'reviewed_by_admin_id',
         'reviewed_at',
+        'album_id',
+        'track_number',
+        'original_track_id',
         'is_featured',
         'featured_order',
         'play_count',
@@ -83,6 +86,9 @@ class MusicTrack extends Model
     ];
 
     protected $casts = [
+        'album_id' => 'integer',
+        'track_number' => 'integer',
+        'original_track_id' => 'integer',
         'rights_agreement_accepted' => 'boolean',
         'is_featured' => 'boolean',
         'duration_seconds' => 'integer',
@@ -198,6 +204,21 @@ class MusicTrack extends Model
         return $this->belongsTo(Admin::class, 'reviewed_by_admin_id', 'id');
     }
 
+    public function album(): BelongsTo
+    {
+        return $this->belongsTo(MusicAlbum::class, 'album_id', 'id');
+    }
+
+    public function originalTrack(): BelongsTo
+    {
+        return $this->belongsTo(MusicTrack::class, 'original_track_id', 'id');
+    }
+
+    public function remixes(): HasMany
+    {
+        return $this->hasMany(MusicTrack::class, 'original_track_id', 'id');
+    }
+
     public function offers(): HasMany
     {
         return $this->hasMany(MusicOffer::class, 'track_id', 'id');
@@ -285,6 +306,16 @@ class MusicTrack extends Model
     public function isOwnedByAdmin(): bool
     {
         return $this->owner_type === self::OWNER_TYPE_ADMIN;
+    }
+
+    public function isFirstParty(): bool
+    {
+        return $this->isOwnedByAdmin();
+    }
+
+    public function isRemix(): bool
+    {
+        return $this->rights_declaration_type === self::RIGHTS_REMIX || !empty($this->original_track_id);
     }
 
     public function isApproved(): bool

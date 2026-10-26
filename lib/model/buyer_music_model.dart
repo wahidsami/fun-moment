@@ -92,6 +92,66 @@ class CatalogSellerModel {
   }
 }
 
+class CatalogAlbumModel {
+  final int id;
+  final String title;
+  final String titleEn;
+  final String titleAr;
+  final String? artistName;
+  final String? coverImageUrl;
+  final int tracksCount;
+
+  CatalogAlbumModel({
+    required this.id,
+    required this.title,
+    required this.titleEn,
+    required this.titleAr,
+    this.artistName,
+    this.coverImageUrl,
+    this.tracksCount = 0,
+  });
+
+  factory CatalogAlbumModel.fromJson(Map<String, dynamic> json) {
+    return CatalogAlbumModel(
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      title: json['title']?.toString() ?? json['title_en']?.toString() ?? '',
+      titleEn: json['title_en']?.toString() ?? '',
+      titleAr: json['title_ar']?.toString() ?? '',
+      artistName: json['artist_name']?.toString(),
+      coverImageUrl: json['cover_image_url']?.toString(),
+      tracksCount: json['tracks_count'] is int
+          ? json['tracks_count']
+          : int.tryParse(json['tracks_count']?.toString() ?? '0') ?? 0,
+    );
+  }
+}
+
+class CatalogOriginalTrackModel {
+  final int id;
+  final String title;
+  final String titleEn;
+  final String titleAr;
+  final String artistName;
+
+  CatalogOriginalTrackModel({
+    required this.id,
+    required this.title,
+    required this.titleEn,
+    required this.titleAr,
+    required this.artistName,
+  });
+
+  factory CatalogOriginalTrackModel.fromJson(Map<String, dynamic> json) {
+    return CatalogOriginalTrackModel(
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      title: json['title']?.toString() ?? json['title_en']?.toString() ?? '',
+      titleEn: json['title_en']?.toString() ?? '',
+      titleAr: json['title_ar']?.toString() ?? '',
+      artistName: json['artist_name']?.toString() ?? '',
+    );
+  }
+}
+
 class CatalogTrackModel {
   final int id;
   final String titleEn;
@@ -112,6 +172,11 @@ class CatalogTrackModel {
   final String? rightsDeclaration;
   final CatalogSellerModel? seller;
   final String? releasedAt;
+  final bool isFirstParty;
+  final String? badge;
+  final CatalogAlbumModel? album;
+  final int? trackNumber;
+  final CatalogOriginalTrackModel? originalTrack;
 
   CatalogTrackModel({
     required this.id,
@@ -133,6 +198,11 @@ class CatalogTrackModel {
     this.rightsDeclaration,
     this.seller,
     this.releasedAt,
+    this.isFirstParty = false,
+    this.badge,
+    this.album,
+    this.trackNumber,
+    this.originalTrack,
   });
 
   factory CatalogTrackModel.fromJson(Map<String, dynamic> json) {
@@ -165,6 +235,18 @@ class CatalogTrackModel {
       sellerInfo = CatalogSellerModel.fromJson(json['seller']);
     }
 
+    final isFirstParty = json['is_first_party'] == true || json['owner_type'] == 'admin';
+    final badge = json['badge']?.toString() ?? (isFirstParty ? 'FUN MOMENT Original' : null);
+    final album = json['album'] is Map<String, dynamic>
+        ? CatalogAlbumModel.fromJson(json['album'])
+        : null;
+    final trackNumber = json['track_number'] != null
+        ? int.tryParse(json['track_number'].toString())
+        : null;
+    final originalTrack = json['original_track'] is Map<String, dynamic>
+        ? CatalogOriginalTrackModel.fromJson(json['original_track'])
+        : null;
+
     return CatalogTrackModel(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       titleEn: json['title_en']?.toString() ?? '',
@@ -191,6 +273,11 @@ class CatalogTrackModel {
       rightsDeclaration: json['rights_declaration']?.toString(),
       seller: sellerInfo,
       releasedAt: json['released_at']?.toString(),
+      isFirstParty: isFirstParty,
+      badge: badge,
+      album: album,
+      trackNumber: trackNumber,
+      originalTrack: originalTrack,
     );
   }
 
@@ -237,7 +324,22 @@ class CatalogTrackModel {
     return list.isNotEmpty ? list.first : null;
   }
 
-  CatalogTrackModel copyWith({bool? isFavorite, int? playCount}) {
+  bool get isRemix => originalTrack != null;
+
+  String displayBadge(bool isRtl) {
+    if (!isFirstParty) return '';
+    return isRtl ? 'أصلي من FUN MOMENT' : 'FUN MOMENT Original';
+  }
+
+  CatalogTrackModel copyWith({
+    bool? isFavorite,
+    int? playCount,
+    bool? isFirstParty,
+    String? badge,
+    CatalogAlbumModel? album,
+    int? trackNumber,
+    CatalogOriginalTrackModel? originalTrack,
+  }) {
     return CatalogTrackModel(
       id: id,
       titleEn: titleEn,
@@ -258,6 +360,11 @@ class CatalogTrackModel {
       rightsDeclaration: rightsDeclaration,
       seller: seller,
       releasedAt: releasedAt,
+      isFirstParty: isFirstParty ?? this.isFirstParty,
+      badge: badge ?? this.badge,
+      album: album ?? this.album,
+      trackNumber: trackNumber ?? this.trackNumber,
+      originalTrack: originalTrack ?? this.originalTrack,
     );
   }
 }

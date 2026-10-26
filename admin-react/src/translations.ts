@@ -59,6 +59,7 @@ export const translations: Record<Language, Record<string, string>> = {
     nav_monetization_section: "Monetization",
     nav_music_settings: "Music Marketplace",
     nav_music_moderation: "Music Submissions",
+    nav_music_library: "Music Originals & Albums",
 
     // Music Marketplace Settings
     music_settings_title: "Music Marketplace Settings",
@@ -379,6 +380,7 @@ export const translations: Record<Language, Record<string, string>> = {
     nav_monetization_section: "تحقيق الدخل",
     nav_music_settings: "سوق الموسيقى",
     nav_music_moderation: "مراجعات الموسيقى",
+    nav_music_library: "الموسيقى الأصلية والألبومات",
 
     // Music Marketplace Settings
     music_settings_title: "إعدادات سوق الموسيقى والبث",

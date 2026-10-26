@@ -32,6 +32,22 @@ Route::middleware(['setlang'])->group(function(){
     Route::get('/music-orders-json/{id}', 'AdminMusicOrderController@show')->name('admin.music.orders.json.show');
     Route::post('/music-orders-json/{id}/refund', 'AdminMusicOrderController@refund')->name('admin.music.orders.json.refund');
     Route::post('/music-orders-json/refund-attempts/{attemptId}/reconcile', 'AdminMusicOrderController@reconcileAttempt')->name('admin.music.orders.json.reconcile');
+    // First-Party Music Library & FUN MOMENT Originals
+    Route::get('/music-library-json', 'AdminMusicLibraryController@index')->name('admin.music.library.json');
+    Route::post('/music-library-json', 'AdminMusicLibraryController@store')->name('admin.music.library.json.store');
+    Route::get('/music-library-json/{id}', 'AdminMusicLibraryController@show')->name('admin.music.library.json.show');
+    Route::post('/music-library-json/{id}', 'AdminMusicLibraryController@update')->name('admin.music.library.json.update');
+    Route::post('/music-library-json/{id}/publish', 'AdminMusicLibraryController@publish')->name('admin.music.library.json.publish');
+    Route::post('/music-library-json/{id}/unpublish', 'AdminMusicLibraryController@unpublish')->name('admin.music.library.json.unpublish');
+    Route::post('/music-library-json/{id}/delete', 'AdminMusicLibraryController@destroy')->name('admin.music.library.json.delete');
+    // First-Party Music Albums Management
+    Route::get('/music-albums-json', 'AdminMusicAlbumController@index')->name('admin.music.albums.json');
+    Route::post('/music-albums-json', 'AdminMusicAlbumController@store')->name('admin.music.albums.json.store');
+    Route::get('/music-albums-json/{id}', 'AdminMusicAlbumController@show')->name('admin.music.albums.json.show');
+    Route::post('/music-albums-json/{id}', 'AdminMusicAlbumController@update')->name('admin.music.albums.json.update');
+    Route::post('/music-albums-json/{id}/publish', 'AdminMusicAlbumController@publish')->name('admin.music.albums.json.publish');
+    Route::post('/music-albums-json/{id}/reorder-tracks', 'AdminMusicAlbumController@reorderTracks')->name('admin.music.albums.json.reorder');
+    Route::post('/music-albums-json/{id}/delete', 'AdminMusicAlbumController@destroy')->name('admin.music.albums.json.delete');
     Route::get('/dark-mode-toggle', 'AdminDashboardController@dark_mode_toggle')->name('admin.dark.mode.toggle');
     Route::get('/feature-flags', 'AdminFeatureFlagController@index')->name('admin.feature.flags');
     Route::post('/feature-flags/{module}', 'AdminFeatureFlagController@update')->name('admin.feature.flags.update');
