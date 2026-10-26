@@ -994,7 +994,7 @@ export const LaravelAPI = {
   },
 
   async saveMusicSettings(settings: Partial<MusicMarketplaceSettings>): Promise<MusicSettingsApiResponse> {
-    const response = await fetch('/admin-home/music-settings-json', {
+    const response = await fetchWithCsrf('/admin-home/music-settings-json', {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
