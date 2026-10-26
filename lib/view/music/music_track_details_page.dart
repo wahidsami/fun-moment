@@ -716,158 +716,172 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
             const SizedBox(height: 16),
 
             // Playback Controls Row: Shuffle · Previous · Play/Pause · Next · Repeat
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // 1. Shuffle
-                  IconButton(
-                    iconSize: 26,
-                    padding: const EdgeInsets.all(8),
-                    tooltip: isArabic ? 'تشغيل عشوائي' : 'Shuffle',
-                    icon: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.shuffle_rounded,
-                          color: player.isShuffle ? FMColors.cyan : Colors.white38,
-                          size: 24,
-                        ),
-                        const SizedBox(height: 2),
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: player.isShuffle ? FMColors.cyan : Colors.transparent,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ),
-                    onPressed: () => player.toggleShuffle(),
+            // Note: In Arabic RTL, Row lays out children from right to left.
+            // To ensure Previous is always on the visual left of Play/Pause and Next is on the visual right:
+            // - In LTR (English): [Shuffle, Previous, Play/Pause, Next, Repeat]
+            // - In RTL (Arabic): [Shuffle, Next, Play/Pause, Previous, Repeat]
+            Builder(
+              builder: (context) {
+                final Widget prevButton = IconButton(
+                  iconSize: 38,
+                  padding: const EdgeInsets.all(4),
+                  tooltip: isArabic ? 'السابق' : 'Previous',
+                  icon: Icon(
+                    Icons.skip_previous_rounded,
+                    color: player.hasPrevious ? Colors.white : Colors.white24,
+                    size: 38,
                   ),
+                  onPressed: player.hasPrevious
+                      ? () {
+                          _isFollowingPlayer = true;
+                          player.playPrevious();
+                        }
+                      : null,
+                );
 
-                  // 2. Previous
-                  IconButton(
-                    iconSize: 38,
-                    padding: const EdgeInsets.all(4),
-                    tooltip: isArabic ? 'السابق' : 'Previous',
-                    icon: Icon(
-                      Icons.skip_previous_rounded,
-                      color: player.hasPrevious ? Colors.white : Colors.white24,
-                      size: 38,
-                    ),
-                    onPressed: player.hasPrevious
-                        ? () {
-                            _isFollowingPlayer = true;
-                            player.playPrevious();
-                          }
-                        : null,
+                final Widget nextButton = IconButton(
+                  iconSize: 38,
+                  padding: const EdgeInsets.all(4),
+                  tooltip: isArabic ? 'التالي' : 'Next',
+                  icon: Icon(
+                    Icons.skip_next_rounded,
+                    color: player.hasNext ? Colors.white : Colors.white24,
+                    size: 38,
                   ),
+                  onPressed: player.hasNext
+                      ? () {
+                          _isFollowingPlayer = true;
+                          player.playNext();
+                        }
+                      : null,
+                );
 
-                  // 3. Play / Pause (Hero control)
-                  GestureDetector(
-                    onTap: () {
-                      _isFollowingPlayer = true;
-                      if (isThisTrackActive) {
-                        player.togglePlayPause();
-                      } else {
-                        player.playTrack(_track);
-                      }
-                    },
-                    child: Container(
-                      width: 68,
-                      height: 68,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: FMGradients.funGradient,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0x66FF4FB3),
-                            blurRadius: 18,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: (isThisTrackActive && (player.isLoadingTicket || player.isBuffering))
-                            ? const SizedBox(
-                                width: 28,
-                                height: 28,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 3,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : Icon(
-                                (isThisTrackActive && player.isPlaying)
-                                    ? Icons.pause_rounded
-                                    : Icons.play_arrow_rounded,
-                                color: Colors.white,
-                                size: 40,
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // 1. Shuffle
+                      IconButton(
+                        iconSize: 26,
+                        padding: const EdgeInsets.all(8),
+                        tooltip: isArabic ? 'تشغيل عشوائي' : 'Shuffle',
+                        icon: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.shuffle_rounded,
+                              color: player.isShuffle ? FMColors.cyan : Colors.white38,
+                              size: 24,
+                            ),
+                            const SizedBox(height: 2),
+                            Container(
+                              width: 4,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: player.isShuffle ? FMColors.cyan : Colors.transparent,
+                                shape: BoxShape.circle,
                               ),
-                      ),
-                    ),
-                  ),
-
-                  // 4. Next
-                  IconButton(
-                    iconSize: 38,
-                    padding: const EdgeInsets.all(4),
-                    tooltip: isArabic ? 'التالي' : 'Next',
-                    icon: Icon(
-                      Icons.skip_next_rounded,
-                      color: player.hasNext ? Colors.white : Colors.white24,
-                      size: 38,
-                    ),
-                    onPressed: player.hasNext
-                        ? () {
-                            _isFollowingPlayer = true;
-                            player.playNext();
-                          }
-                        : null,
-                  ),
-
-                  // 5. Repeat Mode
-                  IconButton(
-                    iconSize: 26,
-                    padding: const EdgeInsets.all(8),
-                    tooltip: player.repeatMode == RepeatMode.off
-                        ? (isArabic ? 'تكرار: متوقف' : 'Repeat: Off')
-                        : (player.repeatMode == RepeatMode.all
-                            ? (isArabic ? 'تكرار: الكل' : 'Repeat: All')
-                            : (isArabic ? 'تكرار: مسار واحد' : 'Repeat: One')),
-                    icon: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          player.repeatMode == RepeatMode.one
-                              ? Icons.repeat_one_rounded
-                              : Icons.repeat_rounded,
-                          color: player.repeatMode == RepeatMode.off
-                              ? Colors.white38
-                              : (player.repeatMode == RepeatMode.one ? FMColors.magenta : FMColors.cyan),
-                          size: 24,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: player.repeatMode == RepeatMode.off
-                                ? Colors.transparent
-                                : (player.repeatMode == RepeatMode.one ? FMColors.magenta : FMColors.cyan),
+                        onPressed: () => player.toggleShuffle(),
+                      ),
+
+                      // In LTR: Previous is to the left of Play/Pause
+                      // In RTL: The 2nd child in Row is placed to the visual RIGHT of Play/Pause, so we place Next here in Arabic
+                      isArabic ? nextButton : prevButton,
+
+                      // Center: Play / Pause (Hero control)
+                      GestureDetector(
+                        onTap: () {
+                          _isFollowingPlayer = true;
+                          if (isThisTrackActive) {
+                            player.togglePlayPause();
+                          } else {
+                            player.playTrack(_track);
+                          }
+                        },
+                        child: Container(
+                          width: 68,
+                          height: 68,
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
+                            gradient: FMGradients.funGradient,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Color(0x66FF4FB3),
+                                blurRadius: 18,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: (isThisTrackActive && (player.isLoadingTicket || player.isBuffering))
+                                ? const SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 3,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : Icon(
+                                    (isThisTrackActive && player.isPlaying)
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
+                                    color: Colors.white,
+                                    size: 40,
+                                  ),
                           ),
                         ),
-                      ],
-                    ),
-                    onPressed: () => player.toggleRepeatMode(),
+                      ),
+
+                      // In LTR: Next is to the right of Play/Pause
+                      // In RTL: The 4th child in Row is placed to the visual LEFT of Play/Pause, so we place Previous here in Arabic
+                      isArabic ? prevButton : nextButton,
+
+                      // 5. Repeat Mode
+                      IconButton(
+                        iconSize: 26,
+                        padding: const EdgeInsets.all(8),
+                        tooltip: player.repeatMode == RepeatMode.off
+                            ? (isArabic ? 'تكرار: متوقف' : 'Repeat: Off')
+                            : (player.repeatMode == RepeatMode.all
+                                ? (isArabic ? 'تكرار: الكل' : 'Repeat: All')
+                                : (isArabic ? 'تكرار: مسار واحد' : 'Repeat: One')),
+                        icon: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              player.repeatMode == RepeatMode.one
+                                  ? Icons.repeat_one_rounded
+                                  : Icons.repeat_rounded,
+                              color: player.repeatMode == RepeatMode.off
+                                  ? Colors.white38
+                                  : (player.repeatMode == RepeatMode.one ? FMColors.magenta : FMColors.cyan),
+                              size: 24,
+                            ),
+                            const SizedBox(height: 2),
+                            Container(
+                              width: 4,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: player.repeatMode == RepeatMode.off
+                                    ? Colors.transparent
+                                    : (player.repeatMode == RepeatMode.one ? FMColors.magenta : FMColors.cyan),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ),
+                        onPressed: () => player.toggleRepeatMode(),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
 
             const SizedBox(height: 14),
