@@ -743,7 +743,7 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
                             border: Border.all(color: FMColors.border),
                           ),
                           child: Text(
-                            g.name,
+                            g.displayName(isArabic),
                             style: const TextStyle(
                               color: FMColors.textSecondary,
                               fontSize: 12,

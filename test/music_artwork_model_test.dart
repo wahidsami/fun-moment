@@ -139,5 +139,95 @@ void main() {
       expect(copiedNew.coverImageUrl, 'https://staging-api.funmoments.unifinitylab.com/storage/art2.png');
       expect(copiedNew.coverArtUrl, 'https://staging-api.funmoments.unifinitylab.com/storage/art2.png');
     });
+
+    test('8. Staging API genre JSON with name_en/name_ar parses correctly and displays localized names', () {
+      final json = {
+        'id': 1,
+        'name_en': 'House',
+        'name_ar': 'هاوس',
+        'slug': 'house',
+        'sort_order': 1,
+        'icon': 'disc',
+      };
+
+      final genre = CatalogGenreModel.fromJson(json);
+
+      expect(genre.id, 1);
+      expect(genre.nameEn, 'House');
+      expect(genre.nameAr, 'هاوس');
+      expect(genre.slug, 'house');
+      expect(genre.icon, 'disc');
+      expect(genre.sortOrder, 1);
+
+      // Verify display names
+      expect(genre.displayName(false), 'House');
+      expect(genre.displayName(true), 'هاوس');
+      expect(genre.name, 'House'); // backward compatibility getter
+    });
+
+    test('9. Track JSON with primary_genre and secondary_genres parses genres correctly', () {
+      final json = {
+        'id': 3,
+        'title_en': 'Doctor',
+        'title_ar': 'دكتور',
+        'artist_name': 'FUN MOMENT Originals',
+        'cover_image_url': 'https://staging-api.funmoments.unifinitylab.com/storage/music_covers/cover_bd93aef1-fa44-4988-9c84-379f24380249.png',
+        'duration_seconds': 167,
+        'preview_duration_seconds': 20,
+        'stream_ticket_url': 'https://staging-api.funmoments.unifinitylab.com/api/v1/music/tracks/3/stream-ticket',
+        'primary_genre': {
+          'id': 1,
+          'name_en': 'House',
+          'name_ar': 'هاوس',
+          'slug': 'house',
+        },
+        'secondary_genres': [
+          {
+            'id': 2,
+            'name_en': 'Techno',
+            'name_ar': 'تكنو',
+            'slug': 'techno',
+          },
+        ],
+      };
+
+      final track = CatalogTrackModel.fromJson(json);
+
+      expect(track.primaryGenre, isNotNull);
+      expect(track.primaryGenre!.displayName(false), 'House');
+      expect(track.primaryGenre!.displayName(true), 'هاوس');
+      expect(track.genres.length, 2);
+      expect(track.genres[0].displayName(false), 'House');
+      expect(track.genres[0].displayName(true), 'هاوس');
+      expect(track.genres[1].displayName(false), 'Techno');
+      expect(track.genres[1].displayName(true), 'تكنو');
+    });
+
+    test('10. Genre fallback: missing translation falls back cleanly', () {
+      final englishOnly = CatalogGenreModel.fromJson({
+        'id': 10,
+        'name_en': 'Ambient',
+        'name_ar': '',
+        'slug': 'ambient',
+      });
+      expect(englishOnly.displayName(true), 'Ambient');
+      expect(englishOnly.displayName(false), 'Ambient');
+
+      final arabicOnly = CatalogGenreModel.fromJson({
+        'id': 11,
+        'name_en': '',
+        'name_ar': 'شعبي',
+        'slug': 'shaabi',
+      });
+      expect(arabicOnly.displayName(false), 'شعبي');
+      expect(arabicOnly.displayName(true), 'شعبي');
+
+      final slugOnly = CatalogGenreModel.fromJson({
+        'id': 12,
+        'slug': 'electronic',
+      });
+      expect(slugOnly.displayName(false), 'electronic');
+      expect(slugOnly.displayName(true), 'electronic');
+    });
   });
 }

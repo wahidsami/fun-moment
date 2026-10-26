@@ -1,13 +1,15 @@
 import 'dart:math';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 
 /// Reusable cover artwork widget for music tracks and albums across the FUN MOMENT app.
 ///
 /// Features:
-/// - Absolute and resolved HTTPS/HTTP image loading via Image.network.
+/// - Absolute and resolved HTTPS/HTTP image loading via CachedNetworkImage with bounded memory caching and disk cache.
 /// - Graceful loading indicator and placeholder state.
 /// - Fallback to music-note icon on error or missing/invalid URL.
+/// - Diagnostic logging on image loading failure.
 /// - Configurable dimensions, border radius, styling, and decorations.
 class MusicArtworkWidget extends StatelessWidget {
   final String? imageUrl;
@@ -74,21 +76,30 @@ class MusicArtworkWidget extends StatelessWidget {
     if (!_hasValidUrl) {
       content = _buildPlaceholder();
     } else {
+      final validUrl = imageUrl!.trim();
+      final cacheW = (width != null && width! > 0)
+          ? (width! * 2).toInt().clamp(60, 800)
+          : 600;
+      final cacheH = (height != null && height! > 0)
+          ? (height! * 2).toInt().clamp(60, 800)
+          : 600;
+
       content = ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: Container(
           width: width,
           height: height,
           color: placeholderBackgroundColor ?? FMColors.surfaceElevated,
-          child: Image.network(
-            imageUrl!.trim(),
+          child: CachedNetworkImage(
+            imageUrl: validUrl,
             width: width,
             height: height,
             fit: fit,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) {
-                return child;
-              }
+            memCacheWidth: cacheW,
+            memCacheHeight: cacheH,
+            maxWidthDiskCache: 1200,
+            maxHeightDiskCache: 1200,
+            placeholder: (context, url) {
               if (showLoadingIndicator) {
                 final indicatorSize = width != null && height != null
                     ? min(min(width!, height!) * 0.35, 32.0)
@@ -106,7 +117,8 @@ class MusicArtworkWidget extends StatelessWidget {
               }
               return _buildPlaceholder();
             },
-            errorBuilder: (context, error, stackTrace) {
+            errorWidget: (context, url, error) {
+              debugPrint('[MusicArtworkWidget] Failed to load "$url": $error');
               return _buildPlaceholder();
             },
           ),

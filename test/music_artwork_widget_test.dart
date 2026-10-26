@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:funmoments/model/buyer_music_model.dart';
@@ -58,7 +59,7 @@ void main() {
       expect(find.byType(Image), findsNothing);
     });
 
-    testWidgets('4. Valid HTTPS image URL instantiates Image.network with proper parameters', (tester) async {
+    testWidgets('4. Valid HTTPS image URL instantiates CachedNetworkImage with proper parameters', (tester) async {
       const testUrl = 'https://staging-api.funmoments.unifinitylab.com/storage/music_covers/cover_bd93aef1-fa44-4988-9c84-379f24380249.png';
 
       await tester.pumpWidget(
@@ -76,16 +77,16 @@ void main() {
       );
 
       expect(find.byType(MusicArtworkWidget), findsOneWidget);
-      final imageFinder = find.byType(Image);
-      expect(imageFinder, findsOneWidget);
+      final cachedImageFinder = find.byType(CachedNetworkImage);
+      expect(cachedImageFinder, findsOneWidget);
 
-      final imageWidget = tester.widget<Image>(imageFinder);
-      expect(imageWidget.image, isA<NetworkImage>());
-      final networkImage = imageWidget.image as NetworkImage;
-      expect(networkImage.url, testUrl);
-      expect(imageWidget.fit, BoxFit.cover);
-      expect(imageWidget.width, 110);
-      expect(imageWidget.height, 110);
+      final cachedImage = tester.widget<CachedNetworkImage>(cachedImageFinder);
+      expect(cachedImage.imageUrl, testUrl);
+      expect(cachedImage.fit, BoxFit.cover);
+      expect(cachedImage.width, 110);
+      expect(cachedImage.height, 110);
+      expect(cachedImage.memCacheWidth, 220);
+      expect(cachedImage.memCacheHeight, 220);
     });
 
     testWidgets('5. Custom styling (border, shadow, placeholder colors) is respected', (tester) async {
@@ -145,10 +146,12 @@ void main() {
         ),
       );
 
-      final imageFinder = find.byType(Image);
-      expect(imageFinder, findsOneWidget);
-      final imageWidget = tester.widget<Image>(imageFinder);
-      expect((imageWidget.image as NetworkImage).url, track.coverImageUrl);
+      final cachedImageFinder = find.byType(CachedNetworkImage);
+      expect(cachedImageFinder, findsOneWidget);
+      final cachedImage = tester.widget<CachedNetworkImage>(cachedImageFinder);
+      expect(cachedImage.imageUrl, track.coverImageUrl);
+      expect(cachedImage.width, 52);
+      expect(cachedImage.height, 52);
     });
   });
 }

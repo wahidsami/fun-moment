@@ -3,27 +3,78 @@ import 'package:funmoments/view/utils/others_helper.dart';
 
 class CatalogGenreModel {
   final int id;
-  final String name;
+  final String nameEn;
+  final String nameAr;
   final String slug;
+  final String? icon;
+  final int sortOrder;
 
   CatalogGenreModel({
     required this.id,
-    required this.name,
+    String? name,
+    String? nameEn,
+    String? nameAr,
     required this.slug,
-  });
+    this.icon,
+    this.sortOrder = 0,
+  })  : nameEn = (nameEn != null && nameEn.trim().isNotEmpty)
+            ? nameEn.trim()
+            : ((name != null && name.trim().isNotEmpty) ? name.trim() : ''),
+        nameAr = (nameAr != null && nameAr.trim().isNotEmpty)
+            ? nameAr.trim()
+            : ((name != null && name.trim().isNotEmpty) ? name.trim() : '');
+
+  /// Localized name based on active language, falling back to other language, then slug.
+  String displayName(bool isArabic) {
+    if (isArabic) {
+      if (nameAr.isNotEmpty) return nameAr;
+      if (nameEn.isNotEmpty) return nameEn;
+    } else {
+      if (nameEn.isNotEmpty) return nameEn;
+      if (nameAr.isNotEmpty) return nameAr;
+    }
+    return slug;
+  }
+
+  /// Default getter for backward compatibility or when locale is unknown.
+  String get name {
+    if (nameEn.isNotEmpty) return nameEn;
+    if (nameAr.isNotEmpty) return nameAr;
+    return slug;
+  }
 
   factory CatalogGenreModel.fromJson(Map<String, dynamic> json) {
+    final idVal = json['id'] is int
+        ? json['id'] as int
+        : int.tryParse(json['id']?.toString() ?? '0') ?? 0;
+    final nameVal = json['name']?.toString()?.trim();
+    final nameEnVal = (json['name_en'] ?? json['nameEn'])?.toString()?.trim();
+    final nameArVal = (json['name_ar'] ?? json['nameAr'])?.toString()?.trim();
+    final slugVal = json['slug']?.toString()?.trim() ?? '';
+    final iconVal = json['icon']?.toString()?.trim();
+    final sortVal = json['sort_order'] is int
+        ? json['sort_order'] as int
+        : int.tryParse(json['sort_order']?.toString() ?? '0') ?? 0;
+
     return CatalogGenreModel(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
-      name: json['name']?.toString() ?? '',
-      slug: json['slug']?.toString() ?? '',
+      id: idVal,
+      name: nameVal,
+      nameEn: nameEnVal,
+      nameAr: nameArVal,
+      slug: slugVal,
+      icon: iconVal,
+      sortOrder: sortVal,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    'name_en': nameEn,
+    'name_ar': nameAr,
     'slug': slug,
+    'icon': icon,
+    'sort_order': sortOrder,
   };
 }
 
@@ -241,6 +292,17 @@ class CatalogTrackModel {
           .whereType<Map<String, dynamic>>()
           .map((g) => CatalogGenreModel.fromJson(g))
           .toList();
+    }
+    if (json['secondary_genres'] is List) {
+      final secondary = (json['secondary_genres'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map((g) => CatalogGenreModel.fromJson(g))
+          .toList();
+      for (final s in secondary) {
+        if (!genreList.any((g) => g.id == s.id)) {
+          genreList.add(s);
+        }
+      }
     }
     if (primary != null && !genreList.any((g) => g.id == primary!.id)) {
       genreList.insert(0, primary);

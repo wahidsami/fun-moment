@@ -188,7 +188,7 @@ class _MyMusicFavoritesPageState extends State<MyMusicFavoritesPage> {
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
-                                            track.genres.first.name,
+                                            track.genres.first.displayName(isArabic),
                                             style: const TextStyle(
                                               color: FMColors.textSecondary,
                                               fontSize: 10,

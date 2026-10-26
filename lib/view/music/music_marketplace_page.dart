@@ -409,7 +409,7 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
                                   border: Border.all(color: FMColors.cyan.withOpacity(0.4)),
                                 ),
                                 child: Text(
-                                  track.genres.first.name,
+                                  track.genres.first.displayName(isArabic),
                                   style: const TextStyle(
                                     color: FMColors.cyan,
                                     fontSize: 10,
@@ -514,7 +514,7 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
         itemBuilder: (context, idx) {
           final isAll = idx == 0;
           final isSelected = isAll ? selectedId == null : selectedId == genres[idx - 1].id;
-          final title = isAll ? (isArabic ? 'الكل' : 'All') : genres[idx - 1].name;
+          final title = isAll ? (isArabic ? 'الكل' : 'All') : genres[idx - 1].displayName(isArabic);
 
           return GestureDetector(
             onTap: () {
@@ -777,7 +777,7 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
                     if (track.genres.isNotEmpty) ...[
                       const SizedBox(width: 8),
                       Text(
-                        '•  ${track.genres.first.name}',
+                        '•  ${track.genres.first.displayName(isArabic)}',
                         style: const TextStyle(color: FMColors.textMuted, fontSize: 11),
                       ),
                     ],
