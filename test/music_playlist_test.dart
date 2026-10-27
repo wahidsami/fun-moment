@@ -443,4 +443,118 @@ void main() {
       expect(find.text('New Playlist'), findsOneWidget);
     });
   });
+
+  group('Local Playlist Persistence & Dual-Mode Operations', () {
+    test('MusicPlaylistModel toJson and fromJson roundtrip correctly', () {
+      final track = makeTestTrack(id: 42, titleEn: 'Oasis Sunset', durationSeconds: 210);
+      final original = MusicPlaylistModel(
+        id: 999,
+        name: 'My Chill Mix',
+        description: 'Desert relaxation vibes',
+        coverImageUrl: 'https://example.com/cover.jpg',
+        isPublic: false,
+        tracksCount: 1,
+        totalDurationSeconds: 210,
+        createdAt: '2026-10-27T10:00:00Z',
+        updatedAt: '2026-10-27T10:30:00Z',
+        tracks: [track],
+      );
+
+      final jsonMap = original.toJson();
+      expect(jsonMap['id'], 999);
+      expect(jsonMap['name'], 'My Chill Mix');
+      expect(jsonMap['tracks'], isA<List>());
+      expect((jsonMap['tracks'] as List).length, 1);
+
+      final reconstructed = MusicPlaylistModel.fromJson(jsonMap);
+      expect(reconstructed.id, 999);
+      expect(reconstructed.name, 'My Chill Mix');
+      expect(reconstructed.description, 'Desert relaxation vibes');
+      expect(reconstructed.tracksCount, 1);
+      expect(reconstructed.tracks.length, 1);
+      expect(reconstructed.tracks[0].id, 42);
+      expect(reconstructed.tracks[0].titleEn, 'Oasis Sunset');
+    });
+
+    test('createPlaylist creates and persists playlist locally when token is null or remote fails', () async {
+      SharedPreferences.setMockInitialValues({});
+      final buyerService = BuyerMusicService();
+      buyerService.playlists = [];
+
+      final created = await buyerService.createPlaylist('Offline Vibes', description: 'Saved locally');
+      expect(created, isNotNull);
+      expect(created!.name, 'Offline Vibes');
+      expect(created.description, 'Saved locally');
+      expect(buyerService.playlists.length, 1);
+      expect(buyerService.playlists[0].name, 'Offline Vibes');
+
+      // Verify that a new service instance can restore it via fetchPlaylists
+      final newService = BuyerMusicService();
+      final loaded = await newService.fetchPlaylists();
+      expect(loaded.length, 1);
+      expect(loaded[0].name, 'Offline Vibes');
+    });
+
+    test('addTrackToPlaylist adds track, updates duration, and prevents duplicates locally', () async {
+      SharedPreferences.setMockInitialValues({});
+      final buyerService = BuyerMusicService();
+      buyerService.playlists = [];
+
+      final playlist = await buyerService.createPlaylist('Road Trip Saudi');
+      expect(playlist, isNotNull);
+
+      final testTrack = makeTestTrack(id: 501, titleEn: 'Highway Beat', durationSeconds: 200);
+      buyerService.catalogTracks = [testTrack];
+
+      // Add track
+      final res1 = await buyerService.addTrackToPlaylist(playlist!.id, 501);
+      expect(res1['success'], true);
+      expect(buyerService.playlists[0].tracksCount, 1);
+      expect(buyerService.playlists[0].totalDurationSeconds, 200);
+      expect(buyerService.playlists[0].tracks.length, 1);
+
+      // Duplicate add should be rejected
+      final res2 = await buyerService.addTrackToPlaylist(playlist.id, 501);
+      expect(res2['success'], false);
+      expect(buyerService.playlists[0].tracksCount, 1);
+    });
+
+    test('removeTrackFromPlaylist removes track and updates counts', () async {
+      SharedPreferences.setMockInitialValues({});
+      final buyerService = BuyerMusicService();
+      buyerService.playlists = [];
+
+      final playlist = await buyerService.createPlaylist('Favorites Collection');
+      final testTrack = makeTestTrack(id: 601, durationSeconds: 150);
+      buyerService.catalogTracks = [testTrack];
+      await buyerService.addTrackToPlaylist(playlist!.id, 601);
+      expect(buyerService.playlists[0].tracksCount, 1);
+
+      final removed = await buyerService.removeTrackFromPlaylist(playlist.id, 601);
+      expect(removed, true);
+      expect(buyerService.playlists[0].tracksCount, 0);
+      expect(buyerService.playlists[0].tracks.isEmpty, true);
+    });
+
+    test('fetchPlaylistsForTrack accurately computes containsTrack in local mode', () async {
+      SharedPreferences.setMockInitialValues({});
+      final buyerService = BuyerMusicService();
+      buyerService.playlists = [];
+
+      final playlist1 = await buyerService.createPlaylist('Rock');
+      final playlist2 = await buyerService.createPlaylist('Jazz');
+
+      final track1 = makeTestTrack(id: 701);
+      buyerService.catalogTracks = [track1];
+      await buyerService.addTrackToPlaylist(playlist1!.id, 701);
+
+      final results = await buyerService.fetchPlaylistsForTrack(701);
+      expect(results.length, 2);
+
+      final rock = results.firstWhere((p) => p.name == 'Rock');
+      final jazz = results.firstWhere((p) => p.name == 'Jazz');
+      expect(rock.containsTrack, true);
+      expect(jazz.containsTrack, false);
+    });
+  });
 }

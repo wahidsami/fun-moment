@@ -52,7 +52,7 @@ class _MyPlaylistsPageState extends State<MyPlaylistsPage> {
                   fillColor: FMColors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: FMColors.border),
+                    borderSide: const BorderSide(color: FMColors.border),
                   ),
                 ),
               ),
@@ -68,7 +68,7 @@ class _MyPlaylistsPageState extends State<MyPlaylistsPage> {
                   fillColor: FMColors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: FMColors.border),
+                    borderSide: const BorderSide(color: FMColors.border),
                   ),
                 ),
               ),
@@ -111,6 +111,15 @@ class _MyPlaylistsPageState extends State<MyPlaylistsPage> {
             backgroundColor: const Color(0xFF10B981),
           ),
         );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isArabic ? 'تعذر إنشاء قائمة التشغيل' : 'Failed to create playlist',
+            ),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
     }
   }
@@ -143,7 +152,7 @@ class _MyPlaylistsPageState extends State<MyPlaylistsPage> {
                   fillColor: FMColors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: FMColors.border),
+                    borderSide: const BorderSide(color: FMColors.border),
                   ),
                 ),
               ),
@@ -159,7 +168,7 @@ class _MyPlaylistsPageState extends State<MyPlaylistsPage> {
                   fillColor: FMColors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: FMColors.border),
+                    borderSide: const BorderSide(color: FMColors.border),
                   ),
                 ),
               ),
@@ -301,7 +310,7 @@ class _MyPlaylistsPageState extends State<MyPlaylistsPage> {
             );
           }
 
-          if (buyerService.playlistsError == 'UNAUTHENTICATED') {
+          if (buyerService.playlistsError == 'UNAUTHENTICATED' && buyerService.playlists.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(28.0),
@@ -341,7 +350,7 @@ class _MyPlaylistsPageState extends State<MyPlaylistsPage> {
                       decoration: BoxDecoration(
                         color: FMColors.surfaceElevated,
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF2DE2FF).withOpacity(0.3)),
+                        border: Border.all(color: const Color(0x4D2DE2FF)),
                       ),
                       child: const Icon(
                         Icons.queue_music_rounded,

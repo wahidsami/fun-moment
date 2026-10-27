@@ -38,6 +38,62 @@ class BuyerMusicService extends ChangeNotifier {
 
   // Guest favorite storage keys
   static const String _guestFavoritesKey = 'guest_music_favorites';
+  static const String _localPlaylistsKey = 'local_music_playlists_v1';
+  static int _localPlaylistCounter = 0;
+
+  static int generateLocalPlaylistId() {
+    _localPlaylistCounter++;
+    return DateTime.now().millisecondsSinceEpoch * 100 + (_localPlaylistCounter % 100);
+  }
+
+  Future<List<MusicPlaylistModel>> _loadLocalPlaylists() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_localPlaylistsKey);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded
+              .whereType<Map<String, dynamic>>()
+              .map((p) => MusicPlaylistModel.fromJson(p))
+              .toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('BuyerMusicService._loadLocalPlaylists error: $e');
+    }
+    return [];
+  }
+
+  Future<void> _saveLocalPlaylists(List<MusicPlaylistModel> list) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = jsonEncode(list.map((p) => p.toJson()).toList());
+      await prefs.setString(_localPlaylistsKey, encoded);
+    } catch (e) {
+      debugPrint('BuyerMusicService._saveLocalPlaylists error: $e');
+    }
+  }
+
+  CatalogTrackModel? findTrackById(int trackId) {
+    for (final t in catalogTracks) {
+      if (t.id == trackId) return t;
+    }
+    for (final t in latestReleases) {
+      if (t.id == trackId) return t;
+    }
+    for (final p in playlists) {
+      for (final t in p.tracks) {
+        if (t.id == trackId) return t;
+      }
+    }
+    if (currentPlaylist != null) {
+      for (final t in currentPlaylist!.tracks) {
+        if (t.id == trackId) return t;
+      }
+    }
+    return null;
+  }
 
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -500,36 +556,55 @@ class BuyerMusicService extends ChangeNotifier {
    * Customer Multi-Playlist API Methods
    *--------------------------------------------------------------------------*/
 
-  /// Fetch all playlists owned by the authenticated customer
+  /// Fetch all playlists owned by the customer (loads locally first, syncs if authenticated)
   Future<List<MusicPlaylistModel>> fetchPlaylists() async {
     isPlaylistsLoading = true;
     playlistsError = null;
     notifyListeners();
 
-    try {
-      final headers = await _getHeaders(requireAuth: true);
-      final url = Uri.parse('$baseApi/music/playlists');
-      final res = await http.get(url, headers: headers);
+    // 1. Instant load from local storage
+    final localPlaylists = await _loadLocalPlaylists();
+    if (localPlaylists.isNotEmpty) {
+      playlists = List.from(localPlaylists);
+      notifyListeners();
+    }
 
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
-        if (body['success'] == true && body['data'] is List) {
-          playlists = (body['data'] as List)
-              .whereType<Map<String, dynamic>>()
-              .map((p) => MusicPlaylistModel.fromJson(p))
-              .toList();
-        } else {
-          playlists = [];
+    try {
+      final token = await _getToken();
+      if (token != null && token.isNotEmpty) {
+        final headers = await _getHeaders(requireAuth: true);
+        final url = Uri.parse('$baseApi/music/playlists');
+        final res = await http.get(url, headers: headers);
+
+        if (res.statusCode == 200) {
+          final body = jsonDecode(res.body);
+          if (body['success'] == true && body['data'] is List) {
+            final remotePlaylists = (body['data'] as List)
+                .whereType<Map<String, dynamic>>()
+                .map((p) => MusicPlaylistModel.fromJson(p))
+                .toList();
+
+            final remoteIds = remotePlaylists.map((p) => p.id).toSet();
+            final merged = List<MusicPlaylistModel>.from(remotePlaylists);
+            for (final local in localPlaylists) {
+              if (!remoteIds.contains(local.id)) {
+                merged.add(local);
+              }
+            }
+            playlists = merged;
+            await _saveLocalPlaylists(playlists);
+          }
+        } else if (res.statusCode == 401) {
+          if (playlists.isEmpty) {
+            playlistsError = 'UNAUTHENTICATED';
+          }
         }
-      } else if (res.statusCode == 401) {
-        playlists = [];
-        playlistsError = 'UNAUTHENTICATED';
-      } else {
-        playlistsError = 'Failed to load playlists.';
       }
     } catch (e) {
       debugPrint('BuyerMusicService.fetchPlaylists error: $e');
-      playlistsError = 'Connection error loading playlists.';
+      if (playlists.isEmpty) {
+        playlistsError = 'Connection error loading playlists.';
+      }
     } finally {
       isPlaylistsLoading = false;
       notifyListeners();
@@ -537,31 +612,55 @@ class BuyerMusicService extends ChangeNotifier {
     return playlists;
   }
 
-  /// Create a new playlist
+  /// Create a new playlist (syncs with remote when available, always persists locally)
   Future<MusicPlaylistModel?> createPlaylist(String name, {String? description}) async {
-    try {
-      final headers = await _getHeaders(requireAuth: true);
-      final url = Uri.parse('$baseApi/music/playlists');
-      final payload = {
-        'name': name.trim(),
-        if (description != null && description.trim().isNotEmpty)
-          'description': description.trim(),
-      };
+    MusicPlaylistModel? createdModel;
+    final trimmedName = name.trim();
+    final trimmedDesc = (description != null && description.trim().isNotEmpty) ? description.trim() : null;
 
-      final res = await http.post(url, headers: headers, body: jsonEncode(payload));
-      if (res.statusCode == 201 || res.statusCode == 200) {
-        final body = jsonDecode(res.body);
-        if (body['success'] == true && body['data'] is Map<String, dynamic>) {
-          final newPlaylist = MusicPlaylistModel.fromJson(body['data']);
-          playlists.insert(0, newPlaylist);
-          notifyListeners();
-          return newPlaylist;
+    try {
+      final token = await _getToken();
+      if (token != null && token.isNotEmpty) {
+        final headers = await _getHeaders(requireAuth: true);
+        final url = Uri.parse('$baseApi/music/playlists');
+        final payload = {
+          'name': trimmedName,
+          if (trimmedDesc != null) 'description': trimmedDesc,
+        };
+
+        final res = await http.post(url, headers: headers, body: jsonEncode(payload));
+        if (res.statusCode == 201 || res.statusCode == 200) {
+          final body = jsonDecode(res.body);
+          if (body['success'] == true && body['data'] is Map<String, dynamic>) {
+            createdModel = MusicPlaylistModel.fromJson(body['data']);
+          }
         }
       }
     } catch (e) {
-      debugPrint('BuyerMusicService.createPlaylist error: $e');
+      debugPrint('BuyerMusicService.createPlaylist remote error: $e');
     }
-    return null;
+
+    // Local fallback: create playlist model if remote unavailable or unauthenticated
+    if (createdModel == null) {
+      final now = DateTime.now();
+      createdModel = MusicPlaylistModel(
+        id: generateLocalPlaylistId(),
+        name: trimmedName,
+        description: trimmedDesc,
+        coverImageUrl: null,
+        isPublic: false,
+        tracksCount: 0,
+        totalDurationSeconds: 0,
+        createdAt: now.toIso8601String(),
+        updatedAt: now.toIso8601String(),
+        tracks: const [],
+      );
+    }
+
+    playlists.insert(0, createdModel);
+    await _saveLocalPlaylists(playlists);
+    notifyListeners();
+    return createdModel;
   }
 
   /// Fetch playlist details and ordered tracks
@@ -570,230 +669,320 @@ class BuyerMusicService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final headers = await _getHeaders(requireAuth: true);
-      final url = Uri.parse('$baseApi/music/playlists/$playlistId');
-      final res = await http.get(url, headers: headers);
+      final token = await _getToken();
+      if (token != null && token.isNotEmpty) {
+        final headers = await _getHeaders(requireAuth: true);
+        final url = Uri.parse('$baseApi/music/playlists/$playlistId');
+        final res = await http.get(url, headers: headers);
 
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
-        if (body['success'] == true && body['data'] is Map<String, dynamic>) {
-          currentPlaylist = MusicPlaylistModel.fromJson(body['data']);
-          // Sync track count in playlists summary
-          final idx = playlists.indexWhere((p) => p.id == playlistId);
-          if (idx != -1 && currentPlaylist != null) {
-            playlists[idx] = currentPlaylist!;
+        if (res.statusCode == 200) {
+          final body = jsonDecode(res.body);
+          if (body['success'] == true && body['data'] is Map<String, dynamic>) {
+            currentPlaylist = MusicPlaylistModel.fromJson(body['data']);
+            final idx = playlists.indexWhere((p) => p.id == playlistId);
+            if (idx != -1 && currentPlaylist != null) {
+              playlists[idx] = currentPlaylist!;
+              await _saveLocalPlaylists(playlists);
+            }
+            notifyListeners();
+            return currentPlaylist;
           }
-          notifyListeners();
-          return currentPlaylist;
         }
       }
     } catch (e) {
       debugPrint('BuyerMusicService.fetchPlaylistDetails error: $e');
     } finally {
+      if (currentPlaylist == null || currentPlaylist!.id != playlistId) {
+        final idx = playlists.indexWhere((p) => p.id == playlistId);
+        if (idx != -1) {
+          currentPlaylist = playlists[idx];
+        }
+      }
       isCurrentPlaylistLoading = false;
       notifyListeners();
     }
-    return null;
+    return currentPlaylist;
   }
 
   /// Rename or update playlist description
   Future<bool> updatePlaylist(int playlistId, {String? name, String? description}) async {
-    try {
-      final headers = await _getHeaders(requireAuth: true);
-      final url = Uri.parse('$baseApi/music/playlists/$playlistId');
-      final payload = <String, dynamic>{};
-      if (name != null) payload['name'] = name.trim();
-      if (description != null) payload['description'] = description.trim();
+    final trimmedName = name?.trim();
+    final trimmedDesc = description?.trim();
 
-      final res = await http.put(url, headers: headers, body: jsonEncode(payload));
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
-        if (body['success'] == true) {
-          final idx = playlists.indexWhere((p) => p.id == playlistId);
-          if (idx != -1) {
-            final existing = playlists[idx];
-            playlists[idx] = MusicPlaylistModel(
-              id: existing.id,
-              name: name?.trim() ?? existing.name,
-              description: description?.trim() ?? existing.description,
-              coverImageUrl: existing.coverImageUrl,
-              isPublic: existing.isPublic,
-              tracksCount: existing.tracksCount,
-              totalDurationSeconds: existing.totalDurationSeconds,
-              createdAt: existing.createdAt,
-              updatedAt: DateTime.now().toIso8601String(),
-              tracks: existing.tracks,
-            );
-          }
-          if (currentPlaylist != null && currentPlaylist!.id == playlistId) {
-            currentPlaylist = MusicPlaylistModel(
-              id: currentPlaylist!.id,
-              name: name?.trim() ?? currentPlaylist!.name,
-              description: description?.trim() ?? currentPlaylist!.description,
-              coverImageUrl: currentPlaylist!.coverImageUrl,
-              isPublic: currentPlaylist!.isPublic,
-              tracksCount: currentPlaylist!.tracksCount,
-              totalDurationSeconds: currentPlaylist!.totalDurationSeconds,
-              createdAt: currentPlaylist!.createdAt,
-              updatedAt: DateTime.now().toIso8601String(),
-              tracks: currentPlaylist!.tracks,
-            );
-          }
-          notifyListeners();
-          return true;
-        }
+    try {
+      final token = await _getToken();
+      if (token != null && token.isNotEmpty) {
+        final headers = await _getHeaders(requireAuth: true);
+        final url = Uri.parse('$baseApi/music/playlists/$playlistId');
+        final payload = <String, dynamic>{};
+        if (trimmedName != null) payload['name'] = trimmedName;
+        if (trimmedDesc != null) payload['description'] = trimmedDesc;
+
+        await http.put(url, headers: headers, body: jsonEncode(payload));
       }
     } catch (e) {
       debugPrint('BuyerMusicService.updatePlaylist error: $e');
     }
-    return false;
+
+    final idx = playlists.indexWhere((p) => p.id == playlistId);
+    if (idx != -1) {
+      final existing = playlists[idx];
+      playlists[idx] = MusicPlaylistModel(
+        id: existing.id,
+        name: trimmedName ?? existing.name,
+        description: trimmedDesc ?? existing.description,
+        coverImageUrl: existing.coverImageUrl,
+        isPublic: existing.isPublic,
+        tracksCount: existing.tracksCount,
+        totalDurationSeconds: existing.totalDurationSeconds,
+        createdAt: existing.createdAt,
+        updatedAt: DateTime.now().toIso8601String(),
+        tracks: existing.tracks,
+      );
+    }
+    if (currentPlaylist != null && currentPlaylist!.id == playlistId) {
+      currentPlaylist = MusicPlaylistModel(
+        id: currentPlaylist!.id,
+        name: trimmedName ?? currentPlaylist!.name,
+        description: trimmedDesc ?? currentPlaylist!.description,
+        coverImageUrl: currentPlaylist!.coverImageUrl,
+        isPublic: currentPlaylist!.isPublic,
+        tracksCount: currentPlaylist!.tracksCount,
+        totalDurationSeconds: currentPlaylist!.totalDurationSeconds,
+        createdAt: currentPlaylist!.createdAt,
+        updatedAt: DateTime.now().toIso8601String(),
+        tracks: currentPlaylist!.tracks,
+      );
+    }
+    await _saveLocalPlaylists(playlists);
+    notifyListeners();
+    return true;
   }
 
   /// Delete a playlist
   Future<bool> deletePlaylist(int playlistId) async {
     try {
-      final headers = await _getHeaders(requireAuth: true);
-      final url = Uri.parse('$baseApi/music/playlists/$playlistId');
-      final res = await http.delete(url, headers: headers);
-
-      if (res.statusCode == 200) {
-        playlists.removeWhere((p) => p.id == playlistId);
-        if (currentPlaylist != null && currentPlaylist!.id == playlistId) {
-          currentPlaylist = null;
-        }
-        notifyListeners();
-        return true;
+      final token = await _getToken();
+      if (token != null && token.isNotEmpty) {
+        final headers = await _getHeaders(requireAuth: true);
+        final url = Uri.parse('$baseApi/music/playlists/$playlistId');
+        await http.delete(url, headers: headers);
       }
     } catch (e) {
       debugPrint('BuyerMusicService.deletePlaylist error: $e');
     }
-    return false;
+
+    playlists.removeWhere((p) => p.id == playlistId);
+    if (currentPlaylist != null && currentPlaylist!.id == playlistId) {
+      currentPlaylist = null;
+    }
+    await _saveLocalPlaylists(playlists);
+    notifyListeners();
+    return true;
   }
 
   /// Add track to a playlist
   Future<Map<String, dynamic>> addTrackToPlaylist(int playlistId, int trackId) async {
-    try {
-      final headers = await _getHeaders(requireAuth: true);
-      final url = Uri.parse('$baseApi/music/playlists/$playlistId/tracks');
-      final res = await http.post(url, headers: headers, body: jsonEncode({'track_id': trackId}));
+    final idx = playlists.indexWhere((p) => p.id == playlistId);
+    if (idx != -1) {
+      final existingPlaylist = playlists[idx];
+      if (existingPlaylist.tracks.any((t) => t.id == trackId)) {
+        return {'success': false, 'message': 'Track is already in this playlist.'};
+      }
+    }
 
-      final body = jsonDecode(res.body);
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        // Refresh playlist summary
-        final idx = playlists.indexWhere((p) => p.id == playlistId);
-        if (idx != -1) {
-          final count = (body['data']?['tracks_count'] as int?) ?? (playlists[idx].tracksCount + 1);
-          playlists[idx] = MusicPlaylistModel(
-            id: playlists[idx].id,
-            name: playlists[idx].name,
-            description: playlists[idx].description,
-            coverImageUrl: playlists[idx].coverImageUrl,
-            isPublic: playlists[idx].isPublic,
-            tracksCount: count,
-            totalDurationSeconds: playlists[idx].totalDurationSeconds,
-            createdAt: playlists[idx].createdAt,
-            updatedAt: DateTime.now().toIso8601String(),
-            tracks: playlists[idx].tracks,
-          );
-          notifyListeners();
+    try {
+      final token = await _getToken();
+      if (token != null && token.isNotEmpty) {
+        final headers = await _getHeaders(requireAuth: true);
+        final url = Uri.parse('$baseApi/music/playlists/$playlistId/tracks');
+        final res = await http.post(url, headers: headers, body: jsonEncode({'track_id': trackId}));
+        if (res.statusCode == 200 || res.statusCode == 201) {
+          if (currentPlaylist != null && currentPlaylist!.id == playlistId) {
+            await fetchPlaylistDetails(playlistId);
+          }
         }
-        return {'success': true, 'message': body['message'] ?? 'Track added to playlist.'};
-      } else {
-        return {
-          'success': false,
-          'error_code': body['error_code'],
-          'message': body['message'] ?? 'Could not add track.',
-        };
       }
     } catch (e) {
-      debugPrint('BuyerMusicService.addTrackToPlaylist error: $e');
-      return {'success': false, 'message': 'Network connection error.'};
+      debugPrint('BuyerMusicService.addTrackToPlaylist remote error: $e');
     }
+
+    // Local sync
+    if (idx != -1) {
+      final existing = playlists[idx];
+      final trackObj = findTrackById(trackId) ??
+          CatalogTrackModel(
+            id: trackId,
+            titleEn: 'Track #$trackId',
+            titleAr: 'مسار رقم $trackId',
+            artistName: 'FUN MOMENT',
+            durationSeconds: 180,
+            previewDurationSeconds: 30,
+            streamTicketUrl: '',
+          );
+
+      final trackWithPos = trackObj.copyWith(
+        playlistPosition: existing.tracks.length + 1,
+      );
+
+      final updatedTracks = List<CatalogTrackModel>.from(existing.tracks)..add(trackWithPos);
+      final coverUrl = existing.coverImageUrl ?? trackObj.coverArtUrl;
+
+      final updatedPlaylist = MusicPlaylistModel(
+        id: existing.id,
+        name: existing.name,
+        description: existing.description,
+        coverImageUrl: coverUrl,
+        isPublic: existing.isPublic,
+        tracksCount: updatedTracks.length,
+        totalDurationSeconds: updatedTracks.fold<int>(0, (sum, t) => sum + t.durationSeconds),
+        createdAt: existing.createdAt,
+        updatedAt: DateTime.now().toIso8601String(),
+        tracks: updatedTracks,
+      );
+
+      playlists[idx] = updatedPlaylist;
+      if (currentPlaylist != null && currentPlaylist!.id == playlistId) {
+        currentPlaylist = updatedPlaylist;
+      }
+      await _saveLocalPlaylists(playlists);
+      notifyListeners();
+    }
+
+    return {'success': true, 'message': 'Track added to playlist.'};
   }
 
   /// Remove track from a playlist
   Future<bool> removeTrackFromPlaylist(int playlistId, int trackId) async {
     try {
-      final headers = await _getHeaders(requireAuth: true);
-      final url = Uri.parse('$baseApi/music/playlists/$playlistId/tracks/$trackId');
-      final res = await http.delete(url, headers: headers);
-
-      if (res.statusCode == 200) {
-        if (currentPlaylist != null && currentPlaylist!.id == playlistId) {
-          final updatedTracks = currentPlaylist!.tracks.where((t) => t.id != trackId).toList();
-          currentPlaylist = MusicPlaylistModel(
-            id: currentPlaylist!.id,
-            name: currentPlaylist!.name,
-            description: currentPlaylist!.description,
-            coverImageUrl: currentPlaylist!.coverImageUrl,
-            isPublic: currentPlaylist!.isPublic,
-            tracksCount: updatedTracks.length,
-            totalDurationSeconds: updatedTracks.fold<int>(0, (sum, t) => sum + t.durationSeconds),
-            createdAt: currentPlaylist!.createdAt,
-            updatedAt: DateTime.now().toIso8601String(),
-            tracks: updatedTracks,
-          );
-        }
-        final idx = playlists.indexWhere((p) => p.id == playlistId);
-        if (idx != -1) {
-          final p = playlists[idx];
-          playlists[idx] = MusicPlaylistModel(
-            id: p.id,
-            name: p.name,
-            description: p.description,
-            coverImageUrl: p.coverImageUrl,
-            isPublic: p.isPublic,
-            tracksCount: (p.tracksCount > 0) ? p.tracksCount - 1 : 0,
-            totalDurationSeconds: p.totalDurationSeconds,
-            createdAt: p.createdAt,
-            updatedAt: DateTime.now().toIso8601String(),
-            tracks: p.tracks,
-          );
-        }
-        notifyListeners();
-        return true;
+      final token = await _getToken();
+      if (token != null && token.isNotEmpty) {
+        final headers = await _getHeaders(requireAuth: true);
+        final url = Uri.parse('$baseApi/music/playlists/$playlistId/tracks/$trackId');
+        await http.delete(url, headers: headers);
       }
     } catch (e) {
-      debugPrint('BuyerMusicService.removeTrackFromPlaylist error: $e');
+      debugPrint('BuyerMusicService.removeTrackFromPlaylist remote error: $e');
     }
-    return false;
+
+    final idx = playlists.indexWhere((p) => p.id == playlistId);
+    if (idx != -1) {
+      final existing = playlists[idx];
+      final updatedTracks = existing.tracks.where((t) => t.id != trackId).toList();
+
+      final updatedPlaylist = MusicPlaylistModel(
+        id: existing.id,
+        name: existing.name,
+        description: existing.description,
+        coverImageUrl: updatedTracks.isNotEmpty ? existing.coverImageUrl : null,
+        isPublic: existing.isPublic,
+        tracksCount: updatedTracks.length,
+        totalDurationSeconds: updatedTracks.fold<int>(0, (sum, t) => sum + t.durationSeconds),
+        createdAt: existing.createdAt,
+        updatedAt: DateTime.now().toIso8601String(),
+        tracks: updatedTracks,
+      );
+
+      playlists[idx] = updatedPlaylist;
+      if (currentPlaylist != null && currentPlaylist!.id == playlistId) {
+        currentPlaylist = updatedPlaylist;
+      }
+      await _saveLocalPlaylists(playlists);
+      notifyListeners();
+    }
+    return true;
   }
 
   /// Reorder tracks in a playlist
   Future<bool> reorderPlaylist(int playlistId, List<int> orderedTrackIds) async {
     try {
-      final headers = await _getHeaders(requireAuth: true);
-      final url = Uri.parse('$baseApi/music/playlists/$playlistId/reorder');
-      final res = await http.post(url, headers: headers, body: jsonEncode({'track_ids': orderedTrackIds}));
-
-      if (res.statusCode == 200) {
-        return true;
+      final token = await _getToken();
+      if (token != null && token.isNotEmpty) {
+        final headers = await _getHeaders(requireAuth: true);
+        final url = Uri.parse('$baseApi/music/playlists/$playlistId/reorder');
+        await http.post(url, headers: headers, body: jsonEncode({'track_ids': orderedTrackIds}));
       }
     } catch (e) {
-      debugPrint('BuyerMusicService.reorderPlaylist error: $e');
+      debugPrint('BuyerMusicService.reorderPlaylist remote error: $e');
     }
-    return false;
+
+    final idx = playlists.indexWhere((p) => p.id == playlistId);
+    if (idx != -1) {
+      final existing = playlists[idx];
+      final trackMap = {for (final t in existing.tracks) t.id: t};
+      final reordered = <CatalogTrackModel>[];
+      for (int i = 0; i < orderedTrackIds.length; i++) {
+        final id = orderedTrackIds[i];
+        if (trackMap.containsKey(id)) {
+          reordered.add(trackMap[id]!.copyWith(playlistPosition: i + 1));
+        }
+      }
+
+      final updatedPlaylist = MusicPlaylistModel(
+        id: existing.id,
+        name: existing.name,
+        description: existing.description,
+        coverImageUrl: existing.coverImageUrl,
+        isPublic: existing.isPublic,
+        tracksCount: reordered.length,
+        totalDurationSeconds: reordered.fold<int>(0, (sum, t) => sum + t.durationSeconds),
+        createdAt: existing.createdAt,
+        updatedAt: DateTime.now().toIso8601String(),
+        tracks: reordered,
+      );
+
+      playlists[idx] = updatedPlaylist;
+      if (currentPlaylist != null && currentPlaylist!.id == playlistId) {
+        currentPlaylist = updatedPlaylist;
+      }
+      await _saveLocalPlaylists(playlists);
+      notifyListeners();
+    }
+    return true;
   }
 
   /// Fetch user playlists with `contains_track` flag for a specific track
   Future<List<MusicPlaylistModel>> fetchPlaylistsForTrack(int trackId) async {
     try {
-      final headers = await _getHeaders(requireAuth: true);
-      final url = Uri.parse('$baseApi/music/playlists-for-track/$trackId');
-      final res = await http.get(url, headers: headers);
+      final token = await _getToken();
+      if (token != null && token.isNotEmpty) {
+        final headers = await _getHeaders(requireAuth: true);
+        final url = Uri.parse('$baseApi/music/playlists-for-track/$trackId');
+        final res = await http.get(url, headers: headers);
 
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
-        if (body['success'] == true && body['data'] is List) {
-          return (body['data'] as List)
-              .whereType<Map<String, dynamic>>()
-              .map((p) => MusicPlaylistModel.fromJson(p))
-              .toList();
+        if (res.statusCode == 200) {
+          final body = jsonDecode(res.body);
+          if (body['success'] == true && body['data'] is List) {
+            return (body['data'] as List)
+                .whereType<Map<String, dynamic>>()
+                .map((p) => MusicPlaylistModel.fromJson(p))
+                .toList();
+          }
         }
       }
     } catch (e) {
       debugPrint('BuyerMusicService.fetchPlaylistsForTrack error: $e');
     }
-    return [];
+
+    // Local fallback: compute containsTrack from cached playlists
+    if (playlists.isEmpty) {
+      await fetchPlaylists();
+    }
+    return playlists.map((p) {
+      final hasTrack = p.tracks.any((t) => t.id == trackId);
+      return MusicPlaylistModel(
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        coverImageUrl: p.coverImageUrl,
+        isPublic: p.isPublic,
+        tracksCount: p.tracksCount,
+        totalDurationSeconds: p.totalDurationSeconds,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        tracks: p.tracks,
+        containsTrack: hasTrack,
+      );
+    }).toList();
   }
 }

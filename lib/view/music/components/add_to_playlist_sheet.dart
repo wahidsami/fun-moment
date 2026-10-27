@@ -30,7 +30,6 @@ class AddToPlaylistSheet extends StatefulWidget {
 class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
   bool _isLoading = true;
   List<MusicPlaylistModel> _playlists = [];
-  String? _error;
 
   @override
   void initState() {
@@ -41,7 +40,6 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
   Future<void> _loadPlaylists() async {
     setState(() {
       _isLoading = true;
-      _error = null;
     });
 
     final buyerService = Provider.of<BuyerMusicService>(context, listen: false);
@@ -86,7 +84,7 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                   fillColor: FMColors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: FMColors.border),
+                    borderSide: const BorderSide(color: FMColors.border),
                   ),
                 ),
               ),
@@ -102,7 +100,7 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                   fillColor: FMColors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: FMColors.border),
+                    borderSide: const BorderSide(color: FMColors.border),
                   ),
                 ),
               ),
@@ -152,6 +150,15 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
           );
           Navigator.pop(context);
         }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isArabic ? 'تعذر إنشاء قائمة التشغيل' : 'Failed to create playlist',
+            ),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
     }
   }
@@ -375,8 +382,8 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                               trailing: contains
                                   ? Container(
                                       padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981).withOpacity(0.2),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0x3310B981),
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(

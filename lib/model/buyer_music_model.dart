@@ -122,6 +122,15 @@ class CatalogOfferModel {
   bool get isFree => offerType == 'free';
   bool get isRent => offerType == 'rent';
   bool get isSale => offerType == 'sale';
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'offer_type': offerType,
+    'price': price,
+    'currency': currency,
+    'rental_duration_days': rentalDurationDays,
+    'is_active': isActive,
+  };
 }
 
 class CatalogSellerModel {
@@ -142,6 +151,12 @@ class CatalogSellerModel {
       image: json['image']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'image': image,
+  };
 }
 
 class CatalogAlbumModel {
@@ -243,6 +258,20 @@ class CatalogAlbumModel {
     final s = totalSec % 60;
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'title_en': titleEn,
+    'title_ar': titleAr,
+    'artist_name': artistName,
+    'cover_image_url': coverImageUrl,
+    'tracks_count': tracksCount,
+    'description_en': descriptionEn,
+    'description_ar': descriptionAr,
+    'released_at': releasedAt,
+    'genre': genre?.toJson(),
+  };
 }
 
 class CatalogOriginalTrackModel {
@@ -269,6 +298,14 @@ class CatalogOriginalTrackModel {
       artistName: json['artist_name']?.toString() ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'title_en': titleEn,
+    'title_ar': titleAr,
+    'artist_name': artistName,
+  };
 }
 
 class CatalogTrackModel {
@@ -540,6 +577,35 @@ class CatalogTrackModel {
       accessStatus: accessStatus ?? this.accessStatus,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title_en': titleEn,
+    'title_ar': titleAr,
+    'artist_name': artistName,
+    'duration_seconds': durationSeconds,
+    'preview_duration_seconds': previewDurationSeconds,
+    'bpm': bpm,
+    'key': musicalKey,
+    'cover_image_url': coverImageUrl,
+    'waveform_url': waveformUrl,
+    'stream_ticket_url': streamTicketUrl,
+    'is_favorite': isFavorite,
+    'play_count': playCount,
+    'primary_genre': primaryGenre?.toJson(),
+    'genres': genres.map((g) => g.toJson()).toList(),
+    'offers': offers.map((o) => o.toJson()).toList(),
+    'rights_declaration': rightsDeclaration,
+    'seller': seller?.toJson(),
+    'released_at': releasedAt,
+    'is_first_party': isFirstParty,
+    'badge': badge,
+    'album': album?.toJson(),
+    'track_number': trackNumber,
+    'original_track': originalTrack?.toJson(),
+    'position': playlistPosition,
+    'access_status': accessStatus?.toJson(),
+  };
 }
 
 class TrackAccessStatusModel {
@@ -569,6 +635,15 @@ class TrackAccessStatusModel {
       expiresAt: json['expires_at']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'status': status,
+    'label_en': labelEn,
+    'label_ar': labelAr,
+    'is_playable': isPlayable,
+    'can_stream_full': canStreamFull,
+    'expires_at': expiresAt,
+  };
 
   String displayLabel(bool isArabic) {
     return isArabic ? labelAr : labelEn;
@@ -643,6 +718,20 @@ class MusicPlaylistModel {
       containsTrack: json['contains_track'] == true || json['contains_track'] == 1,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'description': description,
+    'cover_image_url': coverImageUrl,
+    'is_public': isPublic,
+    'tracks_count': tracksCount,
+    'total_duration_seconds': totalDurationSeconds,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+    'tracks': tracks.map((t) => t.toJson()).toList(),
+    'contains_track': containsTrack,
+  };
 
   String get formattedTotalDuration {
     if (totalDurationSeconds <= 0) return '';
