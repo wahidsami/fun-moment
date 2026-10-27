@@ -34,6 +34,9 @@ if (flutterVersionName == null) {
        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
    }
 
+def appName = project.findProperty('appName') ?: 'Fun Moments'
+def appIdSuffix = project.findProperty('appIdSuffix') ?: ''
+
    android {
     namespace "com.sa.funmomments"
     compileSdkVersion 35
@@ -64,6 +67,12 @@ if (flutterVersionName == null) {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId "com.sa.funmomments"
+        if (appIdSuffix) {
+            applicationIdSuffix appIdSuffix
+        }
+        manifestPlaceholders += [
+            appName: appName
+        ]
         minSdkVersion 23
         targetSdkVersion 33
         versionCode flutterVersionCode.toInteger()

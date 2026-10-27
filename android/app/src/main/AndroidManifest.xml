@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
         
-   <application android:label="Fun Moments" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:usesCleartextTraffic="true" tools:node="merge">
+   <application android:label="${appName}" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:usesCleartextTraffic="true" tools:node="merge">
 
 <!-- google map configuration -->
 
