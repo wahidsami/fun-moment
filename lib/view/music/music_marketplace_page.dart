@@ -498,6 +498,33 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => AddToPlaylistSheet.show(context, track),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: FMColors.surfaceElevated,
+                                  borderRadius: BorderRadius.circular(FMRadii.pill),
+                                  border: Border.all(color: FMColors.cyan.withOpacity(0.5)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.playlist_add_rounded, color: FMColors.cyan, size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isArabic ? 'إضافة لقائمة' : 'Playlist',
+                                      style: const TextStyle(
+                                        color: FMColors.cyan,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                             const Spacer(),
                             Text(
                               track.formattedDuration,

@@ -7,6 +7,7 @@ import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
 import 'package:funmoments/view/music/components/mini_player_bar.dart';
 import 'package:funmoments/view/music/components/music_artwork_widget.dart';
+import 'package:funmoments/view/music/components/add_to_playlist_sheet.dart';
 import 'package:funmoments/view/music/music_track_details_page.dart';
 
 /// Dedicated Album Details page showcasing album artwork, metadata,
@@ -593,6 +594,13 @@ class _MusicAlbumDetailsPageState extends State<MusicAlbumDetailsPage> {
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
+                ),
+
+                // Add to Playlist Button
+                IconButton(
+                  icon: const Icon(Icons.playlist_add_rounded, color: FMColors.cyan, size: 22),
+                  tooltip: isArabic ? 'إضافة إلى قائمة تشغيل' : 'Add to Playlist',
+                  onPressed: () => AddToPlaylistSheet.show(context, track),
                 ),
 
                 // Info / Track Details Button

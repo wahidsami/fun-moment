@@ -983,58 +983,94 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
 
             const SizedBox(height: 14),
 
-            // Queue quick launcher
-            InkWell(
-              onTap: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => const PlayerQueueSheet(),
-                );
-              },
-              borderRadius: BorderRadius.circular(FMRadii.pill),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-                decoration: BoxDecoration(
-                  color: FMColors.surfaceElevated,
+            // Action buttons: Queue quick launcher & Add to Playlist prominent button
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 1. Queue quick launcher
+                InkWell(
+                  onTap: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const PlayerQueueSheet(),
+                    );
+                  },
                   borderRadius: BorderRadius.circular(FMRadii.pill),
-                  border: Border.all(color: FMColors.border),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.queue_music_rounded, color: FMColors.cyan, size: 16),
-                    const SizedBox(width: 8),
-                    Text(
-                      isArabic ? 'قائمة التشغيل' : 'Play Queue',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: FMColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(FMRadii.pill),
+                      border: Border.all(color: FMColors.border),
                     ),
-                    if (player.queue.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: FMColors.cyan.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${player.queue.length}',
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.queue_music_rounded, color: FMColors.cyan, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          isArabic ? 'قائمة الانتظار' : 'Queue',
                           style: const TextStyle(
-                            color: FMColors.cyan,
-                            fontSize: 10,
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (player.queue.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: FMColors.cyan.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${player.queue.length}',
+                              style: const TextStyle(
+                                color: FMColors.cyan,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+
+                // 2. Add to Playlist prominent button
+                InkWell(
+                  onTap: () => AddToPlaylistSheet.show(context, _track),
+                  borderRadius: BorderRadius.circular(FMRadii.pill),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2DE2FF).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(FMRadii.pill),
+                      border: Border.all(color: const Color(0xFF2DE2FF).withOpacity(0.4)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.playlist_add_rounded, color: Color(0xFF2DE2FF), size: 17),
+                        const SizedBox(width: 6),
+                        Text(
+                          isArabic ? 'إضافة لقائمة تشغيل' : 'Add to Playlist',
+                          style: const TextStyle(
+                            color: Color(0xFF2DE2FF),
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                    ],
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
 
             const SizedBox(height: 28),
