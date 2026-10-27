@@ -5,6 +5,7 @@ import 'package:funmoments/service/buyer_music_service.dart';
 import 'package:funmoments/service/music_player_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
+import 'package:funmoments/view/music/components/add_to_playlist_sheet.dart';
 import 'package:funmoments/view/music/components/artwork_ambient_lighting_widget.dart';
 import 'package:funmoments/view/music/components/dj_visualizer_widget.dart';
 import 'package:funmoments/view/music/components/music_artwork_widget.dart';
@@ -531,6 +532,12 @@ class _MusicTrackDetailsPageState extends State<MusicTrackDetailsPage> {
                 ),
               );
             },
+          ),
+          // Add to Playlist Button
+          IconButton(
+            icon: const Icon(Icons.playlist_add_rounded, color: Color(0xFF2DE2FF)),
+            tooltip: isArabic ? 'إضافة إلى قائمة تشغيل' : 'Add to Playlist',
+            onPressed: () => AddToPlaylistSheet.show(context, _track),
           ),
           IconButton(
             icon: Icon(

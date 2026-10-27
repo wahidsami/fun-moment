@@ -242,6 +242,11 @@ class User extends Authenticatable
         return $this->hasMany(MusicSellerLedgerEntry::class, 'seller_id', 'id');
     }
 
+    public function musicPlaylists()
+    {
+        return $this->hasMany(MusicPlaylist::class, 'user_id', 'id');
+    }
+
     public function isVatRegistered(): bool
     {
         return (bool) $this->vat_registered && !empty($this->vat_registration_number);

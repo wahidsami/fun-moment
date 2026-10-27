@@ -5,11 +5,13 @@ import 'package:funmoments/service/buyer_music_service.dart';
 import 'package:funmoments/service/music_player_service.dart';
 import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/theme/fun_moment_theme.dart';
+import 'package:funmoments/view/music/components/add_to_playlist_sheet.dart';
 import 'package:funmoments/view/music/components/mini_player_bar.dart';
 import 'package:funmoments/view/music/components/music_artwork_widget.dart';
 import 'package:funmoments/view/music/music_album_details_page.dart';
 import 'package:funmoments/view/music/music_track_details_page.dart';
 import 'package:funmoments/view/music/my_music_favorites_page.dart';
+import 'package:funmoments/view/music/my_playlists_page.dart';
 
 class MusicMarketplacePage extends StatefulWidget {
   const MusicMarketplacePage({Key? key}) : super(key: key);
@@ -92,6 +94,16 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.queue_music_rounded, color: Color(0xFF2DE2FF)),
+            tooltip: isArabic ? 'قوائم التشغيل' : 'Playlists',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyPlaylistsPage()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.favorite_rounded, color: FMColors.magenta),
             tooltip: isArabic ? 'المفضلة' : 'Favorites',
@@ -992,15 +1004,30 @@ class _MusicMarketplacePageState extends State<MusicMarketplacePage> {
                 ),
               ],
             ),
-            trailing: IconButton(
-              icon: Icon(
-                track.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                color: track.isFavorite ? FMColors.magenta : Colors.white54,
-                size: 20,
-              ),
-              onPressed: () {
-                musicService.toggleFavorite(track);
-              },
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.playlist_add_rounded,
+                    color: Color(0xFF2DE2FF),
+                    size: 22,
+                  ),
+                  tooltip: isArabic ? 'إضافة إلى قائمة تشغيل' : 'Add to Playlist',
+                  onPressed: () => AddToPlaylistSheet.show(context, track),
+                ),
+                IconButton(
+                  icon: Icon(
+                    track.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                    color: track.isFavorite ? FMColors.magenta : Colors.white54,
+                    size: 20,
+                  ),
+                  tooltip: isArabic ? 'المفضلة' : 'Favorite',
+                  onPressed: () {
+                    musicService.toggleFavorite(track);
+                  },
+                ),
+              ],
             ),
           ),
         );

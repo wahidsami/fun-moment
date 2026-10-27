@@ -269,6 +269,18 @@ class MusicTrack extends Model
         return $this->hasMany(MusicPlaybackEvent::class, 'track_id', 'id');
     }
 
+    public function playlistTracks(): HasMany
+    {
+        return $this->hasMany(MusicPlaylistTrack::class, 'track_id', 'id');
+    }
+
+    public function playlists(): BelongsToMany
+    {
+        return $this->belongsToMany(MusicPlaylist::class, 'music_playlist_tracks', 'track_id', 'playlist_id')
+            ->withPivot(['position', 'created_at'])
+            ->withTimestamps();
+    }
+
     // Scopes
     public function scopePublished($query)
     {

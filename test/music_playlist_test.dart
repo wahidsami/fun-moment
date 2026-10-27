@@ -1,0 +1,446 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:funmoments/model/buyer_music_model.dart';
+import 'package:funmoments/service/buyer_music_service.dart';
+import 'package:funmoments/service/music_player_service.dart';
+import 'package:funmoments/service/rtl_service.dart';
+import 'package:funmoments/view/music/my_playlists_page.dart';
+import 'package:funmoments/view/music/playlist_details_page.dart';
+import 'package:funmoments/view/music/components/add_to_playlist_sheet.dart';
+
+CatalogTrackModel makeTestTrack({
+  int id = 1,
+  String titleEn = 'Desert Mirage',
+  String titleAr = 'سراب الصحراء',
+  String artistName = 'DJ Mirage',
+  int durationSeconds = 180,
+  int? playlistPosition,
+  TrackAccessStatusModel? accessStatus,
+}) {
+  return CatalogTrackModel(
+    id: id,
+    titleEn: titleEn,
+    titleAr: titleAr,
+    artistName: artistName,
+    durationSeconds: durationSeconds,
+    previewDurationSeconds: 30,
+    streamTicketUrl: 'https://staging-api.funmoments.unifinitylab.com/api/v1/music/catalog/stream-ticket/$id',
+    playlistPosition: playlistPosition,
+    accessStatus: accessStatus,
+  );
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  group('TrackAccessStatusModel & MusicPlaylistModel Unit Tests', () {
+    test('TrackAccessStatusModel correctly parses all 6 status variants', () {
+      final freeJson = {
+        'status': 'free',
+        'is_playable': true,
+        'can_stream_full': true,
+        'label_en': 'Free Stream',
+        'label_ar': 'بث مجاني',
+        'expires_at': null,
+      };
+      final freeStatus = TrackAccessStatusModel.fromJson(freeJson);
+      expect(freeStatus.status, 'free');
+      expect(freeStatus.isPlayable, true);
+      expect(freeStatus.canStreamFull, true);
+      expect(freeStatus.labelEn, 'Free Stream');
+      expect(freeStatus.labelAr, 'بث مجاني');
+      expect(freeStatus.isFree, true);
+      expect(freeStatus.isPurchased, false);
+      expect(freeStatus.isRented, false);
+
+      final purchasedJson = {
+        'status': 'purchased',
+        'is_playable': true,
+        'can_stream_full': true,
+        'label_en': 'Purchased',
+        'label_ar': 'تم الشراء',
+      };
+      final purchasedStatus = TrackAccessStatusModel.fromJson(purchasedJson);
+      expect(purchasedStatus.status, 'purchased');
+      expect(purchasedStatus.isPurchased, true);
+      expect(purchasedStatus.isPlayable, true);
+      expect(purchasedStatus.canStreamFull, true);
+
+      final rentedJson = {
+        'status': 'rented',
+        'is_playable': true,
+        'can_stream_full': true,
+        'label_en': 'Rented',
+        'label_ar': 'مستأجر',
+        'expires_at': '2026-11-01T12:00:00Z',
+      };
+      final rentedStatus = TrackAccessStatusModel.fromJson(rentedJson);
+      expect(rentedStatus.status, 'rented');
+      expect(rentedStatus.isRented, true);
+      expect(rentedStatus.expiresAt, '2026-11-01T12:00:00Z');
+
+      final expiredJson = {
+        'status': 'rental_expired',
+        'is_playable': true,
+        'can_stream_full': false,
+        'label_en': 'Rental Expired',
+        'label_ar': 'انتهى الاستئجار',
+      };
+      final expiredStatus = TrackAccessStatusModel.fromJson(expiredJson);
+      expect(expiredStatus.status, 'rental_expired');
+      expect(expiredStatus.isRentalExpired, true);
+      expect(expiredStatus.canStreamFull, false);
+
+      final reqJson = {
+        'status': 'purchase_required',
+        'is_playable': true,
+        'can_stream_full': false,
+        'label_en': 'Purchase Required',
+        'label_ar': 'يتطلب الشراء',
+      };
+      final reqStatus = TrackAccessStatusModel.fromJson(reqJson);
+      expect(reqStatus.status, 'purchase_required');
+      expect(reqStatus.isPurchaseRequired, true);
+      expect(reqStatus.canStreamFull, false);
+
+      final unavailJson = {
+        'status': 'unavailable',
+        'is_playable': false,
+        'can_stream_full': false,
+        'label_en': 'Unavailable',
+        'label_ar': 'غير متاح',
+      };
+      final unavailStatus = TrackAccessStatusModel.fromJson(unavailJson);
+      expect(unavailStatus.status, 'unavailable');
+      expect(unavailStatus.isUnavailable, true);
+      expect(unavailStatus.isPlayable, false);
+      expect(unavailStatus.canStreamFull, false);
+    });
+
+    test('MusicPlaylistModel parses playlist with ordered tracks', () {
+      final playlistJson = {
+        'id': 7,
+        'name': 'Riyadh Late Night Beats',
+        'description': 'Curated high-energy dance and original mixes',
+        'cover_image_url': 'https://example.com/playlist7.jpg',
+        'is_public': false,
+        'tracks_count': 2,
+        'total_duration_seconds': 420,
+        'created_at': '2026-10-27T00:00:00Z',
+        'updated_at': '2026-10-27T01:00:00Z',
+        'tracks': [
+          {
+            'id': 101,
+            'title_en': 'Desert Storm Synth',
+            'title_ar': 'عاصفة الصحراء الإلكترونية',
+            'artist_name': 'DJ Dune',
+            'duration_seconds': 200,
+            'preview_duration_seconds': 30,
+            'stream_ticket_url': 'https://staging-api.funmoments.unifinitylab.com/api/v1/music/catalog/stream-ticket/101',
+            'playlist_position': 1,
+            'access_status': {
+              'status': 'free',
+              'is_playable': true,
+              'can_stream_full': true,
+              'label_en': 'Free Stream',
+              'label_ar': 'بث مجاني',
+            },
+          },
+          {
+            'id': 102,
+            'title_en': 'Neon Oasis (VIP Remix)',
+            'title_ar': 'واحة النيون',
+            'artist_name': 'Original by DJ Noor (Remix by Falcon)',
+            'duration_seconds': 220,
+            'preview_duration_seconds': 30,
+            'stream_ticket_url': 'https://staging-api.funmoments.unifinitylab.com/api/v1/music/catalog/stream-ticket/102',
+            'playlist_position': 2,
+            'access_status': {
+              'status': 'purchase_required',
+              'is_playable': true,
+              'can_stream_full': false,
+              'label_en': 'Purchase Required',
+              'label_ar': 'يتطلب الشراء',
+            },
+          },
+        ],
+      };
+
+      final playlist = MusicPlaylistModel.fromJson(playlistJson);
+      expect(playlist.id, 7);
+      expect(playlist.name, 'Riyadh Late Night Beats');
+      expect(playlist.tracksCount, 2);
+      expect(playlist.tracks.length, 2);
+      expect(playlist.tracks[0].playlistPosition, 1);
+      expect(playlist.tracks[0].accessStatus?.isFree, true);
+      expect(playlist.tracks[1].playlistPosition, 2);
+      expect(playlist.tracks[1].accessStatus?.isPurchaseRequired, true);
+    });
+
+    test('CatalogTrackModel copyWith preserves and updates accessStatus and playlistPosition', () {
+      final track = makeTestTrack(id: 1, durationSeconds: 150);
+      expect(track.playlistPosition, null);
+      expect(track.accessStatus, null);
+
+      final updated = track.copyWith(
+        playlistPosition: 5,
+        accessStatus: TrackAccessStatusModel(
+          status: 'purchased',
+          isPlayable: true,
+          canStreamFull: true,
+          labelEn: 'Purchased',
+          labelAr: 'تم الشراء',
+        ),
+      );
+      expect(updated.playlistPosition, 5);
+      expect(updated.accessStatus?.isPurchased, true);
+      expect(updated.accessStatus?.canStreamFull, true);
+    });
+  });
+
+  group('Widget Tests: MyPlaylistsPage', () {
+    testWidgets('Renders empty state when user has no playlists', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 800));
+
+      final buyerService = BuyerMusicService();
+      buyerService.playlists = [];
+      buyerService.isPlaylistsLoading = false;
+      buyerService.playlistsError = null;
+
+      final playerService = MusicPlayerService();
+      final rtlService = RtlService();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<BuyerMusicService>.value(value: buyerService),
+            ChangeNotifierProvider<MusicPlayerService>.value(value: playerService),
+            ChangeNotifierProvider<RtlService>.value(value: rtlService),
+          ],
+          child: const MaterialApp(
+            home: MyPlaylistsPage(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('My Playlists'), findsOneWidget);
+      expect(find.text('No Playlists Yet'), findsOneWidget);
+      expect(find.text('Create Playlist'), findsWidgets);
+    });
+
+    testWidgets('Renders Arabic RTL empty state correctly', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 800));
+
+      final buyerService = BuyerMusicService();
+      buyerService.playlists = [];
+      buyerService.isPlaylistsLoading = false;
+      buyerService.playlistsError = null;
+
+      final playerService = MusicPlayerService();
+      final rtlService = RtlService();
+      rtlService.langSlug = 'ar';
+      rtlService.direction = 'rtl';
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<BuyerMusicService>.value(value: buyerService),
+            ChangeNotifierProvider<MusicPlayerService>.value(value: playerService),
+            ChangeNotifierProvider<RtlService>.value(value: rtlService),
+          ],
+          child: const MaterialApp(
+            home: MyPlaylistsPage(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('قوائم التشغيل'), findsOneWidget);
+      expect(find.text('لا توجد قوائم تشغيل حتى الآن'), findsOneWidget);
+      expect(find.text('إنشاء قائمة تشغيل'), findsWidgets);
+    });
+
+    testWidgets('Renders playlist list when playlists exist', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 800));
+
+      final buyerService = BuyerMusicService();
+      buyerService.playlists = [
+        MusicPlaylistModel(
+          id: 1,
+          name: 'Road Trip Saudi',
+          description: 'Tracks for desert highway',
+          tracksCount: 5,
+          totalDurationSeconds: 900,
+        ),
+        MusicPlaylistModel(
+          id: 2,
+          name: 'Gym Workout Synth',
+          description: 'High energy 130+ BPM',
+          tracksCount: 3,
+          totalDurationSeconds: 600,
+        ),
+      ];
+      buyerService.isPlaylistsLoading = false;
+
+      final playerService = MusicPlayerService();
+      final rtlService = RtlService();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<BuyerMusicService>.value(value: buyerService),
+            ChangeNotifierProvider<MusicPlayerService>.value(value: playerService),
+            ChangeNotifierProvider<RtlService>.value(value: rtlService),
+          ],
+          child: const MaterialApp(
+            home: MyPlaylistsPage(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Road Trip Saudi'), findsOneWidget);
+      expect(find.text('Gym Workout Synth'), findsOneWidget);
+      expect(find.text('5 tracks'), findsOneWidget);
+      expect(find.text('15:00'), findsOneWidget);
+      expect(find.text('3 tracks'), findsOneWidget);
+      expect(find.text('10:00'), findsOneWidget);
+    });
+  });
+
+  group('Widget Tests: PlaylistDetailsPage', () {
+    testWidgets('Displays playlist header, tracks, and entitlement badges', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 900));
+
+      final testPlaylist = MusicPlaylistModel(
+        id: 10,
+        name: 'VIP Club Nights',
+        description: 'Exclusively curated tracks',
+        tracksCount: 2,
+        totalDurationSeconds: 360,
+        tracks: [
+          makeTestTrack(
+            id: 201,
+            titleEn: 'Desert Heat',
+            titleAr: 'حرارة الصحراء',
+            artistName: 'DJ Sahara',
+            durationSeconds: 180,
+            playlistPosition: 1,
+            accessStatus: TrackAccessStatusModel(
+              status: 'free',
+              isPlayable: true,
+              canStreamFull: true,
+              labelEn: 'Free Stream',
+              labelAr: 'بث مجاني',
+            ),
+          ),
+          makeTestTrack(
+            id: 202,
+            titleEn: 'Midnight Oud VIP',
+            titleAr: 'عود منتصف الليل',
+            artistName: 'Tariq Oud',
+            durationSeconds: 180,
+            playlistPosition: 2,
+            accessStatus: TrackAccessStatusModel(
+              status: 'purchase_required',
+              isPlayable: true,
+              canStreamFull: false,
+              labelEn: 'Purchase Required',
+              labelAr: 'يتطلب الشراء',
+            ),
+          ),
+        ],
+      );
+
+      final buyerService = BuyerMusicService();
+      buyerService.currentPlaylist = testPlaylist;
+
+      final playerService = MusicPlayerService();
+      final rtlService = RtlService();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<BuyerMusicService>.value(value: buyerService),
+            ChangeNotifierProvider<MusicPlayerService>.value(value: playerService),
+            ChangeNotifierProvider<RtlService>.value(value: rtlService),
+          ],
+          child: const MaterialApp(
+            home: PlaylistDetailsPage(playlistId: 10),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('VIP Club Nights'), findsWidgets);
+      expect(find.text('Desert Heat'), findsOneWidget);
+      expect(find.text('Midnight Oud VIP'), findsOneWidget);
+      expect(find.text('Free Stream'), findsOneWidget);
+      expect(find.text('Purchase Required'), findsOneWidget);
+      expect(find.text('Play All'), findsOneWidget);
+    });
+  });
+
+  group('Widget Tests: AddToPlaylistSheet', () {
+    testWidgets('Renders existing playlists and detects already-added tracks', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 700));
+
+      final track = makeTestTrack(
+        id: 50,
+        titleEn: 'Echoes of Diriyah',
+        titleAr: 'أصداء الدرعية',
+        artistName: 'Sami Sound',
+        durationSeconds: 210,
+      );
+
+      final buyerService = BuyerMusicService();
+      buyerService.playlists = [
+        MusicPlaylistModel(
+          id: 1,
+          name: 'Traditional & Fusion',
+          tracksCount: 3,
+        ),
+        MusicPlaylistModel(
+          id: 2,
+          name: 'Workout Beats',
+          tracksCount: 1,
+        ),
+      ];
+
+      final rtlService = RtlService();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<BuyerMusicService>.value(value: buyerService),
+            ChangeNotifierProvider<RtlService>.value(value: rtlService),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: AddToPlaylistSheet(track: track),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add to Playlist'), findsOneWidget);
+      expect(find.text('Echoes of Diriyah'), findsOneWidget);
+      expect(find.text('Traditional & Fusion'), findsOneWidget);
+      expect(find.text('Workout Beats'), findsOneWidget);
+      expect(find.text('New Playlist'), findsOneWidget);
+    });
+  });
+}

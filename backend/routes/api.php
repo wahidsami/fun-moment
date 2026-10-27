@@ -386,6 +386,17 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         Route::group(['middleware' => 'auth:sanctum'], function () {
             Route::post('/favorites/toggle', [\App\Http\Controllers\Api\MusicFavoriteController::class, 'toggle'])->name('api.v1.music.favorites.toggle');
             Route::get('/favorites', [\App\Http\Controllers\Api\MusicFavoriteController::class, 'index'])->name('api.v1.music.favorites.index');
+
+            // Customer Multi-Playlist API
+            Route::get('/playlists', [\App\Http\Controllers\Api\MusicPlaylistController::class, 'index'])->name('api.v1.music.playlists.index');
+            Route::post('/playlists', [\App\Http\Controllers\Api\MusicPlaylistController::class, 'store'])->name('api.v1.music.playlists.store');
+            Route::get('/playlists/{id}', [\App\Http\Controllers\Api\MusicPlaylistController::class, 'show'])->name('api.v1.music.playlists.show');
+            Route::match(['put', 'patch'], '/playlists/{id}', [\App\Http\Controllers\Api\MusicPlaylistController::class, 'update'])->name('api.v1.music.playlists.update');
+            Route::delete('/playlists/{id}', [\App\Http\Controllers\Api\MusicPlaylistController::class, 'destroy'])->name('api.v1.music.playlists.destroy');
+            Route::post('/playlists/{id}/tracks', [\App\Http\Controllers\Api\MusicPlaylistController::class, 'addTrack'])->name('api.v1.music.playlists.add-track');
+            Route::delete('/playlists/{id}/tracks/{trackId}', [\App\Http\Controllers\Api\MusicPlaylistController::class, 'removeTrack'])->name('api.v1.music.playlists.remove-track');
+            Route::post('/playlists/{id}/reorder', [\App\Http\Controllers\Api\MusicPlaylistController::class, 'reorder'])->name('api.v1.music.playlists.reorder');
+            Route::get('/playlists-for-track/{trackId}', [\App\Http\Controllers\Api\MusicPlaylistController::class, 'availableForTrack'])->name('api.v1.music.playlists.for-track');
         });
 
         // Phase 5: Commercial Orders & Checkout

@@ -297,6 +297,8 @@ class CatalogTrackModel {
   final CatalogAlbumModel? album;
   final int? trackNumber;
   final CatalogOriginalTrackModel? originalTrack;
+  final int? playlistPosition;
+  final TrackAccessStatusModel? accessStatus;
 
   CatalogTrackModel({
     required this.id,
@@ -324,6 +326,8 @@ class CatalogTrackModel {
     this.album,
     this.trackNumber,
     this.originalTrack,
+    this.playlistPosition,
+    this.accessStatus,
   }) : coverImageUrl = (coverImageUrl != null && coverImageUrl.isNotEmpty)
             ? coverImageUrl
             : ((coverArtUrl != null && coverArtUrl.isNotEmpty) ? coverArtUrl : null);
@@ -401,6 +405,13 @@ class CatalogTrackModel {
     final rawCover = json['cover_image_url'] ?? json['cover_art_url'] ?? json['cover_image'];
     final resolvedCover = CatalogTrackModel.resolveCoverUrl(rawCover, albumCover: album?.coverImageUrl);
 
+    final position = json['position'] != null
+        ? int.tryParse(json['position'].toString())
+        : (json['playlist_position'] != null ? int.tryParse(json['playlist_position'].toString()) : null);
+    final access = json['access_status'] is Map<String, dynamic>
+        ? TrackAccessStatusModel.fromJson(json['access_status'] as Map<String, dynamic>)
+        : null;
+
     return CatalogTrackModel(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       titleEn: json['title_en']?.toString() ?? '',
@@ -432,6 +443,8 @@ class CatalogTrackModel {
       album: album,
       trackNumber: trackNumber,
       originalTrack: originalTrack,
+      playlistPosition: position,
+      accessStatus: access,
     );
   }
 
@@ -495,6 +508,8 @@ class CatalogTrackModel {
     CatalogAlbumModel? album,
     int? trackNumber,
     CatalogOriginalTrackModel? originalTrack,
+    int? playlistPosition,
+    TrackAccessStatusModel? accessStatus,
   }) {
     return CatalogTrackModel(
       id: id,
@@ -521,9 +536,122 @@ class CatalogTrackModel {
       album: album ?? this.album,
       trackNumber: trackNumber ?? this.trackNumber,
       originalTrack: originalTrack ?? this.originalTrack,
+      playlistPosition: playlistPosition ?? this.playlistPosition,
+      accessStatus: accessStatus ?? this.accessStatus,
     );
   }
 }
+
+class TrackAccessStatusModel {
+  final String status; // 'free', 'purchased', 'rented', 'rental_expired', 'purchase_required', 'unavailable'
+  final String labelEn;
+  final String labelAr;
+  final bool isPlayable;
+  final bool canStreamFull;
+  final String? expiresAt;
+
+  TrackAccessStatusModel({
+    required this.status,
+    required this.labelEn,
+    required this.labelAr,
+    required this.isPlayable,
+    required this.canStreamFull,
+    this.expiresAt,
+  });
+
+  factory TrackAccessStatusModel.fromJson(Map<String, dynamic> json) {
+    return TrackAccessStatusModel(
+      status: json['status']?.toString() ?? 'unavailable',
+      labelEn: json['label_en']?.toString() ?? 'Unavailable',
+      labelAr: json['label_ar']?.toString() ?? 'غير متاح',
+      isPlayable: json['is_playable'] == true || json['is_playable'] == 1,
+      canStreamFull: json['can_stream_full'] == true || json['can_stream_full'] == 1,
+      expiresAt: json['expires_at']?.toString(),
+    );
+  }
+
+  String displayLabel(bool isArabic) {
+    return isArabic ? labelAr : labelEn;
+  }
+
+  bool get isFree => status == 'free';
+  bool get isPurchased => status == 'purchased';
+  bool get isRented => status == 'rented';
+  bool get isRentalExpired => status == 'rental_expired';
+  bool get isPurchaseRequired => status == 'purchase_required';
+  bool get isUnavailable => status == 'unavailable';
+}
+
+class MusicPlaylistModel {
+  final int id;
+  final String name;
+  final String? description;
+  final String? coverImageUrl;
+  final bool isPublic;
+  final int tracksCount;
+  final int totalDurationSeconds;
+  final String? createdAt;
+  final String? updatedAt;
+  final List<CatalogTrackModel> tracks;
+  final bool containsTrack;
+
+  MusicPlaylistModel({
+    required this.id,
+    required this.name,
+    this.description,
+    this.coverImageUrl,
+    this.isPublic = false,
+    this.tracksCount = 0,
+    this.totalDurationSeconds = 0,
+    this.createdAt,
+    this.updatedAt,
+    this.tracks = const [],
+    this.containsTrack = false,
+  });
+
+  factory MusicPlaylistModel.fromJson(Map<String, dynamic> json) {
+    final rawCover = json['cover_image_url'] ?? json['cover_image'];
+    final resolvedCover = CatalogTrackModel.resolveCoverUrl(rawCover);
+
+    List<CatalogTrackModel> parsedTracks = [];
+    if (json['tracks'] is List) {
+      parsedTracks = (json['tracks'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map((t) => CatalogTrackModel.fromJson(t))
+          .toList();
+    }
+
+    final count = json['tracks_count'] is int
+        ? json['tracks_count'] as int
+        : (parsedTracks.isNotEmpty ? parsedTracks.length : (int.tryParse(json['tracks_count']?.toString() ?? '0') ?? 0));
+
+    final duration = json['total_duration_seconds'] is int
+        ? json['total_duration_seconds'] as int
+        : (int.tryParse(json['total_duration_seconds']?.toString() ?? '0') ?? 0);
+
+    return MusicPlaylistModel(
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      name: json['name']?.toString() ?? 'Untitled Playlist',
+      description: json['description']?.toString(),
+      coverImageUrl: resolvedCover,
+      isPublic: json['is_public'] == true || json['is_public'] == 1,
+      tracksCount: count,
+      totalDurationSeconds: duration,
+      createdAt: json['created_at']?.toString(),
+      updatedAt: json['updated_at']?.toString(),
+      tracks: parsedTracks,
+      containsTrack: json['contains_track'] == true || json['contains_track'] == 1,
+    );
+  }
+
+  String get formattedTotalDuration {
+    if (totalDurationSeconds <= 0) return '';
+    final m = totalDurationSeconds ~/ 60;
+    final s = totalDurationSeconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+}
+
 
 class CatalogResponse {
   final List<CatalogTrackModel> tracks;
