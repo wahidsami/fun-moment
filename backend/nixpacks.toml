@@ -2,4 +2,4 @@
 nixPkgs = ["...", "ffmpeg"]
 
 [start]
-cmd = "mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs storage/app/music_private/masters storage/app/music_private/streams storage/app/music_private/previews bootstrap/cache && chmod -R ug+rwX storage bootstrap/cache || true && php -d upload_max_filesize=32M -d post_max_size=32M -d memory_limit=256M -S 0.0.0.0:80 -t public server.php"
+cmd = "mkdir -p public/assets/uploads/media-uploader storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs storage/app/music_private/masters storage/app/music_private/streams storage/app/music_private/previews bootstrap/cache && chmod -R ug+rwX storage bootstrap/cache || true && php -d upload_max_filesize=32M -d post_max_size=32M -d memory_limit=256M -S 0.0.0.0:80 -t public server.php"

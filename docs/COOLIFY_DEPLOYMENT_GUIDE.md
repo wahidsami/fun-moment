@@ -130,23 +130,39 @@ Use this:
 
 Do not use `File Mount` or `Directory Mount` for PostgreSQL data.
 
-### 4B - Laravel storage
+### 4B - Laravel runtime storage
 
 On the Laravel backend application, open **Persistent Storage** and click **+ Add**.
 
-Choose **Directory Mount**.
+Choose **Directory Mount** (or Volume Mount).
 
 Set the container path to:
 
 - `/app/storage`
 
-This keeps Laravel uploads and runtime files after redeploys.
+This keeps Laravel session data, logs, framework cache, and private music streams across redeploys.
 
 Use this:
 
 - Name: `funmoments-storage`
 - Source Directory: keep the Coolify default if it is already filled in, or use the app's generated directory path
 - Destination Directory: `/app/storage`
+
+### 4C - Laravel Media Vault uploads (CRITICAL)
+
+The application's legacy Media Vault (`MediaHelper.php`) saves all uploaded images directly into `public/assets/uploads/media-uploader/` (`public_path()`). Without a persistent volume on this path, all uploaded media (including category icons, service images, and CMS uploads) are wiped on every container redeployment.
+
+On the Laravel backend application, open **Persistent Storage** and click **+ Add**:
+
+Choose **Volume Mount**.
+
+Use this:
+
+- Name: `funmoments-uploads-staging` (or `funmoments-uploads-prod` for production)
+- Destination Directory: `/app/public/assets/uploads`
+
+> [!IMPORTANT]
+> **Volume Mount vs Directory Mount:** Use **Volume Mount** (Docker named volume) for `/app/public/assets/uploads`. When Docker initializes a named volume for the first time, it automatically copies the pre-existing container image files (such as `no-image.png` and baseline CMS templates) into the volume. A Directory Mount would mask existing files if the host folder is initially empty.
 
 ## Step 5 - Deploy the backend
 
