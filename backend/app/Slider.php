@@ -11,6 +11,79 @@ class Slider extends Model
 
     protected $table = 'sliders';
 
+    public const ACTION_NONE = 'none';
+    public const ACTION_SERVICE = 'service';
+    public const ACTION_CATEGORY = 'category';
+    public const ACTION_SECTION = 'section';
+    public const ACTION_URL = 'url';
+
+    public const SUPPORTED_ACTION_TYPES = [
+        self::ACTION_NONE,
+        self::ACTION_SERVICE,
+        self::ACTION_CATEGORY,
+        self::ACTION_SECTION,
+        self::ACTION_URL,
+    ];
+
+    public const SUPPORTED_APP_SECTIONS = [
+        [
+            'key' => 'music_marketplace',
+            'label_en' => 'Music Marketplace',
+            'label_ar' => 'سوق الموسيقى',
+            'description_en' => 'Open Music Marketplace track & beat catalog',
+            'description_ar' => 'فتح كتالوج المقاطع الموسيقية وسوق الموسيقى',
+            'icon' => 'music',
+        ],
+        [
+            'key' => 'all_categories',
+            'label_en' => 'All Categories',
+            'label_ar' => 'جميع التصنيفات',
+            'description_en' => 'Browse all marketplace service categories',
+            'description_ar' => 'استعراض كافة تصنيفات الخدمات في المنصة',
+            'icon' => 'grid',
+        ],
+        [
+            'key' => 'bookings',
+            'label_en' => 'My Bookings & Orders',
+            'label_ar' => 'حجوزاتي وطلباتي',
+            'description_en' => 'Buyer bookings, active orders & service status',
+            'description_ar' => 'حجوزات المشتري والطلبات الحالية وحالة الخدمات',
+            'icon' => 'calendar',
+        ],
+        [
+            'key' => 'discover',
+            'label_en' => 'Discover Services',
+            'label_ar' => 'استكشف الخدمات',
+            'description_en' => 'Search & explore marketplace services',
+            'description_ar' => 'البحث واستكشاف خدمات المنصة',
+            'icon' => 'search',
+        ],
+        [
+            'key' => 'saved',
+            'label_en' => 'Saved Favorites',
+            'label_ar' => 'المفضلة والمحفوظات',
+            'description_en' => 'View saved services and bookmarks',
+            'description_ar' => 'عرض الخدمات المحفوظة والمفضلة',
+            'icon' => 'heart',
+        ],
+        [
+            'key' => 'wallet',
+            'label_en' => 'My Wallet',
+            'label_ar' => 'محفظتي',
+            'description_en' => 'Buyer wallet balance & transactions',
+            'description_ar' => 'رصيد محفظة المشتري وسجل العمليات',
+            'icon' => 'credit-card',
+        ],
+        [
+            'key' => 'top_services',
+            'label_en' => 'Top Rated Services',
+            'label_ar' => 'الخدمات الأعلى تقييماً',
+            'description_en' => 'Browse top-reviewed & trending services',
+            'description_ar' => 'استعراض الخدمات الأكثر تقييماً والأكثر طلباً',
+            'icon' => 'star',
+        ],
+    ];
+
     protected $fillable = [
         'background_image',
         'title',

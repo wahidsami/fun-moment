@@ -30,17 +30,21 @@ class AdminSliderApiController extends Controller
         // Provide comprehensive lookup options for target selection in modal
         $searchService = $request ? $request->query('search_service') : null;
         $searchCategory = $request ? $request->query('search_category') : null;
+        $searchSection = $request ? $request->query('search_section') : null;
         $services = $this->getEligibleServices($searchService);
         $categories = $this->getEligibleCategories($searchCategory);
+        $sections = $this->getEligibleSections($searchSection);
 
         return response()->json([
             'status' => 'success',
             'sliders' => $sliders,
             'services' => $services,
             'categories' => $categories,
+            'sections' => $sections,
             'lookups' => [
                 'services' => $services,
                 'categories' => $categories,
+                'sections' => $sections,
             ],
             'counts' => [
                 'total' => $sliders->count(),
@@ -48,6 +52,7 @@ class AdminSliderApiController extends Controller
                 'inactive' => $sliders->where('status', 0)->count(),
                 'services_count' => count($services),
                 'categories_count' => count($categories),
+                'sections_count' => count($sections),
             ],
         ]);
     }
@@ -58,22 +63,26 @@ class AdminSliderApiController extends Controller
     public function lookups(?Request $request = null): JsonResponse
     {
         $search = $request ? $request->query('search') : null;
-        $type = $request ? $request->query('type') : null; // 'service', 'category', or null (both)
+        $type = $request ? $request->query('type') : null; // 'service', 'category', 'section', or null (all)
 
-        $services = ($type === 'category') ? [] : $this->getEligibleServices($search);
-        $categories = ($type === 'service') ? [] : $this->getEligibleCategories($search);
+        $services = ($type === 'category' || $type === 'section') ? [] : $this->getEligibleServices($search);
+        $categories = ($type === 'service' || $type === 'section') ? [] : $this->getEligibleCategories($search);
+        $sections = ($type === 'service' || $type === 'category') ? [] : $this->getEligibleSections($search);
 
         return response()->json([
             'status' => 'success',
             'services' => $services,
             'categories' => $categories,
+            'sections' => $sections,
             'lookups' => [
                 'services' => $services,
                 'categories' => $categories,
+                'sections' => $sections,
             ],
             'counts' => [
                 'services_count' => count($services),
                 'categories_count' => count($categories),
+                'sections_count' => count($sections),
             ],
         ]);
     }
@@ -181,6 +190,35 @@ class AdminSliderApiController extends Controller
     }
 
     /**
+     * Retrieve eligible main application sections supported by mobile navigation.
+     */
+    public function getEligibleSections(?string $search = null): array
+    {
+        $sections = Slider::SUPPORTED_APP_SECTIONS;
+
+        if (!empty($search)) {
+            $term = mb_strtolower(trim($search));
+            $sections = array_filter($sections, function ($sec) use ($term) {
+                return str_contains(mb_strtolower($sec['key']), $term)
+                    || str_contains(mb_strtolower($sec['label_en']), $term)
+                    || str_contains(mb_strtolower($sec['label_ar']), $term);
+            });
+        }
+
+        return array_values(array_map(function ($sec) {
+            return [
+                'key' => $sec['key'],
+                'label_en' => $sec['label_en'],
+                'label_ar' => $sec['label_ar'],
+                'description_en' => $sec['description_en'] ?? null,
+                'description_ar' => $sec['description_ar'] ?? null,
+                'icon' => $sec['icon'] ?? null,
+                'display_label' => "{$sec['label_en']} ({$sec['label_ar']})",
+            ];
+        }, $sections));
+    }
+
+    /**
      * Store a new carousel slide.
      */
     public function store(Request $request): JsonResponse
@@ -193,7 +231,7 @@ class AdminSliderApiController extends Controller
             'sub_title_ar' => 'nullable|string|max:191',
             'btn_text_en' => 'nullable|string|max:100',
             'btn_text_ar' => 'nullable|string|max:100',
-            'action_type' => ['required', Rule::in(['none', 'service', 'category', 'url'])],
+            'action_type' => ['required', Rule::in(Slider::SUPPORTED_ACTION_TYPES)],
             'action_target' => 'nullable|string|max:500',
             'service_id' => 'nullable|integer',
             'order' => 'nullable|integer|min:0',
@@ -249,7 +287,7 @@ class AdminSliderApiController extends Controller
             'sub_title_ar' => 'nullable|string|max:191',
             'btn_text_en' => 'nullable|string|max:100',
             'btn_text_ar' => 'nullable|string|max:100',
-            'action_type' => ['required', Rule::in(['none', 'service', 'category', 'url'])],
+            'action_type' => ['required', Rule::in(Slider::SUPPORTED_ACTION_TYPES)],
             'action_target' => 'nullable|string|max:500',
             'service_id' => 'nullable|integer',
             'order' => 'nullable|integer|min:0',
@@ -355,7 +393,7 @@ class AdminSliderApiController extends Controller
         }
 
         if (empty($target)) {
-            return;
+            abort(422, __('The destination target is required for this action type'));
         }
 
         if ($type === 'url') {
@@ -375,6 +413,13 @@ class AdminSliderApiController extends Controller
                 abort(422, __('The selected category target does not exist'));
             }
         }
+
+        if ($type === 'section') {
+            $validKeys = array_column(Slider::SUPPORTED_APP_SECTIONS, 'key');
+            if (empty($target) || !in_array($target, $validKeys, true)) {
+                abort(422, __('The selected app section target is not supported'));
+            }
+        }
     }
 
     /**
@@ -384,6 +429,26 @@ class AdminSliderApiController extends Controller
     {
         $attachment = $slider->getAttachmentMeta();
         $resolvedUrl = $slider->resolved_image_url;
+
+        $actionType = $slider->action_type ?? ($slider->service_id ? 'service' : 'none');
+        $actionTarget = $slider->action_target ?? ($slider->service_id ? (string) $slider->service_id : '');
+
+        // Resolve section label if action_type is section
+        $sectionMeta = null;
+        if ($actionType === 'section' && !empty($actionTarget)) {
+            foreach (Slider::SUPPORTED_APP_SECTIONS as $sec) {
+                if ($sec['key'] === $actionTarget) {
+                    $sectionMeta = [
+                        'key' => $sec['key'],
+                        'label_en' => $sec['label_en'],
+                        'label_ar' => $sec['label_ar'],
+                        'icon' => $sec['icon'] ?? null,
+                        'display_label' => "{$sec['label_en']} ({$sec['label_ar']})",
+                    ];
+                    break;
+                }
+            }
+        }
 
         return [
             'id' => $slider->id,
@@ -397,8 +462,9 @@ class AdminSliderApiController extends Controller
             'btn_text_en' => $slider->btn_text_en ?? '',
             'btn_text_ar' => $slider->btn_text_ar ?? '',
             'service_id' => $slider->service_id,
-            'action_type' => $slider->action_type ?? ($slider->service_id ? 'service' : 'none'),
-            'action_target' => $slider->action_target ?? ($slider->service_id ? (string) $slider->service_id : ''),
+            'action_type' => $actionType,
+            'action_target' => $actionTarget,
+            'section_meta' => $sectionMeta,
             'order' => $slider->order ?? 0,
             'status' => (int) ($slider->status ?? 1),
             'img_url' => $resolvedUrl,

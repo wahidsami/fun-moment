@@ -52,6 +52,13 @@ class SliderController extends Controller
             } elseif ($rawActionType === 'category' && !empty($rawActionTarget) && is_numeric($rawActionTarget)) {
                 $actionType = 'category';
                 $actionTarget = (string) (int) $rawActionTarget;
+            } elseif ($rawActionType === 'section' && !empty($rawActionTarget)) {
+                $targetKey = trim((string) $rawActionTarget);
+                $validKeys = array_column(Slider::SUPPORTED_APP_SECTIONS, 'key');
+                if (in_array($targetKey, $validKeys, true)) {
+                    $actionType = 'section';
+                    $actionTarget = $targetKey;
+                }
             } elseif ($rawActionType === 'url' && !empty($rawActionTarget)) {
                 $trimmedUrl = trim((string) $rawActionTarget);
                 if (filter_var($trimmedUrl, FILTER_VALIDATE_URL) && (str_starts_with($trimmedUrl, 'http://') || str_starts_with($trimmedUrl, 'https://'))) {

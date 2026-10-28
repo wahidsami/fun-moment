@@ -708,8 +708,15 @@ export interface SliderItem {
   btn_text_en?: string;
   btn_text_ar?: string;
   service_id?: number | null;
-  action_type: 'none' | 'service' | 'category' | 'url';
+  action_type: 'none' | 'service' | 'category' | 'url' | 'section';
   action_target?: string | null;
+  section_meta?: {
+    key: string;
+    label_en: string;
+    label_ar: string;
+    icon?: string;
+    display_label?: string;
+  } | null;
   order: number;
   status: 0 | 1;
   img_url?: string | null;
@@ -743,6 +750,22 @@ export interface SliderLookupCategory {
   name_ar?: string | null;
   status?: number;
   display_label?: string;
+}
+
+export interface SliderLookupSection {
+  key: string;
+  label_en: string;
+  label_ar: string;
+  description_en?: string;
+  description_ar?: string;
+  icon?: string;
+  display_label?: string;
+}
+
+export interface SliderLookups {
+  services: SliderLookupService[];
+  categories: SliderLookupCategory[];
+  sections: SliderLookupSection[];
 }
 
 export interface MusicMarketplaceSettings {

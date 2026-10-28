@@ -4,9 +4,9 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Language, UserRole, SliderItem, SliderLookupService, SliderLookupCategory } from '../types';
+import { Language, UserRole, SliderItem, SliderLookupService, SliderLookupCategory, SliderLookupSection, SliderLookups } from '../types';
 import { translations } from '../translations';
-import { LaravelAPI } from '../api';
+import { LaravelAPI, DEFAULT_APP_SECTIONS } from '../api';
 import {
   BookOpen,
   FolderTree,
@@ -149,14 +149,16 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
 
   // 0. Home Carousel & Promotional Sliders State
   const [sliders, setSliders] = useState<SliderItem[]>([]);
-  const [sliderLookups, setSliderLookups] = useState<{
-    services: SliderLookupService[];
-    categories: SliderLookupCategory[];
-  }>({ services: [], categories: [] });
+  const [sliderLookups, setSliderLookups] = useState<SliderLookups>({
+    services: [],
+    categories: [],
+    sections: DEFAULT_APP_SECTIONS,
+  });
   const [isLoadingLookups, setIsLoadingLookups] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [serviceSearchTerm, setServiceSearchTerm] = useState('');
   const [categorySearchTerm, setCategorySearchTerm] = useState('');
+  const [sectionSearchTerm, setSectionSearchTerm] = useState('');
   const [sliderCounts, setSliderCounts] = useState<{ total: number; active: number; inactive: number }>({ total: 0, active: 0, inactive: 0 });
   const [isLoadingSliders, setIsLoadingSliders] = useState(false);
   const [selectedSlider, setSelectedSlider] = useState<SliderItem | null>(null);
@@ -382,9 +384,13 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
       setSliders(list);
       const incomingServices = Array.isArray(data.lookups?.services) ? data.lookups.services : [];
       const incomingCategories = Array.isArray(data.lookups?.categories) ? data.lookups.categories : [];
+      const incomingSections = Array.isArray(data.lookups?.sections) && data.lookups.sections.length > 0
+        ? data.lookups.sections
+        : DEFAULT_APP_SECTIONS;
       setSliderLookups({
         services: incomingServices,
         categories: incomingCategories,
+        sections: incomingSections,
       });
       if (incomingServices.length === 0 && incomingCategories.length === 0) {
         fetchSliderLookups();
@@ -404,14 +410,15 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
     }
   };
 
-  const fetchSliderLookups = async (search?: string, type?: 'service' | 'category') => {
+  const fetchSliderLookups = async (search?: string, type?: 'service' | 'category' | 'section') => {
     setIsLoadingLookups(true);
     setLookupError(null);
     try {
       const res = await LaravelAPI.getSliderLookups(search, type);
       setSliderLookups(prev => ({
-        services: type === 'category' ? prev.services : (Array.isArray(res.services) ? res.services : []),
-        categories: type === 'service' ? prev.categories : (Array.isArray(res.categories) ? res.categories : []),
+        services: (type === 'category' || type === 'section') ? prev.services : (Array.isArray(res.services) ? res.services : []),
+        categories: (type === 'service' || type === 'section') ? prev.categories : (Array.isArray(res.categories) ? res.categories : []),
+        sections: (type === 'service' || type === 'category') ? prev.sections : (Array.isArray(res.sections) && res.sections.length > 0 ? res.sections : prev.sections),
       }));
     } catch (err: any) {
       console.warn('Failed to load slider lookups', err);
@@ -445,6 +452,18 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
       return matchId || matchName || matchNameAr;
     });
   }, [sliderLookups.categories, categorySearchTerm]);
+
+  const filteredSections = useMemo(() => {
+    const list = sliderLookups.sections || DEFAULT_APP_SECTIONS;
+    if (!sectionSearchTerm.trim()) return list;
+    const q = sectionSearchTerm.toLowerCase().trim();
+    return list.filter((sec: SliderLookupSection) => {
+      const matchKey = (sec.key || '').toLowerCase().includes(q);
+      const matchEn = (sec.label_en || '').toLowerCase().includes(q);
+      const matchAr = (sec.label_ar || '').toLowerCase().includes(q);
+      return matchKey || matchEn || matchAr;
+    });
+  }, [sliderLookups.sections, sectionSearchTerm]);
 
   const handleUploadSliderFile = async (file?: File | null) => {
     if (!hasPermission || !file) return;
@@ -1237,6 +1256,16 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                                         {t.carousel_action_none || (language === 'ar' ? 'بدون إجراء (عرض مرئي)' : 'Visual Banner')}
                                       </span>
                                     )}
+                                    {slide.action_type === 'section' && (
+                                      <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-[9px] font-bold text-purple-700">
+                                        <Sparkles className="h-3 w-3" />
+                                        {(() => {
+                                          const sec = sliderLookups.sections?.find(s => s.key === slide.action_target);
+                                          const label = sec ? (language === 'ar' ? (sec.label_ar || sec.label_en) : (sec.label_en || sec.label_ar)) : (slide.action_target || '');
+                                          return `${language === 'en' ? 'Section: ' : 'قسم: '}${label}`;
+                                        })()}
+                                      </span>
+                                    )}
                                     {slide.action_type === 'service' && (
                                       <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[9px] font-bold text-indigo-700">
                                         <ArrowUpRight className="h-3 w-3" />
@@ -1480,6 +1509,7 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                             className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-semibold"
                           >
                             <option value="none">{t.carousel_action_none || 'None (Visual Banner Only)'}</option>
+                            <option value="section">{t.carousel_action_section || 'Main App Section'}</option>
                             <option value="service">{t.carousel_action_service || 'Direct Link to Service'}</option>
                             <option value="category">{t.carousel_action_category || 'Direct Link to Category'}</option>
                             <option value="url">{t.carousel_action_url || 'External / Custom URL'}</option>
@@ -1499,6 +1529,79 @@ export default function CMSView({ language, activeRole }: CMSViewProps) {
                               value={language === 'en' ? 'No action triggered on tap' : 'لا يوجد إجراء عند النقر'}
                               className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-slate-100 text-slate-400 italic"
                             />
+                          )}
+
+                          {sliderForm.action_type === 'section' && (
+                            <div className="space-y-2">
+                              {/* Header & Controls */}
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-semibold text-slate-500">
+                                  {language === 'en'
+                                    ? `${filteredSections.length} available app sections`
+                                    : `${filteredSections.length} قسم متاح بالتطبيق`}
+                                </span>
+                              </div>
+
+                              {/* Search/filter input */}
+                              <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                                <input
+                                  type="text"
+                                  value={sectionSearchTerm}
+                                  onChange={e => setSectionSearchTerm(e.target.value)}
+                                  placeholder={t.carousel_search_sections || (language === 'ar' ? 'تصفية الأقسام...' : 'Filter app sections...')}
+                                  className="w-full text-xs rounded-xl border border-slate-200 pl-8 pr-3 py-1.5 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:outline-none"
+                                />
+                                {sectionSearchTerm && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSectionSearchTerm('')}
+                                    className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Dropdown Selector */}
+                              <select
+                                value={sliderForm.action_target || ''}
+                                onChange={e => setSliderForm({ ...sliderForm, action_target: e.target.value })}
+                                className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 bg-white focus:border-indigo-500 focus:outline-none font-medium truncate"
+                              >
+                                <option value="">{t.carousel_select_section || 'Select App Section...'}</option>
+                                {sliderForm.action_target &&
+                                  !filteredSections.some(s => s.key === sliderForm.action_target) && (
+                                    <option value={sliderForm.action_target}>
+                                      Current: {sliderForm.action_target}
+                                    </option>
+                                  )}
+                                {filteredSections.map(sec => (
+                                  <option key={sec.key} value={sec.key}>
+                                    {language === 'ar' ? (sec.label_ar || sec.label_en) : (sec.label_en || sec.label_ar)} ({sec.key})
+                                  </option>
+                                ))}
+                              </select>
+
+                              {/* Destination details indicator */}
+                              {sliderForm.action_target && (
+                                <div className="rounded-lg bg-purple-50/80 border border-purple-200/60 p-2 text-[11px] text-purple-700 space-y-0.5">
+                                  <div className="flex items-center gap-1.5 font-bold">
+                                    <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+                                    <span>
+                                      {language === 'en'
+                                        ? `Destination: ${sliderLookups.sections?.find(s => s.key === sliderForm.action_target)?.label_en || sliderForm.action_target}`
+                                        : `الوجهة: ${sliderLookups.sections?.find(s => s.key === sliderForm.action_target)?.label_ar || sliderForm.action_target}`}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-purple-600/90 pl-5">
+                                    {language === 'en'
+                                      ? (sliderLookups.sections?.find(s => s.key === sliderForm.action_target)?.description_en || 'Opens directly in FUN MOMENT mobile app')
+                                      : (sliderLookups.sections?.find(s => s.key === sliderForm.action_target)?.description_ar || 'يفتح مباشرة في تطبيق فن مومنت')}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                           )}
 
                           {sliderForm.action_type === 'service' && (

@@ -38,6 +38,17 @@ export interface DashboardSettings {
   exchange_rate_usd: number;
 }
 
+// Controlled Registry of Canonical App Section Destinations
+export const DEFAULT_APP_SECTIONS: import('./types').SliderLookupSection[] = [
+  { key: 'music_marketplace', label_en: 'Music Marketplace', label_ar: 'سوق الموسيقى', description_en: 'Open Music Marketplace track & beat catalog', description_ar: 'فتح كتالوج المقاطع الموسيقية وسوق الموسيقى', icon: 'music', display_label: 'Music Marketplace (سوق الموسيقى)' },
+  { key: 'all_categories', label_en: 'All Categories', label_ar: 'جميع التصنيفات', description_en: 'Browse all marketplace service categories', description_ar: 'استعراض كافة تصنيفات الخدمات في المنصة', icon: 'grid', display_label: 'All Categories (جميع التصنيفات)' },
+  { key: 'bookings', label_en: 'My Bookings & Orders', label_ar: 'حجوزاتي وطلباتي', description_en: 'Buyer bookings, active orders & service status', description_ar: 'حجوزات المشتري والطلبات الحالية وحالة الخدمات', icon: 'calendar', display_label: 'My Bookings & Orders (حجوزاتي وطلباتي)' },
+  { key: 'discover', label_en: 'Discover Services', label_ar: 'استكشف الخدمات', description_en: 'Search & explore marketplace services', description_ar: 'البحث واستكشاف خدمات المنصة', icon: 'search', display_label: 'Discover Services (استكشف الخدمات)' },
+  { key: 'saved', label_en: 'Saved Favorites', label_ar: 'المفضلة والمحفوظات', description_en: 'View saved services and bookmarks', description_ar: 'عرض الخدمات المحفوظة والمفضلة', icon: 'heart', display_label: 'Saved Favorites (المفضلة والمحفوظات)' },
+  { key: 'wallet', label_en: 'My Wallet', label_ar: 'محفظتي', description_en: 'Buyer wallet balance & transactions', description_ar: 'رصيد محفظة المشتري وسجل العمليات', icon: 'credit-card', display_label: 'My Wallet (محفظتي)' },
+  { key: 'top_services', label_en: 'Top Rated Services', label_ar: 'الخدمات الأعلى تقييماً', description_en: 'Browse top-reviewed & trending services', description_ar: 'استعراض الخدمات الأكثر تقييماً والأكثر طلباً', icon: 'star', display_label: 'Top Rated Services (الخدمات الأعلى تقييماً)' },
+];
+
 // In-memory changes tracker for real-time demo updates
 export const LaravelAPI = {
   async getDashboardSummary(): Promise<DashboardSummaryPayload> {
@@ -2266,7 +2277,7 @@ export const LaravelAPI = {
   // Home Carousel & Sliders Management
   async getSliders(): Promise<{
     sliders: import('./types').SliderItem[];
-    lookups: { services: import('./types').SliderLookupService[]; categories: import('./types').SliderLookupCategory[] };
+    lookups: import('./types').SliderLookups;
     counts: { total: number; active: number; inactive: number };
   }> {
     const response = await fetch('/admin-home/sliders-json', {
@@ -2280,7 +2291,11 @@ export const LaravelAPI = {
     }
 
     const payload = await response.json();
-    let lookups = payload?.lookups ?? { services: [], categories: [] };
+    let lookups: import('./types').SliderLookups = payload?.lookups ?? { services: [], categories: [], sections: [] };
+
+    if (!lookups.sections || lookups.sections.length === 0) {
+      lookups.sections = DEFAULT_APP_SECTIONS;
+    }
 
     // Resilient fallback: if sliders-json did not supply lookups, pull from marketplace services payload
     if ((!lookups.services || lookups.services.length === 0) || (!lookups.categories || lookups.categories.length === 0)) {
@@ -2318,10 +2333,7 @@ export const LaravelAPI = {
     };
   },
 
-  async getSliderLookups(search?: string, type?: 'service' | 'category'): Promise<{
-    services: import('./types').SliderLookupService[];
-    categories: import('./types').SliderLookupCategory[];
-  }> {
+  async getSliderLookups(search?: string, type?: 'service' | 'category' | 'section'): Promise<import('./types').SliderLookups> {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     if (type) params.append('type', type);
@@ -2339,6 +2351,9 @@ export const LaravelAPI = {
           return {
             services: Array.isArray(payload.lookups.services) ? payload.lookups.services : [],
             categories: Array.isArray(payload.lookups.categories) ? payload.lookups.categories : [],
+            sections: Array.isArray(payload.lookups.sections) && payload.lookups.sections.length > 0
+              ? payload.lookups.sections
+              : DEFAULT_APP_SECTIONS,
           };
         }
       }
@@ -2365,6 +2380,7 @@ export const LaravelAPI = {
         name_ar: c.name_ar || c.name,
         display_label: c.name,
       })),
+      sections: DEFAULT_APP_SECTIONS,
     };
   },
 

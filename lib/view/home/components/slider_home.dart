@@ -7,6 +7,11 @@ import 'package:funmoments/service/rtl_service.dart';
 import 'package:funmoments/service/service_details_service.dart';
 import 'package:funmoments/view/services/service_details_page.dart';
 import 'package:funmoments/view/services/service_by_category_page.dart';
+import 'package:funmoments/view/music/music_marketplace_page.dart';
+import 'package:funmoments/view/home/categories/all_categories_page.dart';
+import 'package:funmoments/view/home/homepage_helper.dart';
+import 'package:funmoments/view/wallet/wallet_page.dart';
+import 'package:funmoments/view/home/top_all_service_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SliderHome extends StatelessWidget {
@@ -21,7 +26,7 @@ class SliderHome extends StatelessWidget {
   final List<dynamic>? sliderDetailsList;
   final List<dynamic>? sliderImageList;
 
-  /// Safely routes slide tap to service, category, or validated external URL
+  /// Safely routes slide tap to service, category, app section, or validated external URL
   static void handleSlideAction(BuildContext context, dynamic slide) {
     if (slide == null || slide is! Map) return;
 
@@ -60,6 +65,8 @@ class SliderHome extends StatelessWidget {
           ),
         );
       }
+    } else if (actionType == 'section') {
+      handleSectionNavigation(context, actionTarget);
     } else if (actionType == 'url') {
       if (actionTarget != null && actionTarget.isNotEmpty) {
         final uri = Uri.tryParse(actionTarget);
@@ -67,6 +74,59 @@ class SliderHome extends StatelessWidget {
           launchUrl(uri, mode: LaunchMode.externalApplication);
         }
       }
+    }
+  }
+
+  /// Safely routes slide tap to canonical main application section
+  static void handleSectionNavigation(BuildContext context, String? sectionKey) {
+    if (sectionKey == null || sectionKey.trim().isEmpty) return;
+
+    final key = sectionKey.toLowerCase().trim();
+    switch (key) {
+      case 'music_marketplace':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const MusicMarketplacePage(),
+          ),
+        );
+        break;
+      case 'all_categories':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AllCategoriesPage(),
+          ),
+        );
+        break;
+      case 'bookings':
+        HomepageHelper.tabIndex.value = 2;
+        break;
+      case 'discover':
+        HomepageHelper.tabIndex.value = 1;
+        break;
+      case 'saved':
+        HomepageHelper.tabIndex.value = 3;
+        break;
+      case 'wallet':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const WalletPage(),
+          ),
+        );
+        break;
+      case 'top_services':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const TopAllServicePage(),
+          ),
+        );
+        break;
+      default:
+        debugPrint('[SliderHome] Unrecognized section key "$key"; safe no-op');
+        break;
     }
   }
 
