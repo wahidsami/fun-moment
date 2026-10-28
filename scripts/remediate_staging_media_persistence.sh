@@ -132,11 +132,19 @@ fi
 echo ""
 echo "[3/6] Auditing container persistent storage mounts..."
 
-P2_STORAGE_MOUNT=$(docker inspect "$P2_BACKEND_ID" --format '{{range .Mounts}}{{if eq .Destination "/app/storage"}}{{.Source}}{{end}}{{end}}')
-P2_UPLOADS_MOUNT=$(docker inspect "$P2_BACKEND_ID" --format '{{range .Mounts}}{{if eq .Destination "/app/public/assets/uploads"}}{{.Source}}{{end}}{{end}}')
+# Invariant check: music-private nested persistent volume must be active
+P2_MUSIC_PRIVATE_MOUNT=$(docker inspect "$P2_BACKEND_ID" --format '{{range .Mounts}}{{if eq .Destination "/app/storage/app/music_private"}}{{.Name}} (Source: {{.Source}}){{end}}{{end}}')
+P2_UPLOADS_MOUNT=$(docker inspect "$P2_BACKEND_ID" --format '{{range .Mounts}}{{if eq .Destination "/app/public/assets/uploads"}}{{.Name}} (Source: {{.Source}}){{end}}{{end}}')
 
-echo "  Project 2 /app/storage mount                : ${P2_STORAGE_MOUNT:-NOT MOUNTED}"
-echo "  Project 2 /app/public/assets/uploads mount  : ${P2_UPLOADS_MOUNT:-NOT MOUNTED}"
+echo "  Project 2 music-private mount (/app/storage/app/music_private) : ${P2_MUSIC_PRIVATE_MOUNT:-NOT MOUNTED}"
+echo "  Project 2 uploads mount       (/app/public/assets/uploads)      : ${P2_UPLOADS_MOUNT:-NOT MOUNTED}"
+
+if [[ -z "$P2_MUSIC_PRIVATE_MOUNT" ]]; then
+    echo "FATAL: music_private persistent volume mount (/app/storage/app/music_private) was not found on Project 2!" >&2
+    echo "Existing music private storage must be preserved and cannot be missing or detached." >&2
+    exit 107
+fi
+echo "  [OK] music_private persistent volume verified: ${P2_MUSIC_PRIVATE_MOUNT}"
 
 # -----------------------------------------------------------------------------
 # 4. PREFLIGHT EXECUTION (READ-ONLY)
@@ -246,19 +254,21 @@ if [[ "$MODE" == "--restore-staging-media" || "$MODE" == "--all" ]]; then
     echo ""
     echo "[5/6] Restoring media into Project 2 persistent uploads volume..."
 
-    # Ensure persistent mount is present before restoring
+    # Ensure persistent mount is present on /app/public/assets/uploads
     if [[ -z "$P2_UPLOADS_MOUNT" ]]; then
         echo "FATAL: Refusing to restore media without an active persistent mount on Project 2!" >&2
         echo "Configure Volume Mount '/app/public/assets/uploads' in Coolify before running restore." >&2
         exit 120
     fi
 
-    # Verify that /app/storage (music-private & runtime storage) remains actively mounted and untouched
-    if [[ -z "$P2_STORAGE_MOUNT" ]]; then
-        echo "FATAL: /app/storage mount could not be verified on Project 2 backend!" >&2
+    # Strict Volume Invariant: verify that /app/storage/app/music_private (music-private-staging) remains mounted and untouched
+    P2_MUSIC_PRIVATE_CHECK=$(docker inspect "$P2_BACKEND_ID" --format '{{range .Mounts}}{{if eq .Destination "/app/storage/app/music_private"}}{{.Name}}{{end}}{{end}}')
+    if [[ -z "$P2_MUSIC_PRIVATE_CHECK" ]]; then
+        echo "FATAL CRITICAL SAFETY HAZARD: music_private volume mount (/app/storage/app/music_private) is missing or detached on Project 2!" >&2
+        echo "Refusing to proceed: Existing music-private storage must remain mounted and untouched." >&2
         exit 122
     fi
-    echo "  [OK] Project 2 /app/storage (music-private) persistent mount verified: ${P2_STORAGE_MOUNT}"
+    echo "  [OK] music_private persistent volume mount verified: ${P2_MUSIC_PRIVATE_CHECK}"
 
     # Step A: Restore Project 2 pre-mount baseline files if pre-mount archive exists
     P2_PRE_TAR=$(ls -t "${BACKUP_BASE_DIR}"/funmoments_p2_uploads_pre_mount_*.tar.gz 2>/dev/null | head -n 1 || true)
@@ -275,10 +285,10 @@ if [[ "$MODE" == "--restore-staging-media" || "$MODE" == "--all" ]]; then
     fi
 
     # Step B: Locate or extract Project 1 uploads backup
-    P1_SOURCE_DIR=""
+    P1_SOURCE_MEDIA_DIR=""
     LATEST_BACKUP_DIR=$(ls -td "${BACKUP_BASE_DIR}"/p1_uploads_* 2>/dev/null | head -n 1 || true)
-    if [[ -n "$LATEST_BACKUP_DIR" && -d "$LATEST_BACKUP_DIR/uploads" ]]; then
-        P1_SOURCE_DIR="${LATEST_BACKUP_DIR}/uploads"
+    if [[ -n "$LATEST_BACKUP_DIR" && -d "$LATEST_BACKUP_DIR/uploads/media-uploader" ]]; then
+        P1_SOURCE_MEDIA_DIR="${LATEST_BACKUP_DIR}/uploads/media-uploader"
     else
         LATEST_P1_TAR=$(ls -t "${BACKUP_BASE_DIR}"/funmoments_p1_uploads_*.tar.gz 2>/dev/null | head -n 1 || true)
         if [[ -n "$LATEST_P1_TAR" && -f "$LATEST_P1_TAR" ]]; then
@@ -286,21 +296,96 @@ if [[ "$MODE" == "--restore-staging-media" || "$MODE" == "--all" ]]; then
             P1_EXTRACT_TMP="${BACKUP_BASE_DIR}/p1_uploads_extracted"
             mkdir -p "$P1_EXTRACT_TMP"
             tar -xzf "$LATEST_P1_TAR" -C "$P1_EXTRACT_TMP"
-            P1_SOURCE_DIR="${P1_EXTRACT_TMP}/uploads"
+            P1_SOURCE_MEDIA_DIR="${P1_EXTRACT_TMP}/uploads/media-uploader"
         fi
     fi
 
-    if [[ -z "$P1_SOURCE_DIR" || ! -d "$P1_SOURCE_DIR" ]]; then
+    if [[ -z "$P1_SOURCE_MEDIA_DIR" || ! -d "$P1_SOURCE_MEDIA_DIR" ]]; then
         echo "FATAL: No valid Project 1 uploads backup directory or tarball found in ${BACKUP_BASE_DIR}!" >&2
         exit 121
     fi
-    echo "  Using Project 1 backup source: ${P1_SOURCE_DIR}"
+    echo "  Using Project 1 media source: ${P1_SOURCE_MEDIA_DIR}"
+
+    # Step C: Selective copy of ONLY the 8 approved category files and their scaled variants
+    APPROVED_CATEGORY_FILES=(
+        # Category 1: Music & DJ
+        "dj-world1791019173.png"
+        "grid-dj-world1791019173.png"
+        "large-dj-world1791019173.png"
+        "semi-large-dj-world1791019173.png"
+        "thumb-dj-world1791019173.png"
+
+        # Category 2: Food & Hospitality
+        "food-hospitality-mobile1791026107.png"
+        "grid-food-hospitality-mobile1791026107.png"
+        "large-food-hospitality-mobile1791026107.png"
+        "semi-large-food-hospitality-mobile1791026107.png"
+        "thumb-food-hospitality-mobile1791026107.png"
+
+        # Category 3: Sound & Lighting
+        "sound-lighting-mobile1791026141.png"
+        "grid-sound-lighting-mobile1791026141.png"
+        "large-sound-lighting-mobile1791026141.png"
+        "semi-large-sound-lighting-mobile1791026141.png"
+        "thumb-sound-lighting-mobile1791026141.png"
+
+        # Category 4: Event Setup & Equipment
+        "event-setup-equipment-mobile1791026170.png"
+        "grid-event-setup-equipment-mobile1791026170.png"
+        "large-event-setup-equipment-mobile1791026170.png"
+        "semi-large-event-setup-equipment-mobile1791026170.png"
+        "thumb-event-setup-equipment-mobile1791026170.png"
+
+        # Category 5: Decor & Event Styling
+        "decor-event-styling-mobile1791026203.png"
+        "grid-decor-event-styling-mobile1791026203.png"
+        "large-decor-event-styling-mobile1791026203.png"
+        "semi-large-decor-event-styling-mobile1791026203.png"
+        "thumb-decor-event-styling-mobile1791026203.png"
+
+        # Category 6: Photography & Video
+        "photography-video-mobile1791026232.png"
+        "grid-photography-video-mobile1791026232.png"
+        "large-photography-video-mobile1791026232.png"
+        "semi-large-photography-video-mobile1791026232.png"
+        "thumb-photography-video-mobile1791026232.png"
+
+        # Category 7: Entertainment Activities
+        "entertainment-activities-mobile1791026260.png"
+        "grid-entertainment-activities-mobile1791026260.png"
+        "large-entertainment-activities-mobile1791026260.png"
+        "semi-large-entertainment-activities-mobile1791026260.png"
+        "thumb-entertainment-activities-mobile1791026260.png"
+
+        # Category 8: Body Guards
+        "vip-bodyguard-security-duo1792672760.png"
+        "grid-vip-bodyguard-security-duo1792672760.png"
+        "large-vip-bodyguard-security-duo1792672760.png"
+        "semi-large-vip-bodyguard-security-duo1792672760.png"
+        "thumb-vip-bodyguard-security-duo1792672760.png"
+    )
+
+    CATEGORY_RESTORE_TMP="${BACKUP_BASE_DIR}/category_media_restore_staging"
+    mkdir -p "${CATEGORY_RESTORE_TMP}"
+
+    COPIED_COUNT=0
+    for CFILE in "${APPROVED_CATEGORY_FILES[@]}"; do
+        if [ -f "${P1_SOURCE_MEDIA_DIR}/${CFILE}" ]; then
+            cp "${P1_SOURCE_MEDIA_DIR}/${CFILE}" "${CATEGORY_RESTORE_TMP}/"
+            COPIED_COUNT=$((COPIED_COUNT + 1))
+        fi
+    done
+
+    echo "  Staged ${COPIED_COUNT} approved category media files (8 base images + variants) for restore."
 
     # Ensure target directory structure exists in P2 container
     docker exec "$P2_BACKEND_ID" mkdir -p /app/public/assets/uploads/media-uploader
 
-    echo "  Copying uploaded media into Project 2 (/app/public/assets/uploads/)..."
-    docker cp "${P1_SOURCE_DIR}/." "${P2_BACKEND_ID}:/app/public/assets/uploads/"
+    echo "  Copying scoped category media into Project 2 (/app/public/assets/uploads/media-uploader/)..."
+    docker cp "${CATEGORY_RESTORE_TMP}/." "${P2_BACKEND_ID}:/app/public/assets/uploads/media-uploader/"
+
+    # Clean up temporary staging dir
+    rm -rf "${CATEGORY_RESTORE_TMP}"
 
     # Clean up temporary extract dir if used
     if [ -d "${BACKUP_BASE_DIR}/p1_uploads_extracted" ]; then
