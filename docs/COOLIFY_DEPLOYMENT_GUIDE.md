@@ -164,6 +164,22 @@ Use this:
 > [!IMPORTANT]
 > **Volume Mount vs Directory Mount:** Use **Volume Mount** (Docker named volume) for `/app/public/assets/uploads`. When Docker initializes a named volume for the first time, it automatically copies the pre-existing container image files (such as `no-image.png` and baseline CMS templates) into the volume. A Directory Mount would mask existing files if the host folder is initially empty.
 
+### 4D - Laravel Public Storage for Music Covers & Artwork (CRITICAL)
+
+The music subsystem stores album cover artwork and track covers using Laravel's `'public'` disk (`/app/storage/app/public/music_covers/`), which is served publicly through the `/app/public/storage` symlink. If `/app/storage/app/public` is ephemeral, all uploaded cover artwork is wiped on container redeployment.
+
+On the Laravel backend application, open **Persistent Storage** and click **+ Add**:
+
+Choose **Volume Mount**.
+
+Use this:
+
+- Name: `funmoments-public-storage-staging` (or `funmoments-public-storage-prod` for production)
+- Destination Directory: `/app/storage/app/public`
+
+> [!NOTE]
+> Do NOT alter the existing private music volume at `/app/storage/app/music_private` (which stores master audio files and preview cuts) or the uploads volume at `/app/public/assets/uploads`.
+
 ## Step 5 - Deploy the backend
 
 Deploy the Laravel backend application.
