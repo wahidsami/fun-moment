@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart' hide RepeatMode;
+import 'package:flutter_test/flutter_test.dart' hide RepeatMode;
 import 'package:provider/provider.dart';
 import 'package:funmoments/model/buyer_music_model.dart';
 import 'package:funmoments/service/buyer_music_service.dart';

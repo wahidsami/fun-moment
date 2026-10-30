@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:provider/provider.dart';
 import 'package:funmoments/model/buyer_music_model.dart';
 import 'package:funmoments/service/music_player_service.dart';
