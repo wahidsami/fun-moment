@@ -398,6 +398,11 @@ function get_attachment_image_by_id($id, $size = null, $default = false)
             $return_val['img_url'] = !empty($image_url) ? $image_url : null;
         }
         $return_val['img_alt'] = $image_details->alt;
+        $return_val['image_variants'] = app(\App\Services\Media\ImageOptimizationService::class)->getVariantUrls(
+            'assets/uploads/media-uploader/' . $image_details->path,
+            \App\Services\Media\ImageOptimizationService::PRESET_GENERAL,
+            null
+        );
     }elseif (empty($image_details) && $default) {
         $return_val['img_url'] = asset('assets/uploads/no-image.png');
     }

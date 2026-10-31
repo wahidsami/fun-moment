@@ -391,6 +391,7 @@ class FMNetworkImageFrame extends StatelessWidget {
   const FMNetworkImageFrame({
     super.key,
     this.imageUrl,
+    this.imageVariants,
     this.borderRadius,
     this.height,
     this.width,
@@ -401,6 +402,7 @@ class FMNetworkImageFrame extends StatelessWidget {
   });
 
   final String? imageUrl;
+  final Map<String, String>? imageVariants;
   final BorderRadiusGeometry? borderRadius;
   final double? height;
   final double? width;
@@ -411,7 +413,20 @@ class FMNetworkImageFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trimmed = imageUrl?.trim();
+    String? chosenUrl = imageUrl;
+    if (imageVariants != null && imageVariants!.isNotEmpty) {
+      final double effectiveDim = [width ?? 0, height ?? 0].reduce((a, b) => a > b ? a : b);
+      if (effectiveDim > 0 && effectiveDim <= 160) {
+        chosenUrl = imageVariants!['thumbnail'] ?? chosenUrl;
+      } else if (effectiveDim > 0 && effectiveDim <= 600) {
+        chosenUrl = imageVariants!['medium'] ?? chosenUrl;
+      } else if (effectiveDim > 600) {
+        chosenUrl = imageVariants!['large'] ?? chosenUrl;
+      } else {
+        chosenUrl = imageVariants!['medium'] ?? imageVariants!['thumbnail'] ?? chosenUrl;
+      }
+    }
+    final trimmed = chosenUrl?.trim();
     final validUrl = (trimmed != null &&
             trimmed.isNotEmpty &&
             trimmed.startsWith('http') &&

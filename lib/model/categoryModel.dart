@@ -43,6 +43,7 @@ class Category {
     this.nameAr,
     this.icon,
     this.mobileIcon,
+    this.imageVariants,
   });
 
   dynamic id;
@@ -50,6 +51,10 @@ class Category {
   String? nameAr;
   String? icon;
   String? mobileIcon;
+  Map<String, String>? imageVariants;
+  String? get thumbnailUrl => imageVariants?['thumbnail'] ?? mobileIcon;
+  String? get mediumUrl => imageVariants?['medium'] ?? mobileIcon;
+  String? get largeUrl => imageVariants?['large'] ?? mobileIcon;
 
   factory Category.fromJson(Map<String, dynamic> json) => Category(
         id: json["id"],
@@ -57,6 +62,9 @@ class Category {
         nameAr: json["name_ar"],
         icon: json["icon"],
         mobileIcon: json["mobile_icon"],
+        imageVariants: json["image_variants"] is Map
+            ? Map<String, String>.from((json["image_variants"] as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')))
+            : null,
       );
 
   Map<String, dynamic> toJson() => {

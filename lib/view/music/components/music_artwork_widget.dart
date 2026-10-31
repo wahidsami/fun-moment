@@ -11,8 +11,11 @@ import 'package:funmoments/theme/fun_moment_theme.dart';
 /// - Fallback to music-note icon on error or missing/invalid URL.
 /// - Diagnostic logging on image loading failure.
 /// - Configurable dimensions, border radius, styling, and decorations.
+import 'package:funmoments/model/buyer_music_model.dart';
+
 class MusicArtworkWidget extends StatelessWidget {
   final String? imageUrl;
+  final Map<String, String>? imageVariants;
   final double? width;
   final double? height;
   final double borderRadius;
@@ -27,7 +30,8 @@ class MusicArtworkWidget extends StatelessWidget {
 
   const MusicArtworkWidget({
     Key? key,
-    required this.imageUrl,
+    this.imageUrl,
+    this.imageVariants,
     this.width,
     this.height,
     this.borderRadius = FMRadii.md,
@@ -41,9 +45,97 @@ class MusicArtworkWidget extends StatelessWidget {
     this.boxShadow,
   }) : super(key: key);
 
+  factory MusicArtworkWidget.fromTrack(
+    CatalogTrackModel track, {
+    Key? key,
+    double? width,
+    double? height,
+    double borderRadius = FMRadii.md,
+    BoxFit fit = BoxFit.cover,
+    IconData placeholderIcon = Icons.music_note_rounded,
+    double placeholderIconSize = 28,
+    Color? placeholderBackgroundColor,
+    Color? placeholderIconColor,
+    bool showLoadingIndicator = false,
+    BoxBorder? border,
+    List<BoxShadow>? boxShadow,
+  }) {
+    return MusicArtworkWidget(
+      key: key,
+      imageUrl: track.coverImageUrl,
+      imageVariants: track.imageVariants,
+      width: width,
+      height: height,
+      borderRadius: borderRadius,
+      fit: fit,
+      placeholderIcon: placeholderIcon,
+      placeholderIconSize: placeholderIconSize,
+      placeholderBackgroundColor: placeholderBackgroundColor,
+      placeholderIconColor: placeholderIconColor,
+      showLoadingIndicator: showLoadingIndicator,
+      border: border,
+      boxShadow: boxShadow,
+    );
+  }
+
+  factory MusicArtworkWidget.fromAlbum(
+    CatalogAlbumModel album, {
+    Key? key,
+    double? width,
+    double? height,
+    double borderRadius = FMRadii.md,
+    BoxFit fit = BoxFit.cover,
+    IconData placeholderIcon = Icons.music_note_rounded,
+    double placeholderIconSize = 28,
+    Color? placeholderBackgroundColor,
+    Color? placeholderIconColor,
+    bool showLoadingIndicator = false,
+    BoxBorder? border,
+    List<BoxShadow>? boxShadow,
+  }) {
+    return MusicArtworkWidget(
+      key: key,
+      imageUrl: album.coverImageUrl,
+      imageVariants: album.imageVariants,
+      width: width,
+      height: height,
+      borderRadius: borderRadius,
+      fit: fit,
+      placeholderIcon: placeholderIcon,
+      placeholderIconSize: placeholderIconSize,
+      placeholderBackgroundColor: placeholderBackgroundColor,
+      placeholderIconColor: placeholderIconColor,
+      showLoadingIndicator: showLoadingIndicator,
+      border: border,
+      boxShadow: boxShadow,
+    );
+  }
+
+  String? get _resolvedUrl {
+    if (imageVariants != null && imageVariants!.isNotEmpty) {
+      final double effectiveDim = max(width ?? 0, height ?? 0);
+      if (effectiveDim > 0 && effectiveDim <= 160) {
+        if (imageVariants!['thumbnail']?.isNotEmpty == true) {
+          return imageVariants!['thumbnail'];
+        }
+      } else if (effectiveDim > 0 && effectiveDim <= 600) {
+        if (imageVariants!['medium']?.isNotEmpty == true) {
+          return imageVariants!['medium'];
+        }
+      } else if (effectiveDim > 600) {
+        if (imageVariants!['large']?.isNotEmpty == true) {
+          return imageVariants!['large'];
+        }
+      }
+      return imageVariants!['medium'] ?? imageVariants!['thumbnail'] ?? imageVariants!['large'] ?? imageUrl;
+    }
+    return imageUrl;
+  }
+
   bool get _hasValidUrl {
-    if (imageUrl == null) return false;
-    final trimmed = imageUrl!.trim();
+    final url = _resolvedUrl;
+    if (url == null) return false;
+    final trimmed = url.trim();
     if (trimmed.isEmpty) return false;
     final uri = Uri.tryParse(trimmed);
     if (uri == null || !uri.hasScheme || (uri.scheme != 'http' && uri.scheme != 'https')) {
@@ -76,7 +168,7 @@ class MusicArtworkWidget extends StatelessWidget {
     if (!_hasValidUrl) {
       content = _buildPlaceholder();
     } else {
-      final validUrl = imageUrl!.trim();
+      final validUrl = _resolvedUrl!.trim();
       final cacheW = (width != null && width! > 0)
           ? (width! * 2).toInt().clamp(60, 800)
           : 600;

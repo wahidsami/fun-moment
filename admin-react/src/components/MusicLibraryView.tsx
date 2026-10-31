@@ -512,7 +512,7 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
                           <div className="flex items-center gap-3">
                             {track.cover_image_url || track.cover_image ? (
                               <img
-                                src={track.cover_image_url || (track.cover_image?.startsWith('http') ? track.cover_image : `/storage/${track.cover_image}`)}
+                                src={track.cover_image_variants?.thumbnail || track.cover_image_url || (track.cover_image?.startsWith('http') ? track.cover_image : `/storage/${track.cover_image}`)}
                                 alt=""
                                 className="w-10 h-10 rounded-lg object-cover border border-slate-700 bg-slate-800 flex-shrink-0"
                               />
@@ -728,7 +728,7 @@ export default function MusicLibraryView({ language, activeRole }: MusicLibraryV
                   <div className="flex items-start gap-3">
                     {album.cover_image_url || album.cover_image ? (
                       <img
-                        src={album.cover_image_url || (album.cover_image?.startsWith('http') ? album.cover_image : `/storage/${album.cover_image}`)}
+                        src={album.cover_image_variants?.thumbnail || album.cover_image_url || (album.cover_image?.startsWith('http') ? album.cover_image : `/storage/${album.cover_image}`)}
                         alt={album.title_en}
                         className="w-12 h-12 rounded-lg object-cover border border-slate-700 bg-slate-900 flex-shrink-0"
                       />

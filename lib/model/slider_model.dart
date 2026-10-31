@@ -54,18 +54,26 @@ class ImageUrl {
     this.path,
     this.imgUrl,
     this.imgAlt,
+    this.imageVariants,
   });
 
   int? imageId;
   String? path;
   String? imgUrl;
   dynamic imgAlt;
+  Map<String, String>? imageVariants;
+  String? get thumbnailUrl => imageVariants?['thumbnail'] ?? imgUrl;
+  String? get mediumUrl => imageVariants?['medium'] ?? imgUrl;
+  String? get largeUrl => imageVariants?['large'] ?? imgUrl;
 
   factory ImageUrl.fromJson(Map<String, dynamic> json) => ImageUrl(
         imageId: json["image_id"] == null ? null : int.tryParse(json["image_id"].toString()),
         path: json["path"]?.toString(),
         imgUrl: json["img_url"]?.toString(),
         imgAlt: json["img_alt"],
+        imageVariants: json["image_variants"] is Map
+            ? Map<String, String>.from((json["image_variants"] as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')))
+            : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -94,6 +102,7 @@ class SliderDetail {
     this.actionTarget,
     this.order = 0,
     this.imgUrl,
+    this.imageVariants,
   });
 
   int? id;
@@ -112,6 +121,10 @@ class SliderDetail {
   String? actionTarget;
   int? order;
   String? imgUrl;
+  Map<String, String>? imageVariants;
+  String? get thumbnailUrl => imageVariants?['thumbnail'] ?? imgUrl;
+  String? get mediumUrl => imageVariants?['medium'] ?? imgUrl;
+  String? get largeUrl => imageVariants?['large'] ?? imgUrl;
 
   factory SliderDetail.fromJson(Map<String, dynamic> json) => SliderDetail(
         id: json["id"] == null ? null : int.tryParse(json["id"].toString()),
@@ -134,6 +147,9 @@ class SliderDetail {
             ? 0
             : (int.tryParse(json["order"].toString()) ?? 0),
         imgUrl: json["img_url"]?.toString(),
+        imageVariants: json["image_variants"] is Map
+            ? Map<String, String>.from((json["image_variants"] as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')))
+            : null,
       );
 
   Map<String, dynamic> toJson() => {

@@ -13,6 +13,7 @@ class CategoryController extends Controller
             //
             $mobile_icon = get_attachment_image_by_id($item->mobile_icon);
             $item->mobile_icon = !empty($mobile_icon) ? $mobile_icon['img_url'] : null;
+            $item->image_variants = !empty($mobile_icon['image_variants']) ? $mobile_icon['image_variants'] : null;
             
             return $item;
         });

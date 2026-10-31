@@ -695,6 +695,12 @@ export interface LegalTerm {
   versions_count?: number;
   updated_at?: string | null;
 }
+export interface ImageVariants {
+  thumbnail?: string | null;
+  medium?: string | null;
+  large?: string | null;
+}
+
 export interface SliderItem {
   id: number;
   background_image: string;
@@ -720,11 +726,13 @@ export interface SliderItem {
   order: number;
   status: 0 | 1;
   img_url?: string | null;
+  image_variants?: ImageVariants | null;
   attachment?: {
     image_id?: number | null;
     path?: string | null;
     img_url?: string | null;
     img_alt?: string | null;
+    image_variants?: ImageVariants | null;
   };
   created_at?: string;
   updated_at?: string;
@@ -847,6 +855,7 @@ export interface MusicModerationTrackItem {
   admin_notes?: string | null;
   cover_image_path?: string | null;
   cover_image_url?: string | null;
+  cover_image_variants?: ImageVariants | null;
   duration_seconds?: number | null;
   audio_format?: string | null;
   audio_bitrate_kbps?: number | null;
@@ -890,6 +899,7 @@ export interface MusicAlbumItem {
   artist_name?: string | null;
   cover_image?: string | null;
   cover_image_url?: string | null;
+  cover_image_variants?: ImageVariants | null;
   genre_id?: number | null;
   genre_name?: string | null;
   genre?: {
@@ -945,6 +955,7 @@ export interface MusicLibraryTrackItem {
   media_status: 'draft' | 'pending' | 'processing' | 'ready' | 'failed';
   cover_image?: string | null;
   cover_image_url?: string | null;
+  cover_image_variants?: ImageVariants | null;
   duration_seconds?: number | null;
   preview_duration_seconds?: number | null;
   file_size_bytes?: number | null;

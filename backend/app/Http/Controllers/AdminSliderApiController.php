@@ -468,6 +468,7 @@ class AdminSliderApiController extends Controller
             'order' => $slider->order ?? 0,
             'status' => (int) ($slider->status ?? 1),
             'img_url' => $resolvedUrl,
+            'image_variants' => $attachment['image_variants'] ?? null,
             'attachment' => $attachment,
             'created_at' => $slider->created_at?->toISOString(),
             'updated_at' => $slider->updated_at?->toISOString(),

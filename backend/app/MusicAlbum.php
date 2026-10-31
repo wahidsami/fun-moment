@@ -43,6 +43,7 @@ class MusicAlbum extends Model
 
     protected $appends = [
         'cover_image_url',
+        'cover_image_variants',
     ];
 
     public function genre(): BelongsTo
@@ -134,6 +135,22 @@ class MusicAlbum extends Model
             return $this->cover_image;
         }
         return asset('storage/' . ltrim($this->cover_image, '/'));
+    }
+
+    /**
+     * Get responsive WebP variants for album cover image.
+     */
+    public function getCoverImageVariantsAttribute(): ?array
+    {
+        if (empty($this->cover_image)) {
+            return null;
+        }
+
+        return app(\App\Services\Media\ImageOptimizationService::class)->getVariantUrls(
+            $this->cover_image,
+            \App\Services\Media\ImageOptimizationService::PRESET_MUSIC_ARTWORK,
+            'public'
+        );
     }
 
     public function getTotalDurationSecondsAttribute(): int

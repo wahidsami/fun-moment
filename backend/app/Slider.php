@@ -175,6 +175,7 @@ class Slider extends Model
                     'path' => $attach['path'] ?? null,
                     'img_url' => $attach['img_url'],
                     'img_alt' => $attach['img_alt'] ?? null,
+                    'image_variants' => $attach['image_variants'] ?? null,
                 ];
             }
         }

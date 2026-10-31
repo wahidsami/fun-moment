@@ -69,6 +69,12 @@ class MediaHelper
     public static function delete_user_media_image($image_id,$type ='web')
     {
         $get_image_details = MediaUpload::find($image_id);
+        if ($get_image_details) {
+            app(\App\Services\Media\ImageOptimizationService::class)->deleteVariants(
+                'assets/uploads/media-uploader/' . $get_image_details->path,
+                null
+            );
+        }
         if (file_exists('assets/uploads/media-uploader/' . $get_image_details->path) && !is_dir('assets/uploads/media-uploader/' . $get_image_details->path)) {
             unlink('assets/uploads/media-uploader/' . $get_image_details->path);
         }
@@ -96,6 +102,12 @@ class MediaHelper
     public static function delete_media_image($request,$type ='admin')
     {
         $get_image_details = MediaUpload::find($request->img_id);
+        if ($get_image_details) {
+            app(\App\Services\Media\ImageOptimizationService::class)->deleteVariants(
+                'assets/uploads/media-uploader/' . $get_image_details->path,
+                null
+            );
+        }
         if (file_exists('assets/uploads/media-uploader/' . $get_image_details->path) && !is_dir('assets/uploads/media-uploader/' . $get_image_details->path)) {
             unlink('assets/uploads/media-uploader/' . $get_image_details->path);
         }
@@ -178,6 +190,16 @@ class MediaHelper
                 $resize_grid_image->save($folder_path . $image_grid);
                 $resize_large_image->save($folder_path . $image_large);
                 $resize_semi_large_image->save($folder_path . $image_semi_large);
+            }
+
+            try {
+                app(\App\Services\Media\ImageOptimizationService::class)->optimizeExistingFile(
+                    'assets/uploads/media-uploader/' . $image_db,
+                    \App\Services\Media\ImageOptimizationService::PRESET_GENERAL,
+                    null
+                );
+            } catch (\Throwable $e) {
+                // Fail-safe: original upload preserved
             }
 
             return $mediaUpload;

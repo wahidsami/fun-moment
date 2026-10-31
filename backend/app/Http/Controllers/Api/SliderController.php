@@ -86,6 +86,7 @@ class SliderController extends Controller
                 'action_target' => $actionTarget,
                 'order' => $slider->order ?? 0,
                 'img_url' => $resolvedImgUrl,
+                'image_variants' => $attachmentMeta['image_variants'] ?? null,
             ];
 
             $imageUrls[] = [
@@ -93,6 +94,7 @@ class SliderController extends Controller
                 'path' => $attachmentMeta['path'],
                 'img_url' => $resolvedImgUrl,
                 'img_alt' => $activeTitle,
+                'image_variants' => $attachmentMeta['image_variants'] ?? null,
             ];
         }
 

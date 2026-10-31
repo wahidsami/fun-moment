@@ -28,6 +28,7 @@ class MusicPlaylist extends Model
 
     protected $appends = [
         'cover_image_url',
+        'cover_image_variants',
     ];
 
     public function user(): BelongsTo
@@ -68,6 +69,28 @@ class MusicPlaylist extends Model
         }
 
         return null;
+    }
+
+    /**
+     * Get responsive WebP variants for playlist cover image.
+     */
+    public function getCoverImageVariantsAttribute(): ?array
+    {
+        $imagePath = $this->cover_image;
+        if (empty($imagePath)) {
+            $firstTrack = $this->tracks->first();
+            $imagePath = $firstTrack ? $firstTrack->cover_image : null;
+        }
+
+        if (empty($imagePath)) {
+            return null;
+        }
+
+        return app(\App\Services\Media\ImageOptimizationService::class)->getVariantUrls(
+            $imagePath,
+            \App\Services\Media\ImageOptimizationService::PRESET_MUSIC_ARTWORK,
+            'public'
+        );
     }
 
     /**

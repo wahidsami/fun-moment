@@ -168,6 +168,11 @@ class AdminMusicAlbumController extends Controller
             $coverExt = $coverFile->getClientOriginalExtension() ?: 'jpg';
             $coverName = 'album_cover_' . Str::uuid()->toString() . '.' . $coverExt;
             $coverPath = $coverFile->storeAs('music_covers', $coverName, 'public');
+            app(\App\Services\Media\ImageOptimizationService::class)->optimizeExistingFile(
+                $coverPath,
+                \App\Services\Media\ImageOptimizationService::PRESET_MUSIC_ARTWORK,
+                'public'
+            );
         }
 
         $status = $request->input('status', MusicAlbum::STATUS_DRAFT);
@@ -251,6 +256,7 @@ class AdminMusicAlbumController extends Controller
         if ($request->boolean('remove_cover')) {
             if (!empty($album->cover_image) && Storage::disk('public')->exists($album->cover_image)) {
                 Storage::disk('public')->delete($album->cover_image);
+                app(\App\Services\Media\ImageOptimizationService::class)->deleteVariants($album->cover_image, 'public');
             }
             $updates['cover_image'] = null;
         } elseif ($request->hasFile('cover_image')) {
@@ -259,8 +265,14 @@ class AdminMusicAlbumController extends Controller
             $coverName = 'album_cover_' . Str::uuid()->toString() . '.' . $coverExt;
             if (!empty($album->cover_image) && Storage::disk('public')->exists($album->cover_image)) {
                 Storage::disk('public')->delete($album->cover_image);
+                app(\App\Services\Media\ImageOptimizationService::class)->deleteVariants($album->cover_image, 'public');
             }
             $updates['cover_image'] = $coverFile->storeAs('music_covers', $coverName, 'public');
+            app(\App\Services\Media\ImageOptimizationService::class)->optimizeExistingFile(
+                $updates['cover_image'],
+                \App\Services\Media\ImageOptimizationService::PRESET_MUSIC_ARTWORK,
+                'public'
+            );
         }
 
         $album->update($updates);
@@ -409,6 +421,7 @@ class AdminMusicAlbumController extends Controller
         if (!empty($coverToDelete) && Storage::disk('public')->exists($coverToDelete)) {
             try {
                 Storage::disk('public')->delete($coverToDelete);
+                app(\App\Services\Media\ImageOptimizationService::class)->deleteVariants($coverToDelete, 'public');
             } catch (\Throwable $e) {
                 Log::warning("Notice deleting cover for album #{$id}: " . $e->getMessage());
             }

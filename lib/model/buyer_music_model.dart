@@ -166,6 +166,10 @@ class CatalogAlbumModel {
   final String titleAr;
   final String? artistName;
   final String? coverImageUrl;
+  final Map<String, String>? imageVariants;
+  String? get thumbnailUrl => imageVariants?['thumbnail'] ?? coverImageUrl;
+  String? get mediumUrl => imageVariants?['medium'] ?? coverImageUrl;
+  String? get largeUrl => imageVariants?['large'] ?? coverImageUrl;
   final int tracksCount;
   final String? descriptionEn;
   final String? descriptionAr;
@@ -180,6 +184,7 @@ class CatalogAlbumModel {
     required this.titleAr,
     this.artistName,
     this.coverImageUrl,
+    this.imageVariants,
     this.tracksCount = 0,
     this.descriptionEn,
     this.descriptionAr,
@@ -191,6 +196,21 @@ class CatalogAlbumModel {
   factory CatalogAlbumModel.fromJson(Map<String, dynamic> json) {
     final rawCover = json['cover_image_url'] ?? json['cover_image'];
     final resolvedCover = CatalogTrackModel.resolveCoverUrl(rawCover);
+
+    Map<String, String>? parsedVariants;
+    final rawVariants = json['cover_image_variants'] ?? json['image_variants'];
+    if (rawVariants is Map) {
+      parsedVariants = {};
+      rawVariants.forEach((k, v) {
+        if (v != null && v.toString().trim().isNotEmpty) {
+          final res = CatalogTrackModel.resolveCoverUrl(v.toString());
+          if (res != null && res.isNotEmpty) {
+            parsedVariants![k.toString()] = res;
+          }
+        }
+      });
+      if (parsedVariants.isEmpty) parsedVariants = null;
+    }
 
     List<CatalogTrackModel> parsedTracks = [];
     if (json['tracks'] is List) {
@@ -221,6 +241,7 @@ class CatalogAlbumModel {
       titleAr: json['title_ar']?.toString() ?? '',
       artistName: json['artist_name']?.toString(),
       coverImageUrl: effectiveCover,
+      imageVariants: parsedVariants,
       tracksCount: resolvedCount,
       descriptionEn: json['description_en']?.toString(),
       descriptionAr: json['description_ar']?.toString(),
@@ -319,6 +340,10 @@ class CatalogTrackModel {
   final String? musicalKey;
   final String? coverImageUrl;
   String? get coverArtUrl => coverImageUrl;
+  final Map<String, String>? imageVariants;
+  String? get thumbnailUrl => imageVariants?['thumbnail'] ?? coverImageUrl;
+  String? get mediumUrl => imageVariants?['medium'] ?? coverImageUrl;
+  String? get largeUrl => imageVariants?['large'] ?? coverImageUrl;
   final String? waveformUrl;
   final String streamTicketUrl;
   bool isFavorite;
@@ -348,6 +373,7 @@ class CatalogTrackModel {
     this.musicalKey,
     String? coverImageUrl,
     String? coverArtUrl,
+    this.imageVariants,
     this.waveformUrl,
     required this.streamTicketUrl,
     this.isFavorite = false,
@@ -442,6 +468,21 @@ class CatalogTrackModel {
     final rawCover = json['cover_image_url'] ?? json['cover_art_url'] ?? json['cover_image'];
     final resolvedCover = CatalogTrackModel.resolveCoverUrl(rawCover, albumCover: album?.coverImageUrl);
 
+    Map<String, String>? parsedVariants;
+    final rawVariants = json['cover_image_variants'] ?? json['image_variants'];
+    if (rawVariants is Map) {
+      parsedVariants = {};
+      rawVariants.forEach((k, v) {
+        if (v != null && v.toString().trim().isNotEmpty) {
+          final res = CatalogTrackModel.resolveCoverUrl(v.toString());
+          if (res != null && res.isNotEmpty) {
+            parsedVariants![k.toString()] = res;
+          }
+        }
+      });
+      if (parsedVariants.isEmpty) parsedVariants = null;
+    }
+
     final position = json['position'] != null
         ? int.tryParse(json['position'].toString())
         : (json['playlist_position'] != null ? int.tryParse(json['playlist_position'].toString()) : null);
@@ -463,6 +504,7 @@ class CatalogTrackModel {
       bpm: json['bpm'] != null ? int.tryParse(json['bpm'].toString()) : null,
       musicalKey: json['key']?.toString(),
       coverImageUrl: resolvedCover,
+      imageVariants: parsedVariants,
       waveformUrl: json['waveform_url']?.toString(),
       streamTicketUrl: json['stream_ticket_url']?.toString() ?? '',
       isFavorite: json['is_favorite'] == true || json['is_favorite'] == 1,
@@ -542,6 +584,7 @@ class CatalogTrackModel {
     String? badge,
     String? coverImageUrl,
     String? coverArtUrl,
+    Map<String, String>? imageVariants,
     CatalogAlbumModel? album,
     int? trackNumber,
     CatalogOriginalTrackModel? originalTrack,
@@ -558,6 +601,7 @@ class CatalogTrackModel {
       bpm: bpm,
       musicalKey: musicalKey,
       coverImageUrl: coverImageUrl ?? coverArtUrl ?? this.coverImageUrl,
+      imageVariants: imageVariants ?? this.imageVariants,
       waveformUrl: waveformUrl,
       streamTicketUrl: streamTicketUrl,
       isFavorite: isFavorite ?? this.isFavorite,
@@ -662,6 +706,10 @@ class MusicPlaylistModel {
   final String name;
   final String? description;
   final String? coverImageUrl;
+  final Map<String, String>? imageVariants;
+  String? get thumbnailUrl => imageVariants?['thumbnail'] ?? coverImageUrl;
+  String? get mediumUrl => imageVariants?['medium'] ?? coverImageUrl;
+  String? get largeUrl => imageVariants?['large'] ?? coverImageUrl;
   final bool isPublic;
   final int tracksCount;
   final int totalDurationSeconds;
@@ -675,6 +723,7 @@ class MusicPlaylistModel {
     required this.name,
     this.description,
     this.coverImageUrl,
+    this.imageVariants,
     this.isPublic = false,
     this.tracksCount = 0,
     this.totalDurationSeconds = 0,
@@ -687,6 +736,21 @@ class MusicPlaylistModel {
   factory MusicPlaylistModel.fromJson(Map<String, dynamic> json) {
     final rawCover = json['cover_image_url'] ?? json['cover_image'];
     final resolvedCover = CatalogTrackModel.resolveCoverUrl(rawCover);
+
+    Map<String, String>? parsedVariants;
+    final rawVariants = json['cover_image_variants'] ?? json['image_variants'];
+    if (rawVariants is Map) {
+      parsedVariants = {};
+      rawVariants.forEach((k, v) {
+        if (v != null && v.toString().trim().isNotEmpty) {
+          final res = CatalogTrackModel.resolveCoverUrl(v.toString());
+          if (res != null && res.isNotEmpty) {
+            parsedVariants![k.toString()] = res;
+          }
+        }
+      });
+      if (parsedVariants.isEmpty) parsedVariants = null;
+    }
 
     List<CatalogTrackModel> parsedTracks = [];
     if (json['tracks'] is List) {
@@ -709,6 +773,7 @@ class MusicPlaylistModel {
       name: json['name']?.toString() ?? 'Untitled Playlist',
       description: json['description']?.toString(),
       coverImageUrl: resolvedCover,
+      imageVariants: parsedVariants,
       isPublic: json['is_public'] == true || json['is_public'] == 1,
       tracksCount: count,
       totalDurationSeconds: duration,

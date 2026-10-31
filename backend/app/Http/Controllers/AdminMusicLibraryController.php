@@ -321,6 +321,11 @@ class AdminMusicLibraryController extends Controller
                 $coverExt = $coverFile->getClientOriginalExtension() ?: 'jpg';
                 $coverName = 'cover_' . Str::uuid()->toString() . '.' . $coverExt;
                 $coverPath = $coverFile->storeAs('music_covers', $coverName, 'public');
+                app(\App\Services\Media\ImageOptimizationService::class)->optimizeExistingFile(
+                    $coverPath,
+                    \App\Services\Media\ImageOptimizationService::PRESET_MUSIC_ARTWORK,
+                    'public'
+                );
             } elseif ($request->filled('album_id')) {
                 // Inherit album cover if available
                 $album = MusicAlbum::find($request->input('album_id'));
@@ -549,6 +554,11 @@ class AdminMusicLibraryController extends Controller
             $coverExt = $coverFile->getClientOriginalExtension() ?: 'jpg';
             $coverName = 'cover_' . Str::uuid()->toString() . '.' . $coverExt;
             $updates['cover_image'] = $coverFile->storeAs('music_covers', $coverName, 'public');
+            app(\App\Services\Media\ImageOptimizationService::class)->optimizeExistingFile(
+                $updates['cover_image'],
+                \App\Services\Media\ImageOptimizationService::PRESET_MUSIC_ARTWORK,
+                'public'
+            );
         }
 
         DB::transaction(function () use ($track, $updates, $request) {
@@ -740,6 +750,7 @@ class AdminMusicLibraryController extends Controller
                 if (str_starts_with($file, 'music_covers/')) {
                     if (Storage::disk('public')->exists($file)) {
                         Storage::disk('public')->delete($file);
+                        app(\App\Services\Media\ImageOptimizationService::class)->deleteVariants($file, 'public');
                     }
                 } else {
                     $this->storageService->deleteFile($file);

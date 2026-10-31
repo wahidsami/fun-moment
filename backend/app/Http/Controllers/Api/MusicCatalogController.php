@@ -295,6 +295,7 @@ class MusicCatalogController extends Controller
             'title_ar' => $track->title_ar ?: $track->title_en,
             'artist_name' => $track->artist_name,
             'cover_image_url' => $coverUrl,
+            'cover_image_variants' => $track->cover_image_variants,
             'duration_seconds' => (int) $track->duration_seconds,
             'preview_duration_seconds' => (int) ($track->preview_duration_seconds ?: MusicSetting::get('paid_preview_duration_seconds', 20)),
             'play_count' => (int) $track->play_count,
@@ -326,7 +327,16 @@ class MusicCatalogController extends Controller
                 'id' => $track->seller->id,
                 'name' => $track->seller->name,
                 'username' => $track->seller->username,
-                'image_url' => $track->seller->image ? url('storage/' . ltrim($track->seller->image, '/')) : null,
+                'image_url' => (function() use ($track) {
+                    if (empty($track->seller->image)) return null;
+                    if (is_numeric($track->seller->image)) {
+                        $media = get_attachment_image_by_id($track->seller->image);
+                        return $media['img_url'] ?? null;
+                    }
+                    return filter_var($track->seller->image, FILTER_VALIDATE_URL)
+                        ? $track->seller->image
+                        : url('storage/' . ltrim($track->seller->image, '/'));
+                })(),
             ] : null,
             'is_first_party' => $track->isOwnedByAdmin(),
             'owner_type' => $track->owner_type,
@@ -338,6 +348,7 @@ class MusicCatalogController extends Controller
                 'title_ar' => $track->album->title_ar ?: $track->album->title_en,
                 'artist_name' => $track->album->artist_name,
                 'cover_image_url' => $track->album->cover_image_url,
+                'cover_image_variants' => $track->album->cover_image_variants,
                 'track_number' => $track->track_number,
             ] : null,
             'original_track' => $track->originalTrack ? [

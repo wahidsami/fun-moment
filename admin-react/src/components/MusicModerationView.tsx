@@ -391,7 +391,7 @@ export default function MusicModerationView({ language, activeRole }: MusicModer
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
                           {track.cover_image_url ? (
-                            <img src={track.cover_image_url} alt={track.title} className="w-full h-full object-cover" />
+                            <img src={track.cover_image_variants?.thumbnail || track.cover_image_url} alt={track.title} className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-400">
                               <Music className="w-4 h-4" />
@@ -537,7 +537,7 @@ export default function MusicModerationView({ language, activeRole }: MusicModer
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
                 <div className="w-20 h-20 rounded-xl overflow-hidden bg-white border border-slate-200 shrink-0 shadow-2xs">
                   {selectedTrack.cover_image_url ? (
-                    <img src={selectedTrack.cover_image_url} alt={selectedTrack.title} className="w-full h-full object-cover" />
+                    <img src={selectedTrack.cover_image_variants?.medium || selectedTrack.cover_image_url} alt={selectedTrack.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-400">
                       <Music className="w-8 h-8" />
