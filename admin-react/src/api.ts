@@ -177,14 +177,12 @@ export const LaravelAPI = {
 
     async deleteUser(id: number, confirmEmail: string, lang?: string): Promise<any> {
       const url = lang ? `/admin-home/frontend-users/${id}/delete?lang=${encodeURIComponent(lang)}` : `/admin-home/frontend-users/${id}/delete`;
-      const response = await fetch(url, {
+      const response = await fetchWithCsrf(url, {
         method: 'POST',
         headers: {
-          'Accept': 'application/json',
           'Content-Type': 'application/json',
           ...(lang ? { 'X-Language': lang } : {}),
         },
-        credentials: 'include',
         body: JSON.stringify({ confirm_email: confirmEmail, lang }),
       });
 
@@ -2478,29 +2476,63 @@ export const LaravelAPI = {
 export const api = LaravelAPI;
 
 // CSRF Token Management for authenticated administrative requests
-let cachedCsrfToken: string | null = null;
+let cachedPlaintextCsrfToken: string | null = null;
 
 export const setCsrfToken = (token: string | null) => {
-  cachedCsrfToken = token;
+  cachedPlaintextCsrfToken = token;
 };
 
-export const getCsrfToken = async (): Promise<string | null> => {
-  if (cachedCsrfToken) {
-    return cachedCsrfToken;
-  }
-
-  // 1. Check if token is available in document.cookie (when same-origin or reverse-proxied)
+/**
+ * Extract the encrypted XSRF-TOKEN cookie value from document.cookie.
+ * Laravel's EncryptCookies middleware encrypts this cookie value.
+ * Laravel's VerifyCsrfToken expects this encrypted value exclusively in the X-XSRF-TOKEN header.
+ */
+export const getXsrfCookie = (): string | null => {
   if (typeof document !== 'undefined' && document.cookie) {
-    const match = document.cookie.match(/(?:^|;\s*)(?:XSRF-TOKEN|csrf_token)=([^;]+)/);
+    const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
     if (match) {
       try {
-        cachedCsrfToken = decodeURIComponent(match[1]);
-        return cachedCsrfToken;
+        return decodeURIComponent(match[1]);
+      } catch (_) {}
+    }
+  }
+  return null;
+};
+
+/**
+ * Retrieve the plaintext CSRF session token.
+ * Laravel's VerifyCsrfToken expects this value in the X-CSRF-TOKEN header.
+ * Encrypted XSRF cookie values must NEVER be returned here.
+ */
+export const getCsrfToken = async (): Promise<string | null> => {
+  if (cachedPlaintextCsrfToken) {
+    return cachedPlaintextCsrfToken;
+  }
+
+  // 1. Check if plaintext token is in a dedicated cookie (e.g. csrf_token, NOT encrypted XSRF-TOKEN)
+  if (typeof document !== 'undefined' && document.cookie) {
+    const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    if (match) {
+      try {
+        cachedPlaintextCsrfToken = decodeURIComponent(match[1]);
+        return cachedPlaintextCsrfToken;
       } catch (_) {}
     }
   }
 
-  // 2. Fetch fresh token from authenticated session endpoint
+  // 2. Check meta tag in HTML shell (standard Laravel blade)
+  if (typeof document !== 'undefined') {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) {
+      const content = meta.getAttribute('content');
+      if (content) {
+        cachedPlaintextCsrfToken = content;
+        return cachedPlaintextCsrfToken;
+      }
+    }
+  }
+
+  // 3. Fetch fresh plaintext token from authenticated session endpoint
   try {
     const res = await fetch('/admin-home/csrf-token', {
       method: 'GET',
@@ -2510,8 +2542,8 @@ export const getCsrfToken = async (): Promise<string | null> => {
     if (res.ok) {
       const data = await res.json();
       if (data?.csrf_token) {
-        cachedCsrfToken = data.csrf_token;
-        return cachedCsrfToken;
+        cachedPlaintextCsrfToken = data.csrf_token;
+        return cachedPlaintextCsrfToken;
       }
     }
   } catch (_) {}
@@ -2519,12 +2551,23 @@ export const getCsrfToken = async (): Promise<string | null> => {
   return null;
 };
 
-async function fetchWithCsrf(url: string, options: RequestInit = {}): Promise<Response> {
-  const token = await getCsrfToken();
+export const getPlaintextCsrfToken = getCsrfToken;
+
+export async function fetchWithCsrf(url: string, options: RequestInit = {}): Promise<Response> {
   const headers = new Headers(options.headers || {});
   headers.set('Accept', 'application/json');
-  if (token && !headers.has('X-CSRF-TOKEN')) {
-    headers.set('X-CSRF-TOKEN', token);
+
+  // Token protocol:
+  // 1. Send encrypted XSRF cookie value through X-XSRF-TOKEN
+  const xsrfCookie = getXsrfCookie();
+  if (xsrfCookie && !headers.has('X-XSRF-TOKEN')) {
+    headers.set('X-XSRF-TOKEN', xsrfCookie);
+  }
+
+  // 2. Send plaintext session token through X-CSRF-TOKEN (NEVER send encrypted cookie here)
+  const plaintextToken = await getPlaintextCsrfToken();
+  if (plaintextToken && !headers.has('X-CSRF-TOKEN')) {
+    headers.set('X-CSRF-TOKEN', plaintextToken);
   }
 
   const response = await fetch(url, {
@@ -2533,9 +2576,9 @@ async function fetchWithCsrf(url: string, options: RequestInit = {}): Promise<Re
     credentials: 'include',
   });
 
-  // If 419 (TokenMismatchException / CSRF token expired or mismatch), refresh once and retry
+  // If 419 (TokenMismatchException / CSRF token expired or mismatch), refresh plaintext token and retry once
   if (response.status === 419) {
-    cachedCsrfToken = null;
+    cachedPlaintextCsrfToken = null;
     try {
       const tokenRes = await fetch('/admin-home/csrf-token', {
         method: 'GET',
@@ -2545,8 +2588,15 @@ async function fetchWithCsrf(url: string, options: RequestInit = {}): Promise<Re
       if (tokenRes.ok) {
         const tokenData = await tokenRes.json();
         if (tokenData?.csrf_token) {
-          cachedCsrfToken = tokenData.csrf_token;
+          cachedPlaintextCsrfToken = tokenData.csrf_token;
           headers.set('X-CSRF-TOKEN', tokenData.csrf_token);
+
+          // Update X-XSRF-TOKEN if a refreshed cookie was set by the response
+          const refreshedCookie = getXsrfCookie();
+          if (refreshedCookie) {
+            headers.set('X-XSRF-TOKEN', refreshedCookie);
+          }
+
           return fetch(url, {
             ...options,
             headers,

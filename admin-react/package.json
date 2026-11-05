@@ -10,6 +10,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test:csrf": "tsx test_music_settings_csrf.ts",
+    "test:user-delete-csrf": "tsx test_user_delete_csrf.ts",
     "test:first-party-upload": "tsx test_first_party_upload.ts"
   },
   "dependencies": {
