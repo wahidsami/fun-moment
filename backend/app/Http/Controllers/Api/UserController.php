@@ -699,6 +699,7 @@ class UserController extends Controller
 
         $documentService = app(ProviderVerificationDocumentService::class);
         $uploadedFiles = [];
+        $user = null;
 
         try {
             $nationalIdDocName = null;
@@ -803,7 +804,14 @@ class UserController extends Controller
                 return $user;
             });
 
-            $user->load(['sellerVerify', 'registeredCategories']);
+            // 3. Post-commit response building: Transaction committed successfully.
+            // Safely load relationships so post-commit formatting exceptions cannot mislead the client.
+            try {
+                $user->load(['sellerVerify', 'registeredCategories']);
+            } catch (\Throwable $loadEx) {
+                \Log::warning('Post-registration relation eager-load warning: ' . $loadEx->getMessage());
+            }
+
             $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
 
             return response()->success([
@@ -819,9 +827,11 @@ class UserController extends Controller
             ]);
 
         } catch (\Throwable $e) {
-            // Clean up files written to private storage if database transaction fails
-            foreach ($uploadedFiles as $filename) {
-                $documentService->delete($filename);
+            // Clean up files written to private storage ONLY IF database transaction failed to commit
+            if (!$user) {
+                foreach ($uploadedFiles as $filename) {
+                    $documentService->delete($filename);
+                }
             }
             throw $e;
         }
