@@ -140,10 +140,24 @@ if [ "$HEADER" != "PGDMP" ]; then
     exit 1
 fi
 
-# 3. Atomically promote verified partial file to final .dump file (no clobber)
-mv -n "${PARTIAL_FILE}" "${FINAL_FILE}"
+# 3. Atomically promote verified partial file to final .dump file (fail-closed no-clobber)
+mv -nT -- "${PARTIAL_FILE}" "${FINAL_FILE}"
+
+# Fail-closed promotion verification:
+# - Assert partial source no longer exists (must have been atomically moved)
+# - Assert final destination is a regular non-empty file
+if [ -e "${PARTIAL_FILE}" ]; then
+    echo "CRITICAL: Backup promotion failed! Source ${PARTIAL_FILE} still exists (destination collision or move skipped)." >&2
+    exit 1
+fi
+
+if [ ! -f "${FINAL_FILE}" ] || [ ! -s "${FINAL_FILE}" ]; then
+    echo "CRITICAL: Backup promotion failed! Destination ${FINAL_FILE} is missing or empty." >&2
+    exit 1
+fi
+
+# Set CLEANUP_PARTIAL=0 ONLY after promotion is positively confirmed
 CLEANUP_PARTIAL=0
-chmod 600 "${FINAL_FILE}"
 
 echo "[3/3] Atomically promoted verified backup: ${FINAL_FILE} (${FILE_SIZE} bytes, mode 600)."
 echo "STAGE 1 COMPLETE: Host backup verified and promoted."
@@ -159,7 +173,7 @@ Restores the host backup into an ephemeral database using `--exit-on-error`.
 2. **Restorability:** `pg_restore --exit-on-error` runs to completion with exit code 0.
 3. **Exact Primary-Key Set Parity:** Extracts the exact sorted set of primary keys from the restored database for `users`, `seller_verifies`, and `provider_categories`, and asserts an **exact 100% match** against the live database bounded by the restored primary keys (`WHERE id <= RESTORED_MAX_ID`).
 4. **Relational Consistency:** Restored records satisfy internal relational consistency with zero orphaned records.
-5. **Verified Teardown Safety:** The ephemeral database is dropped cleanly via an ownership-guarded, recursion-safe cleanup handler on exit (success, failure, or interrupt). Independently verifies database absence via `pg_database` query, never drops uncreated or pre-existing databases, and fails closed if cleanup fails.
+5. **Verified Teardown Safety:** The ephemeral database is dropped cleanly via an ownership-guarded, recursion-safe cleanup handler on exit (success, failure, or interrupt). Independently verifies database absence via explicit three-state query handling, never drops uncreated or pre-existing databases, and fails closed if cleanup cannot be independently confirmed.
 
 ```bash
 ssh deploy@141.140.0.90 'bash -s' << 'EOF'
@@ -179,8 +193,11 @@ IN_CLEANUP=0
 # - Recursion guard: executes exactly once
 # - Only drops database if positively created by this execution (DB_CREATED=1)
 # - Validates dropdb exit status
-# - Independently confirms database absence via pg_database
-# - Fails closed: overrides exit status to non-zero if cleanup fails
+# - Explicit three-state independent absence verification via psql -X -v ON_ERROR_STOP=1:
+#     State A: exit 0 and empty output -> database absence confirmed
+#     State B: exit 0 and output "1" -> database still exists (cleanup failed)
+#     State C: exit non-zero or unexpected output -> cleanup verification failed
+# - Fails closed: overrides exit status to non-zero if cleanup fails or cannot be confirmed
 cleanup_stage2() {
     ORIGINAL_EXIT=$?
     if [ "$IN_CLEANUP" -eq 1 ]; then
@@ -198,11 +215,17 @@ cleanup_stage2() {
             DROPDB_STATUS=$?
         fi
 
-        DB_STILL_EXISTS=$(docker exec 172440f7a419 psql -U postgres -t -A -c "SELECT 1 FROM pg_database WHERE datname = '${TEMP_DB}';" 2>/dev/null || echo "0")
-        if [ "$DROPDB_STATUS" -eq 0 ] && [ "$DB_STILL_EXISTS" != "1" ]; then
+        # Explicit three-state independent absence verification
+        ABSENCE_OUTPUT=$(docker exec 172440f7a419 psql -X -U postgres -v ON_ERROR_STOP=1 -t -A -c "SELECT 1 FROM pg_database WHERE datname = '${TEMP_DB}';" 2>/dev/null)
+        QUERY_STATUS=$?
+
+        if [ "$DROPDB_STATUS" -eq 0 ] && [ "$QUERY_STATUS" -eq 0 ] && [ -z "$ABSENCE_OUTPUT" ]; then
             echo "Ephemeral database $TEMP_DB dropped cleanly (independent verification: confirmed absent)."
+        elif [ "$QUERY_STATUS" -eq 0 ] && [ "$ABSENCE_OUTPUT" = "1" ]; then
+            echo "CRITICAL CLEANUP FAILURE: Ephemeral database $TEMP_DB still exists after dropdb!" >&2
+            CLEANUP_FAILED=1
         else
-            echo "CRITICAL CLEANUP FAILURE: Failed to drop ephemeral database $TEMP_DB! (dropdb status: $DROPDB_STATUS, still_exists: $DB_STILL_EXISTS)" >&2
+            echo "CRITICAL CLEANUP FAILURE: Failed to independently verify database absence for $TEMP_DB! (dropdb status: $DROPDB_STATUS, query status: $QUERY_STATUS, output: '$ABSENCE_OUTPUT')" >&2
             CLEANUP_FAILED=1
         fi
     else
