@@ -3,6 +3,9 @@
 namespace App\Mail\Transport;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractTransport;
 use Symfony\Component\Mime\Email;
@@ -22,6 +25,12 @@ class ResendTransport extends AbstractTransport
 
     protected function doSend(SentMessage $message): void
     {
+        if (empty(trim($this->apiKey))) {
+            $msg = 'Resend API key is not configured. Please set RESEND_API_KEY in environment.';
+            Log::error($msg);
+            throw new TransportException($msg);
+        }
+
         $email = MessageConverter::toEmail($message->getOriginalMessage());
 
         $from = $email->getFrom();
@@ -54,14 +63,25 @@ class ResendTransport extends AbstractTransport
             $payload['bcc'] = $bcc;
         }
 
-        $this->client->post('https://api.resend.com/emails', [
-            'headers' => [
-                'Authorization' => 'Bearer ' . $this->apiKey,
-                'Content-Type' => 'application/json',
-            ],
-            'json' => $payload,
-            'http_errors' => true,
-        ]);
+        try {
+            $response = $this->client->post('https://api.resend.com/emails', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $this->apiKey,
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => $payload,
+                'http_errors' => true,
+                'timeout' => 15,
+            ]);
+
+            $body = (string) $response->getBody();
+            Log::info("Resend email successfully dispatched to [" . implode(', ', $to) . "]: " . $body);
+        } catch (RequestException $e) {
+            $responseBody = $e->hasResponse() ? (string) $e->getResponse()->getBody() : $e->getMessage();
+            $statusCode = $e->hasResponse() ? $e->getResponse()->getStatusCode() : 0;
+            Log::error("Resend API delivery failure [HTTP {$statusCode}]: {$responseBody}");
+            throw new TransportException("Resend API delivery failure [HTTP {$statusCode}]: {$responseBody}", $e->getCode(), $e);
+        }
     }
 
     public function __toString(): string

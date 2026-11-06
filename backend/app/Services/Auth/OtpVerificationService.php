@@ -97,6 +97,10 @@ class OtpVerificationService
                 'message' => $messageBody,
             ]));
         } catch (Exception $e) {
+            // Delivery failed: clear cooldown so the client is not throttled from retrying
+            Cache::forget($cooldownKey);
+            Cache::forget($cooldownKey . '_ts');
+
             Log::error('OTP email delivery failure for ' . $normalizedEmail . ': ' . $e->getMessage());
             return [
                 'success' => false,

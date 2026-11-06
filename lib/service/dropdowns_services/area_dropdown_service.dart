@@ -18,6 +18,7 @@ class AreaDropdownService with ChangeNotifier {
 
   final List<String> _allAreas = ['Olaya'];
   final List<dynamic> _allAreaIds = [2];
+  final Map<dynamic, Map<String, dynamic>> _cityAreaCache = {};
 
   dynamic selectedArea = 'Olaya';
   dynamic selectedAreaId = 2;
@@ -114,17 +115,8 @@ class AreaDropdownService with ChangeNotifier {
   }
 
   Future<bool> fetchArea(BuildContext context, {bool isrefresh = false}) async {
+    if (isLoading) return false;
     if (areaDropdownList.length > 1 && !isrefresh) return false;
-
-    if (isrefresh) {
-      areaDropdownList = [];
-      areaDropdownIndexList = [];
-      _allAreas.clear();
-      _allAreaIds.clear();
-      currentPage = 1;
-    }
-
-    setLoadingTrue();
 
     var selectedCountryId =
         Provider.of<CountryDropdownService>(context, listen: false)
@@ -142,6 +134,35 @@ class AreaDropdownService with ChangeNotifier {
       notifyListeners();
       return false;
     }
+
+    // Serve from cache if available and not an explicit refresh
+    if (!isrefresh && _cityAreaCache.containsKey(selectedStateId)) {
+      final cached = _cityAreaCache[selectedStateId]!;
+      final cachedNames = List<String>.from(cached['names'] ?? []);
+      final cachedIds = List<dynamic>.from(cached['ids'] ?? []);
+      if (cachedNames.isNotEmpty) {
+        areaDropdownList = List.from(cachedNames);
+        areaDropdownIndexList = List.from(cachedIds);
+        _allAreas.clear();
+        _allAreas.addAll(cachedNames);
+        _allAreaIds.clear();
+        _allAreaIds.addAll(cachedIds);
+        setArea(context);
+        hasError = false;
+        notifyListeners();
+        return true;
+      }
+    }
+
+    if (isrefresh) {
+      areaDropdownList = [];
+      areaDropdownIndexList = [];
+      _allAreas.clear();
+      _allAreaIds.clear();
+      currentPage = 1;
+    }
+
+    setLoadingTrue();
 
     try {
       final response = await http
@@ -170,6 +191,12 @@ class AreaDropdownService with ChangeNotifier {
             _allAreas.add(areaName);
             _allAreaIds.add(areaId);
           }
+
+          // Cache areas for this city
+          _cityAreaCache[selectedStateId] = {
+            'names': List<String>.from(areaDropdownList),
+            'ids': List<dynamic>.from(areaDropdownIndexList),
+          };
 
           setArea(context, data: data);
           hasError = false;

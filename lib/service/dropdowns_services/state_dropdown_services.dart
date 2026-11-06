@@ -81,6 +81,7 @@ class StateDropdownService with ChangeNotifier {
 
   Future<bool> fetchStates(BuildContext context,
       {bool isrefresh = false}) async {
+    if (isLoading) return false;
     if (statesDropdownList.length > 1 && !isrefresh) return false;
 
     if (isrefresh) {

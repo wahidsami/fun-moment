@@ -28,15 +28,13 @@ class BasicMail extends Mailable
      */
     public function build()
     {
-        $envFromAddress = env('MAIL_FROM_ADDRESS');
-        $configEmail = (!empty($envFromAddress) && $envFromAddress !== 'null') ? $envFromAddress : config('mail.from.address');
+        $configEmail = config('mail.from.address');
         $siteEmail = get_static_option('site_global_email');
         $fromEmail = (!empty($configEmail) && $configEmail !== 'null' && $configEmail !== 'hello@example.com')
             ? $configEmail
             : (!empty($siteEmail) ? $siteEmail : 'no-reply@funmoments.sa');
 
-        $envFromName = env('MAIL_FROM_NAME');
-        $configName = (!empty($envFromName) && $envFromName !== 'null') ? $envFromName : config('mail.from.name');
+        $configName = config('mail.from.name');
         $siteTitle = get_static_option('site_title');
         $fromName = (!empty($configName) && $configName !== 'null' && $configName !== 'Example')
             ? $configName
