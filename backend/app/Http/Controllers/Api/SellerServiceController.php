@@ -26,23 +26,23 @@ class SellerServiceController extends Controller
 {
     public function myService()
     {
-        $services = Service::select(['id','title','image','price','is_service_online','view','is_service_on','status'])
+        $services = Service::select(['id', 'title', 'image', 'price', 'is_service_online', 'view', 'is_service_on', 'status'])
             ->with('reviews_for_mobile')
-            ->withCount('reviews','pendingOrder','completeOrder','cancelOrder')
+            ->withCount('reviews', 'pendingOrder', 'completeOrder', 'cancelOrder')
             ->where('seller_id', Auth::guard('sanctum')->user()->id)
             ->latest()->paginate(10)
             ->withQueryString();
 
-        if(!empty($services)){
-            $service_image=[];
-            foreach($services as $service){
-                $service_image[]= get_attachment_image_by_id($service->image);
+        if (!empty($services)) {
+            $service_image = [];
+            foreach ($services as $service) {
+                $service_image[] = get_attachment_image_by_id($service->image);
             }
             return response()->success([
-                'my_services'=> $services,
-                'service_image'=> $service_image,
+                'my_services' => $services,
+                'service_image' => $service_image,
             ]);
-        }else{
+        } else {
             return response()->error([
                 'my_services' => __('No service found'),
             ]);
@@ -52,12 +52,12 @@ class SellerServiceController extends Controller
 
     public function subCategoryByCategory($category)
     {
-        if($category){
-            $sub_category = Subcategory::where('category_id',$category)->get();
+        if ($category) {
+            $sub_category = Subcategory::where('category_id', $category)->get();
             return response()->success([
                 'sub_category' => $sub_category,
             ]);
-        }else{
+        } else {
             return response()->error([
                 'message' => __('Category not found'),
             ]);
@@ -66,21 +66,30 @@ class SellerServiceController extends Controller
 
     public function childCategoryBySubcategory($sub_category)
     {
-        if($sub_category){
-            $child_category = ChildCategory::where('sub_category_id',$sub_category)->get();
+        if ($sub_category) {
+            $child_category = ChildCategory::where('sub_category_id', $sub_category)->get();
             return response()->success([
                 'child_category' => $child_category,
             ]);
-        }else{
+        } else {
             return response()->error([
                 'message' => __('Subcategory not found'),
             ]);
         }
     }
-    
-     public function ServiceOnOff($id)
+
+    public function ServiceOnOff($id)
     {
-        $seller_id = Auth::guard('sanctum')->id();
+        $user = Auth::guard('sanctum')->user();
+        if (!$user || (int) optional($user->sellerVerify)->status !== 1) {
+            return response()->json([
+                'status' => 'failed',
+                'message' => __('Your seller account is pending commercial verification approval.'),
+                'seller_verified' => false,
+            ], 403);
+        }
+
+        $seller_id = $user->id;
         $service = Service::where('id', $id)->where('seller_id', $seller_id)->first();
         if (empty($service)) {
             return response()->error(['msg' => __('Service not found or unauthorized.')]);
@@ -137,6 +146,21 @@ class SellerServiceController extends Controller
     {
         if ($request->isMethod('post')) {
             $user = Auth::guard('sanctum')->user();
+            if (!$user) {
+                return response()->json(['message' => __('Unauthenticated')], 401);
+            }
+
+            // Commercial Verification Check: Seller must be approved (status === 1)
+            $sellerVerify = $user->sellerVerify;
+            if (!$sellerVerify || (int) $sellerVerify->status !== 1) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => __('Your seller account is pending commercial verification approval. You cannot create or publish services until your documents have been approved by an administrator.'),
+                    'seller_verified' => false,
+                    'commercial_status' => (int) ($sellerVerify ? $sellerVerify->status : 0),
+                ], 403);
+            }
+
             $city_id = $request->input('service_city_id') ?: $user->service_city;
             if (empty($city_id) || !\App\ServiceCity::where('id', $city_id)->exists()) {
                 $defaultCity = \App\ServiceCity::where('status', 1)->first() ?: \App\ServiceCity::first();
@@ -199,25 +223,25 @@ class SellerServiceController extends Controller
                     ], 422);
                 }
             }
-            
+
             $seller_country_id = $user->country_id;
             $country_tax = $seller_country_id ? Tax::select('tax')->where('country_id', $seller_country_id)->first() : null;
 
             $image_id = null;
-            if($request->file('image')){
-                $media = MediaHelper::insert_media_image($request,'web','image');
+            if ($request->file('image')) {
+                $media = MediaHelper::insert_media_image($request, 'web', 'image');
                 $image_id = $media ? $media->id : null;
             } elseif ($request->has('image') && is_numeric($request->image)) {
                 $image_id = (int) $request->image;
             }
-            
-            if($request->file('image_gallery')){
-                $media = MediaHelper::insert_media_image($request,'web','image_gallery');
+
+            if ($request->file('image_gallery')) {
+                $media = MediaHelper::insert_media_image($request, 'web', 'image_gallery');
                 $image_id = $media ? $media->id : $image_id;
             }
 
             $durationInput = $request->input('duration') ?: $request->input('delivery_days', 1);
-            $deliveryDays = (int) preg_replace('/[^0-9]/', '', (string)$durationInput) ?: 1;
+            $deliveryDays = (int) preg_replace('/[^0-9]/', '', (string) $durationInput) ?: 1;
 
             $service = new Service();
             $service->category_id = $request->category_id;
@@ -239,17 +263,17 @@ class SellerServiceController extends Controller
             $service->is_service_all_cities = $request->is_service_all_cities ?? 0;
 
             $Metas = [
-                'meta_title'=> purify_html($request->meta_title),
-                'meta_tags'=> purify_html($request->meta_tags),
-                'meta_description'=> purify_html($request->meta_description),
+                'meta_title' => purify_html($request->meta_title),
+                'meta_tags' => purify_html($request->meta_tags),
+                'meta_description' => purify_html($request->meta_description),
 
-                'facebook_meta_tags'=> purify_html($request->facebook_meta_tags),
-                'facebook_meta_description'=> purify_html($request->facebook_meta_description),
-                'facebook_meta_image'=> $request->facebook_meta_image,
+                'facebook_meta_tags' => purify_html($request->facebook_meta_tags),
+                'facebook_meta_description' => purify_html($request->facebook_meta_description),
+                'facebook_meta_image' => $request->facebook_meta_image,
 
-                'twitter_meta_tags'=> purify_html($request->twitter_meta_tags),
-                'twitter_meta_description'=> purify_html($request->twitter_meta_description),
-                'twitter_meta_image'=> $request->twitter_meta_image,
+                'twitter_meta_tags' => purify_html($request->twitter_meta_tags),
+                'twitter_meta_description' => purify_html($request->twitter_meta_description),
+                'twitter_meta_image' => $request->twitter_meta_image,
             ];
             $service->save();
             $last_service_id = $service->id;
@@ -260,7 +284,7 @@ class SellerServiceController extends Controller
                 $includesData = is_string($request->includes) ? json_decode($request->includes, true) : $request->includes;
                 if (is_array($includesData)) {
                     foreach ($includesData as $inc) {
-                        $incTitle = is_array($inc) ? ($inc['title'] ?? '') : (string)$inc;
+                        $incTitle = is_array($inc) ? ($inc['title'] ?? '') : (string) $inc;
                         if (!empty(trim($incTitle))) {
                             Serviceinclude::create([
                                 'service_id' => $service->id,
@@ -276,9 +300,9 @@ class SellerServiceController extends Controller
 
             try {
                 $message = get_static_option('service_approve_message');
-                $message = str_replace(["@service_id"],[$last_service_id],$message);
+                $message = str_replace(["@service_id"], [$last_service_id], $message);
                 Mail::to(get_static_option('site_global_email'))->send(new BasicMail([
-                    'subject' =>get_static_option('service_approve_subject') ?? __('New Service Approve Request'),
+                    'subject' => get_static_option('service_approve_subject') ?? __('New Service Approve Request'),
                     'message' => $message
                 ]));
             } catch (\Exception $e) {
@@ -289,7 +313,7 @@ class SellerServiceController extends Controller
             $imageUrl = !empty($imgData) ? ($imgData['img_url'] ?? null) : null;
 
             return response()->success([
-                'msg'=> __('Service Successfully Add'),
+                'msg' => __('Service Successfully Add'),
                 'id' => $last_service_id,
                 'image_url' => $imageUrl,
                 'service' => $service
@@ -319,10 +343,19 @@ class SellerServiceController extends Controller
             'additionals' => $service->serviceAdditional,
         ]);
     }
-    
+
     public function updateService(Request $request)
     {
         if ($request->isMethod('post')) {
+            $user = Auth::guard('sanctum')->user();
+            if (!$user || (int) optional($user->sellerVerify)->status !== 1) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => __('Your seller account is pending commercial verification approval. You cannot update services until approved.'),
+                    'seller_verified' => false,
+                ], 403);
+            }
+
             $service_id = $request->input('service_id') ?: $request->input('id');
             $seller_id = Auth::guard('sanctum')->id();
 
@@ -387,17 +420,17 @@ class SellerServiceController extends Controller
             }
 
             $image_id = $service->image;
-            if($request->file('image')){
-                $media = MediaHelper::insert_media_image($request,'web','image');
+            if ($request->file('image')) {
+                $media = MediaHelper::insert_media_image($request, 'web', 'image');
                 $image_id = $media ? $media->id : $image_id;
             }
-            if($request->file('image_gallery')){
-                $media = MediaHelper::insert_media_image($request,'web','image_gallery');
+            if ($request->file('image_gallery')) {
+                $media = MediaHelper::insert_media_image($request, 'web', 'image_gallery');
                 $image_id = $media ? $media->id : $image_id;
             }
 
             $durationInput = $request->input('duration') ?: $request->input('delivery_days');
-            $deliveryDays = $durationInput !== null ? ((int) preg_replace('/[^0-9]/', '', (string)$durationInput) ?: 1) : $service->delivery_days;
+            $deliveryDays = $durationInput !== null ? ((int) preg_replace('/[^0-9]/', '', (string) $durationInput) ?: 1) : $service->delivery_days;
 
             $updateData = [
                 'title' => $request->title,
@@ -429,7 +462,7 @@ class SellerServiceController extends Controller
                 if (is_array($includesData)) {
                     Serviceinclude::where('service_id', $service->id)->delete();
                     foreach ($includesData as $inc) {
-                        $incTitle = is_array($inc) ? ($inc['title'] ?? '') : (string)$inc;
+                        $incTitle = is_array($inc) ? ($inc['title'] ?? '') : (string) $inc;
                         if (!empty(trim($incTitle))) {
                             Serviceinclude::create([
                                 'service_id' => $service->id,
@@ -455,19 +488,19 @@ class SellerServiceController extends Controller
 
             return response()->success([
                 'status' => 'success',
-                'message'=> __('Service updated successfully and submitted for admin review.'),
+                'message' => __('Service updated successfully and submitted for admin review.'),
                 'service' => $service->fresh(),
                 'image_url' => $imageUrl,
             ]);
         }
     }
 
-    public function addServiceAttributesByID(Request $request,$id=null)
+    public function addServiceAttributesByID(Request $request, $id = null)
     {
 
-        $get_service = Service::where('id',$id)->where('seller_id',Auth::guard('sanctum')->user()->id)->first();
+        $get_service = Service::where('id', $id)->where('seller_id', Auth::guard('sanctum')->user()->id)->first();
 
-        if($request->isMethod('post')) {
+        if ($request->isMethod('post')) {
 
             $data = $request->all();
             $all_include_service = [];
@@ -482,9 +515,9 @@ class SellerServiceController extends Controller
             $new_benifits_services = [];
 
 
-            if(isset($data['is_service_online_id'])){
-                if($data['is_service_online_id'] == 1){
-                    if(isset($data['all_include_service'])){
+            if (isset($data['is_service_online_id'])) {
+                if ($data['is_service_online_id'] == 1) {
+                    if (isset($data['all_include_service'])) {
 
                         $validator = Validator::make($request->all(), [
                             'online_service_price' => 'required|numeric|min:0',
@@ -497,8 +530,8 @@ class SellerServiceController extends Controller
 
                         $new_include_services = json_decode($data['all_include_service']);
                         // include service
-                        foreach ($new_include_services as  $value) {
-                            foreach ($value as $service){
+                        foreach ($new_include_services as $value) {
+                            foreach ($value as $service) {
                                 $all_include_service[] = (array) $service +
                                     [
                                         'seller_id' => Auth::guard('sanctum')->user()->id,
@@ -510,7 +543,7 @@ class SellerServiceController extends Controller
                         }
 
                         // update service for online
-                        Service::where('id',$id)->update([
+                        Service::where('id', $id)->update([
                             'price' => $data['online_service_price'],
                             'online_service_price' => $data['online_service_price'],
                             'delivery_days' => $data['delivery_days'],
@@ -520,11 +553,11 @@ class SellerServiceController extends Controller
 
                     }
                 }
-            }else{
-                if(isset($data['all_include_service'])){
+            } else {
+                if (isset($data['all_include_service'])) {
                     $new_include_services = json_decode($data['all_include_service']);
-                    foreach ($new_include_services as  $value) {
-                        foreach ($value as $service){
+                    foreach ($new_include_services as $value) {
+                        foreach ($value as $service) {
                             $service = (array) $service;
                             $all_include_service[] = $service +
                                 [
@@ -538,17 +571,17 @@ class SellerServiceController extends Controller
                     }
                 }
             }
-            if($service_count>=1){
+            if ($service_count >= 1) {
                 Serviceinclude::insert($all_include_service);
-                $service_old_price = Service::where('id',$id)->select('price')->first();
-                $service_total_price_with_new_added_attribute =($service_old_price->price + $service_total_price);
+                $service_old_price = Service::where('id', $id)->select('price')->first();
+                $service_total_price_with_new_added_attribute = ($service_old_price->price + $service_total_price);
                 Service::where('id', $id)->update(['price' => $service_total_price_with_new_added_attribute]);
             }
 
-            if(isset($data['all_additional_service'])) {
+            if (isset($data['all_additional_service'])) {
                 $new_additional_services = json_decode($data['all_additional_service']);
                 foreach ($new_additional_services as $value) {
-                    foreach ($value as $service){
+                    foreach ($value as $service) {
                         $all_additional_service[] = (array) $service +
                             [
                                 'seller_id' => Auth::guard('sanctum')->user()->id,
@@ -559,14 +592,14 @@ class SellerServiceController extends Controller
                     }
                 }
             }
-            if($service_count>=1){
+            if ($service_count >= 1) {
                 Serviceadditional::insert($all_additional_service);
             }
 
-            if(isset($data['service_benifits'])) {
+            if (isset($data['service_benifits'])) {
                 $new_benifits = json_decode($data['service_benifits']);
                 foreach ($new_benifits as $value) {
-                    foreach ($value as $service){
+                    foreach ($value as $service) {
                         $all_benifits_service[] = (array) $service +
                             [
                                 'seller_id' => Auth::guard('sanctum')->user()->id,
@@ -577,14 +610,14 @@ class SellerServiceController extends Controller
                 }
             }
 
-            if($service_count>=1){
+            if ($service_count >= 1) {
                 Servicebenifit::insert($all_benifits_service);
             }
 
-            if(isset($data['online_service_faqs'])){
+            if (isset($data['online_service_faqs'])) {
                 $new_faqs_services = json_decode($data['online_service_faqs']);
                 foreach ($new_faqs_services as $value) {
-                    foreach ($value as $service){
+                    foreach ($value as $service) {
                         $online_service_faqs[] = (array) $service +
                             [
                                 'seller_id' => Auth::guard('sanctum')->user()->id,
@@ -595,32 +628,32 @@ class SellerServiceController extends Controller
                     }
                 }
             }
-            if($service_count>=1){
+            if ($service_count >= 1) {
                 OnlineServiceFaq::insert($online_service_faqs);
             }
 
-            if($service_count <= 0){
+            if ($service_count <= 0) {
                 return response()->error([
-                    'message'=>__('Please input service attributes.')
+                    'message' => __('Please input service attributes.')
                 ]);
             }
             return response()->success([
-                'message'=>__('Service attributes added success.')
+                'message' => __('Service attributes added success.')
             ]);
         }
 
-        if($get_service !=''){
+        if ($get_service != '') {
             return response()->error([
-                'message'=>__('Service not found.')
+                'message' => __('Service not found.')
             ]);
         }
     }
 
-    public function updateServiceAttributesByID(Request $request,$id=null)
+    public function updateServiceAttributesByID(Request $request, $id = null)
     {
-        $get_service = Service::where('id',$id)->where('seller_id',Auth::guard('sanctum')->user()->id)->first();
+        $get_service = Service::where('id', $id)->where('seller_id', Auth::guard('sanctum')->user()->id)->first();
 
-        if($request->isMethod('post')) {
+        if ($request->isMethod('post')) {
             $data = $request->all();
 
             $all_include_service = [];
@@ -634,9 +667,9 @@ class SellerServiceController extends Controller
             $new_additional_services = [];
             $new_benifits_services = [];
 
-            if(isset($data['is_service_online_id'])){
-                if($data['is_service_online_id'] == 1){
-                    if(isset($data['all_include_service'])){
+            if (isset($data['is_service_online_id'])) {
+                if ($data['is_service_online_id'] == 1) {
+                    if (isset($data['all_include_service'])) {
                         $validator = Validator::make($request->all(), [
                             'online_service_price' => 'required|numeric|min:0',
                             'delivery_days' => 'required|integer|min:0'
@@ -647,8 +680,8 @@ class SellerServiceController extends Controller
                         }
 
                         $new_include_services = json_decode($data['all_include_service']);
-                        foreach ($new_include_services as  $value) {
-                            foreach ($value as $service){
+                        foreach ($new_include_services as $value) {
+                            foreach ($value as $service) {
                                 $all_include_service[] = (array) $service +
                                     [
                                         'seller_id' => Auth::guard('sanctum')->user()->id,
@@ -660,7 +693,7 @@ class SellerServiceController extends Controller
                         }
 
                         // update service for online
-                        Service::where('id',$id)->update([
+                        Service::where('id', $id)->update([
                             'price' => $data['online_service_price'],
                             'online_service_price' => $data['online_service_price'],
                             'delivery_days' => $data['delivery_days'],
@@ -669,11 +702,11 @@ class SellerServiceController extends Controller
                         ]);
                     }
                 }
-            }else{
-                if(isset($data['all_include_service'])){
+            } else {
+                if (isset($data['all_include_service'])) {
                     $new_include_services = json_decode($data['all_include_service']);
-                    foreach ($new_include_services as  $value) {
-                        foreach ($value as $service){
+                    foreach ($new_include_services as $value) {
+                        foreach ($value as $service) {
                             $service = (array) $service;
                             $all_include_service[] = $service +
                                 [
@@ -688,20 +721,20 @@ class SellerServiceController extends Controller
                 }
             }
 
-            if($service_count>=1){
+            if ($service_count >= 1) {
                 Serviceinclude::where("service_id", $get_service->id)->delete();
                 Serviceinclude::insert($all_include_service);
-                $service_old_price = Service::where('id',$id)->select('price')->first();
+                $service_old_price = Service::where('id', $id)->select('price')->first();
                 $service_total_price_with_new_added_attribute = $service_total_price;
 
-                if(isset($data['is_service_online_id'])){
-                    if($data['is_service_online_id'] == 1) {
+                if (isset($data['is_service_online_id'])) {
+                    if ($data['is_service_online_id'] == 1) {
                         Service::where('id', $id)->update(['price' => $data['online_service_price']]);
                     }
-                }else{
+                } else {
                     Service::where('id', $id)->update(['price' => $service_total_price_with_new_added_attribute]);
                     // update service for online
-                    Service::where('id',$id)->update([
+                    Service::where('id', $id)->update([
                         'online_service_price' => 0,
                         'delivery_days' => 0,
                         'revision' => 0,
@@ -710,10 +743,10 @@ class SellerServiceController extends Controller
                 }
             }
 
-            if(isset($data['all_additional_service'])) {
+            if (isset($data['all_additional_service'])) {
                 $new_additional_services = json_decode($data['all_additional_service']);
                 foreach ($new_additional_services as $value) {
-                    foreach ($value as $service){
+                    foreach ($value as $service) {
                         $all_additional_service[] = (array) $service +
                             [
                                 'seller_id' => Auth::guard('sanctum')->user()->id,
@@ -724,16 +757,16 @@ class SellerServiceController extends Controller
                     }
                 }
             }
-            
-            if($service_count>=1){
+
+            if ($service_count >= 1) {
                 Serviceadditional::where("service_id", $get_service->id)->delete();
                 Serviceadditional::insert($all_additional_service);
             }
 
-            if(isset($data['service_benifits'])) {
+            if (isset($data['service_benifits'])) {
                 $new_benifits = json_decode($data['service_benifits']);
                 foreach ($new_benifits as $value) {
-                    foreach ($value as $service){
+                    foreach ($value as $service) {
                         $all_benifits_service[] = (array) $service +
                             [
                                 'seller_id' => Auth::guard('sanctum')->user()->id,
@@ -744,15 +777,15 @@ class SellerServiceController extends Controller
                 }
             }
 
-            if($service_count>=1){
+            if ($service_count >= 1) {
                 Servicebenifit::where("service_id", $get_service->id)->delete();
                 Servicebenifit::insert($all_benifits_service);
             }
 
-            if(isset($data['online_service_faqs'])){
+            if (isset($data['online_service_faqs'])) {
                 $new_faqs_services = json_decode($data['online_service_faqs']);
                 foreach ($new_faqs_services as $value) {
-                    foreach ($value as $service){
+                    foreach ($value as $service) {
                         $online_service_faqs[] = (array) $service +
                             [
                                 'seller_id' => Auth::guard('sanctum')->user()->id,
@@ -763,49 +796,49 @@ class SellerServiceController extends Controller
                     }
                 }
             }
-            if($service_count>=1){
+            if ($service_count >= 1) {
                 OnlineServiceFaq::where("service_id", $get_service->id)->delete();
                 OnlineServiceFaq::insert($online_service_faqs);
             }
 
-            if($service_count <= 0){
+            if ($service_count <= 0) {
                 return response()->error([
-                    'message'=>__('Please input service attributes.')
+                    'message' => __('Please input service attributes.')
                 ]);
             }
             return response()->success([
-                'message'=>__('Service attributes updated success.')
+                'message' => __('Service attributes updated success.')
             ]);
         }
 
-        if($get_service !=''){
+        if ($get_service != '') {
             return response()->error([
-                'message'=>__('Service not found.')
+                'message' => __('Service not found.')
             ]);
         }
 
     }
-    
-    public function showAttributes($id=null)
+
+    public function showAttributes($id = null)
     {
         $seller_id = Auth::guard('sanctum')->user()->id;
-        $service = Service::select(['id','title','image'])
-            ->where('id',$id)
-            ->where('seller_id',$seller_id)
+        $service = Service::select(['id', 'title', 'image'])
+            ->where('id', $id)
+            ->where('seller_id', $seller_id)
             ->first();
 
-        if(!empty($service)){
-            $include_service = Serviceinclude::where('service_id',$id)->get();
-            $additional_service = Serviceadditional::where('service_id',$id)->get();
-            $service_benifit = Servicebenifit::where('service_id',$id)->get();
+        if (!empty($service)) {
+            $include_service = Serviceinclude::where('service_id', $id)->get();
+            $additional_service = Serviceadditional::where('service_id', $id)->get();
+            $service_benifit = Servicebenifit::where('service_id', $id)->get();
             return response()->success([
-                'include_services'=>$include_service,
-                'additional_service'=>$additional_service,
-                'service_benifit'=>$service_benifit,
+                'include_services' => $include_service,
+                'additional_service' => $additional_service,
+                'service_benifit' => $service_benifit,
             ]);
         }
     }
-    
+
     public function deleteIncludeService($id = null)
     {
         $seller_id = Auth::guard('sanctum')->user()->id;
@@ -825,10 +858,10 @@ class SellerServiceController extends Controller
         $service_details->save();
         $include_details->delete();
         return response()->success([
-            'message'=>__('Include Service Delete Success.')
+            'message' => __('Include Service Delete Success.')
         ]);
     }
-    
+
     public function deleteAdditionalService($id = null)
     {
         $seller_id = Auth::guard('sanctum')->user()->id;
@@ -838,10 +871,10 @@ class SellerServiceController extends Controller
         }
         $additional->delete();
         return response()->success([
-            'message'=>__('Additional Service Delete Success.')
+            'message' => __('Additional Service Delete Success.')
         ]);
     }
-    
+
     public function deleteBenefits($id = null)
     {
         $seller_id = Auth::guard('sanctum')->user()->id;
@@ -851,7 +884,7 @@ class SellerServiceController extends Controller
         }
         $benefit->delete();
         return response()->success([
-            'message'=>__('Service Benefit Delete Success')
+            'message' => __('Service Benefit Delete Success')
         ]);
     }
 
@@ -869,7 +902,7 @@ class SellerServiceController extends Controller
         OnlineServiceFaq::where('service_id', $id)->delete();
         $service->delete();
         return response()->success([
-            'message'=>__('Service Delete Success'),
+            'message' => __('Service Delete Success'),
         ]);
     }
 }

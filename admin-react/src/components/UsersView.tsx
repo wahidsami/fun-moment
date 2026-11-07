@@ -580,7 +580,18 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                         </td>
                         <td className="px-6 py-4">
                           <div className="font-bold text-slate-700">{user.name}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{user.email}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] text-slate-400 font-mono">{user.email}</span>
+                            <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                              user.email_verified
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-amber-50 text-amber-700'
+                            }`}>
+                              {user.email_verified
+                                ? (language === 'en' ? 'Email Verified' : 'بريد موثق')
+                                : (language === 'en' ? 'Email Pending' : 'بريد غير موثق')}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-1">
@@ -619,11 +630,18 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                            user.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-                          }`}>
-                            {user.status === 'active' ? t.status_active : t.status_suspended}
-                          </span>
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              user.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                            }`}>
+                              {user.status === 'active' ? t.status_active : t.status_suspended}
+                            </span>
+                            {!user.email_verified && (
+                              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold bg-amber-50 text-amber-800">
+                                {language === 'en' ? 'OTP Pending' : 'بانتظار التفعيل'}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-1">
@@ -715,7 +733,20 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                           <div className="font-bold text-slate-800">{user.name}</div>
                           <div className="text-[10px] text-slate-400 mt-0.5">{user.phone}</div>
                         </td>
-                        <td className="px-6 py-4 font-mono text-[11px] text-slate-500">{user.email}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-mono text-[11px] text-slate-500">{user.email}</div>
+                          <div className="mt-1">
+                            <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                              user.email_verified
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-amber-50 text-amber-700'
+                            }`}>
+                              {user.email_verified
+                                ? (language === 'en' ? 'Email Verified' : 'بريد موثق')
+                                : (language === 'en' ? 'Email Pending' : 'بريد غير موثق')}
+                            </span>
+                          </div>
+                        </td>
                         <td className="px-6 py-4 text-slate-600 font-bold">
                           {profile?.bookingsCount || 0} bookings
                         </td>
@@ -724,11 +755,18 @@ export default function UsersView({ language, activeRole }: UsersViewProps) {
                         </td>
                         <td className="px-6 py-4 uppercase font-mono">{profile?.preferredLocale || 'en'}</td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                            user.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-                          }`}>
-                            {user.status === 'active' ? t.status_active : t.status_suspended}
-                          </span>
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              user.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                            }`}>
+                              {user.status === 'active' ? t.status_active : t.status_suspended}
+                            </span>
+                            {!user.email_verified && (
+                              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold bg-amber-50 text-amber-800">
+                                {language === 'en' ? 'OTP Pending' : 'بانتظار التفعيل'}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-1">

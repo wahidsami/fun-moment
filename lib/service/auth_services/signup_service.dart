@@ -126,30 +126,33 @@ class SignupService with ChangeNotifier {
 
         if (response.statusCode == 201) {
           OthersHelper().showToast(
-              "Registration successful", ConstantColors().successColor);
-          print(response.body);
+              "Registration submitted. Please verify your email.", ConstantColors().successColor);
+          debugPrint('[BuyerSignup] response: ${response.body}');
 
           var responseData = jsonDecode(response.body);
-          String token = responseData['token']?.toString() ?? '';
+          String? token = responseData['token']?.toString();
           int userId = int.tryParse(responseData['users']?['id']?.toString() ?? '') ?? 0;
           String state = responseData['users']?['state']?.toString() ?? '';
           String countryId =
               responseData['users']?['country_id']?.toString() ?? '';
 
-          // Send OTP
-          bool isOtepSent = false;
-          try {
-            isOtepSent = await Provider.of<EmailVerifyService>(context, listen: false)
-                .sendOtpForEmailValidation(email, context, token, client: httpClient);
-          } catch (e) {
-            debugPrint('[BuyerSignup] OTP dispatch note: $e');
+          bool isOtepSent = responseData['otp_sent'] == true;
+          if (!isOtepSent) {
+            // If backend didn't auto-send OTP or delivery failed, attempt client-side dispatch
+            try {
+              isOtepSent = await Provider.of<EmailVerifyService>(context, listen: false)
+                  .sendOtpForEmailValidation(email, context, token, client: httpClient, purpose: 'email_verify');
+            } catch (e) {
+              debugPrint('[BuyerSignup] OTP dispatch note: $e');
+              isOtepSent = false;
+            }
           }
           setLoadingFalse();
 
           if (context.mounted) {
             if (!isOtepSent) {
               OthersHelper().showToast(
-                "Registration successful. We couldn't send the verification code right now. Please tap Send again on the verification screen.",
+                "Registration submitted. We couldn't send the verification code automatically. Please tap Send again on the verification screen.",
                 Colors.black,
               );
             }
@@ -163,6 +166,7 @@ class SignupService with ChangeNotifier {
                   state: state,
                   countryId: countryId,
                   userType: selectedUserType,
+                  initialOtpFailed: !isOtepSent,
                 ),
               ),
             );

@@ -408,19 +408,36 @@ class FrontendUserManageController extends Controller
 
         $isVerified = optional($user->sellerVerify)->status === 1;
 
+        $lifecycleStatus = 'active';
+        if ((int) $user->user_status === 0) {
+            $lifecycleStatus = 'suspended';
+        } elseif ((int) $user->email_verified !== 1) {
+            $lifecycleStatus = 'unverified_email';
+        } elseif ($role === 'seller') {
+            $verifyStatus = (int) optional($user->sellerVerify)->status;
+            if ($verifyStatus === 1) {
+                $lifecycleStatus = 'active';
+            } elseif ($verifyStatus === 2) {
+                $lifecycleStatus = 'commercial_rejected';
+            } else {
+                $lifecycleStatus = 'pending_commercial_review';
+            }
+        }
+
         return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
             'role' => $role,
             'status' => $status,
+            'lifecycle_status' => $lifecycleStatus,
             'seller_type' => (int) ($user->seller_type ?: 1),
             'avatar' => $avatar,
             'phone' => $user->phone,
             'country' => $countryName,
             'created_at' => optional($user->created_at)->toDateString(),
             'wallet_balance' => $walletBalance,
-            'email_verified' => (bool) $user->email_verified,
+            'email_verified' => (bool) ((int) $user->email_verified === 1),
             'seller_verified' => $isVerified,
             'tax_number' => $user->tax_number,
             'business_registration' => $user->business_registration,

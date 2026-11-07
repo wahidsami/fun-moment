@@ -36,13 +36,13 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
     Route::get('/currency',[MiscellaneousController::class,'currencyInfo']);
     Route::get('/module-permission',[MiscellaneousController::class,'modulePermission']);
     Route::get('/admin-commission-type',[MiscellaneousController::class,'adminCommissionType']);
-    Route::post('/account-delete',[MiscellaneousController::class,'accountDelete'])->middleware('auth:sanctum');
+    Route::post('/account-delete',[MiscellaneousController::class,'accountDelete'])->middleware(['auth:sanctum', 'userEmailVerify']);
     
     //todo: languages
     Route::get('/language',[LanguageController::class,'languageInfo']);
     Route::post('/translate-string',[LanguageController::class,'translateString']);
     Route::get('/mollie-ipn',[PaymentController::class,'mollieIpn'])->name('mollie.api.ipn')->middleware(['api']);
-    Route::post('/mollie-charge-customer',[PaymentController::class,'mollieChargeCustomer'])->middleware(['auth:sanctum','api']);
+    Route::post('/mollie-charge-customer',[PaymentController::class,'mollieChargeCustomer'])->middleware(['auth:sanctum', 'api', 'userEmailVerify']);
     
     // PayTabs IPN and Return routes
     Route::post('/paytabs/ipn', [PayTabsApiController::class, 'ipn'])->name('api.paytabs.ipn');
@@ -74,7 +74,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
     /*--------------------------
         Buyer Api Routes
     --------------------------*/
-    Route::group(['prefix' => 'user/','middleware' => 'auth:sanctum'],function (){
+    Route::group(['prefix' => 'user/','middleware' => ['auth:sanctum', 'userEmailVerify']],function (){
 
         // frontend cashfree payment
         Route::post('payment/cashfree',[UserController::class,'cashfreePayment']);
@@ -214,7 +214,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
     }
 
     //verify 
-    Route::group(['middleware' => 'auth:sanctum'],function (){
+    Route::group(['middleware' => ['auth:sanctum', 'userEmailVerify']],function (){
         Route::post('service/order', [ServiceController::class,'order']);
         Route::post('service/order/cancel-pending', [PayTabsApiController::class, 'cancelPending']);
         Route::post('image/upload', [ServiceController::class,'imageUpload']);
@@ -225,7 +225,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
     /*--------------------------
         Seller Api Routes
     --------------------------*/
-    Route::group(['prefix' => 'seller','middleware' => 'auth:sanctum'],function (){
+    Route::group(['prefix' => 'seller','middleware' => ['auth:sanctum', 'userEmailVerify']],function (){
         Route::post('dashboard-info', [SellerController::class,'dashboardInfo']);
         Route::post('chart-data', [SellerController::class,'chartData']);
         Route::post('recent-orders', [SellerController::class,'recentOrders']);
@@ -234,13 +234,15 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         // Available Day & Schedule APIs
         Route::get('available-days-list', [SellerController::class,'availableDaysList']);
         Route::get('schedule-days-list', [SellerController::class,'scheduleDaysList']);
-        Route::post('create-day', [SellerController::class,'createDay']);
-        Route::post('toggle-day', [SellerController::class,'toggleDay']);
-        Route::post('day-delete', [SellerController::class,'deleteDay']);
         Route::get('schedule-list', [SellerController::class,'scheduleList']);
-        Route::post('schedule/create', [SellerController::class,'scheduleCreate']);
-        Route::post('schedule/update', [SellerController::class,'scheduleUpdate']);
-        Route::post('schedule/delete', [SellerController::class,'scheduleDelete']);
+        Route::group(['middleware' => 'sellerApproved'], function() {
+            Route::post('create-day', [SellerController::class,'createDay']);
+            Route::post('toggle-day', [SellerController::class,'toggleDay']);
+            Route::post('day-delete', [SellerController::class,'deleteDay']);
+            Route::post('schedule/create', [SellerController::class,'scheduleCreate']);
+            Route::post('schedule/update', [SellerController::class,'scheduleUpdate']);
+            Route::post('schedule/delete', [SellerController::class,'scheduleDelete']);
+        });
         Route::get('allowed-categories', [SellerServiceController::class, 'allowedCategories']);
         Route::get('service/allowed-categories', [SellerServiceController::class, 'allowedCategories']);
 
@@ -263,8 +265,8 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
             Route::get('/verification-document/{type}', [\App\Http\Controllers\VerificationDocumentController::class, 'streamProvider']);
         }); 
         
-        //Services
-        Route::group(['prefix' => 'service'],function(){
+        //Services (requires commercial approval)
+        Route::group(['prefix' => 'service', 'middleware' => 'sellerApproved'],function(){
             Route::get('/my-services',[SellerServiceController::class,'myService']);
             Route::get('/details/{id}',[SellerServiceController::class,'serviceDetails']);
             Route::get('/category-wise-sub-category/{id}',[SellerServiceController::class,'subCategoryByCategory']);
@@ -281,8 +283,8 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
             Route::post('/delete/service-with-all-attributes/{id}',[SellerServiceController::class,'deleteService']);
         });
         
-        //my orders
-        Route::group(['prefix' => 'my-orders'],function(){
+        //my orders (requires commercial approval)
+        Route::group(['prefix' => 'my-orders', 'middleware' => 'sellerApproved'],function(){
             Route::post('/',[SellerController::class,'myOrders']);
             Route::post('/{id}',[SellerController::class,'singleOrder']);
             Route::post('status/complete/request',[SellerController::class,'orderStatus']);
@@ -292,7 +294,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         });
 
         /* extra order request */
-        Route::group(['prefix' => 'order'],function(){
+        Route::group(['prefix' => 'order', 'middleware' => 'sellerApproved'],function(){
             Route::post('order-decline',[SellerController::class,'orderDecline']);
             Route::post('extra-service/add',[SellerController::class,'extraService']);
             Route::post('extra-service/delete',[SellerController::class,'extraServiceDelete']);
@@ -383,7 +385,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         Route::post('/analytics/playback-event', [\App\Http\Controllers\Api\MusicAnalyticsController::class, 'recordPlaybackEvent'])->name('api.v1.music.analytics.playback-event');
 
         // Phase 4: Authenticated Favorites
-        Route::group(['middleware' => 'auth:sanctum'], function () {
+        Route::group(['middleware' => ['auth:sanctum', 'userEmailVerify']], function () {
             Route::post('/favorites/toggle', [\App\Http\Controllers\Api\MusicFavoriteController::class, 'toggle'])->name('api.v1.music.favorites.toggle');
             Route::get('/favorites', [\App\Http\Controllers\Api\MusicFavoriteController::class, 'index'])->name('api.v1.music.favorites.index');
 
@@ -404,7 +406,7 @@ Route::group(['prefix'=>'v1', 'middleware' => 'setlang'],function(){
         Route::post('/payments/paytabs/callback', [\App\Http\Controllers\Api\MusicOrderController::class, 'handlePayTabsCallback'])->name('api.v1.music.payments.paytabs.callback');
         Route::match(['get', 'post'], '/payments/paytabs/return', [\App\Http\Controllers\Api\MusicOrderController::class, 'handlePayTabsCallback'])->name('api.v1.music.payments.paytabs.return');
 
-        Route::group(['middleware' => 'auth:sanctum'], function () {
+        Route::group(['middleware' => ['auth:sanctum', 'userEmailVerify']], function () {
             Route::get('/orders', [\App\Http\Controllers\Api\MusicOrderController::class, 'index'])->name('api.v1.music.orders.index');
             Route::post('/orders', [\App\Http\Controllers\Api\MusicOrderController::class, 'store'])->name('api.v1.music.orders.store');
             Route::get('/orders/{id}', [\App\Http\Controllers\Api\MusicOrderController::class, 'show'])->name('api.v1.music.orders.show');

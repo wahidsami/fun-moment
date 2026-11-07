@@ -39,67 +39,71 @@ use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
-    public function walletBalance(){
-        $buyer_id = auth('sanctum')->id();
-        $user_info = auth('sanctum')->user();
-        $user_column =  'buyer_id';
-
-        $waller_details = Wallet::where($user_column,$buyer_id)->first();
-        if (!is_null($waller_details)){
-            return response([
-                'balance' => amount_with_currency_symbol($waller_details->balance)
-            ],200);
-        }
-        return response(['msg' => __('wallet not found')],422);
-    }
-    public function walletDeduct(Request $request){
-        
-        $request->validate([
-            'amount' => 'required'
-        ]);
-        
-        $buyer_id = auth('sanctum')->id();
-        $user_column =  'buyer_id';
-
-        $waller_details = Wallet::where($user_column,$buyer_id)->first();
-        if (!is_null($waller_details)){
-            
-            if($waller_details->balance > $request->amount){
-                
-                $waller_details->balance -= $request->amount;
-                $waller_details->save();
-                
-                return response([
-                    'balance' => amount_with_currency_symbol($waller_details->balance),
-                    'msg' => __("wallet charge success")
-                ],200);
-            }
-           
-            return response([
-                'balance' => amount_with_currency_symbol($waller_details->balance),
-                'msg' => __("wallet charge failed, due to insufficient balance")
-            ],200);
-        }
-        return response(['msg' => __('wallet not found')],422);
-    }
-
-    public function walletHistory(){
+    public function walletBalance()
+    {
         $buyer_id = auth('sanctum')->id();
         $user_info = auth('sanctum')->user();
         $user_column = 'buyer_id';
 
-        $wallet_history = WalletHistory::select('id','buyer_id','payment_gateway','payment_status','amount')
-            ->whereIn('payment_status',['complete','pending'])
-            ->where([$user_column => $buyer_id])->get();
-        if (!is_null($wallet_history)){
+        $waller_details = Wallet::where($user_column, $buyer_id)->first();
+        if (!is_null($waller_details)) {
             return response([
-                'history' => $wallet_history
-            ],200);
+                'balance' => amount_with_currency_symbol($waller_details->balance)
+            ], 200);
         }
-        return response(['msg' => __('no history found')],422);
+        return response(['msg' => __('wallet not found')], 422);
+    }
+    public function walletDeduct(Request $request)
+    {
+
+        $request->validate([
+            'amount' => 'required'
+        ]);
+
+        $buyer_id = auth('sanctum')->id();
+        $user_column = 'buyer_id';
+
+        $waller_details = Wallet::where($user_column, $buyer_id)->first();
+        if (!is_null($waller_details)) {
+
+            if ($waller_details->balance > $request->amount) {
+
+                $waller_details->balance -= $request->amount;
+                $waller_details->save();
+
+                return response([
+                    'balance' => amount_with_currency_symbol($waller_details->balance),
+                    'msg' => __("wallet charge success")
+                ], 200);
+            }
+
+            return response([
+                'balance' => amount_with_currency_symbol($waller_details->balance),
+                'msg' => __("wallet charge failed, due to insufficient balance")
+            ], 200);
+        }
+        return response(['msg' => __('wallet not found')], 422);
     }
 
-    public function walletDepositPaymentStatus(Request $request){
+    public function walletHistory()
+    {
+        $buyer_id = auth('sanctum')->id();
+        $user_info = auth('sanctum')->user();
+        $user_column = 'buyer_id';
+
+        $wallet_history = WalletHistory::select('id', 'buyer_id', 'payment_gateway', 'payment_status', 'amount')
+            ->whereIn('payment_status', ['complete', 'pending'])
+            ->where([$user_column => $buyer_id])->get();
+        if (!is_null($wallet_history)) {
+            return response([
+                'history' => $wallet_history
+            ], 200);
+        }
+        return response(['msg' => __('no history found')], 422);
+    }
+
+    public function walletDepositPaymentStatus(Request $request)
+    {
 
         $request->validate([
             'wallet_history_id' => 'required|integer'
@@ -107,12 +111,12 @@ class UserController extends Controller
 
         $buyer_id = auth('sanctum')->id();
         $user_column = 'buyer_id';
-        $wallet_details = Wallet::where($user_column,$buyer_id)->first();
+        $wallet_details = Wallet::where($user_column, $buyer_id)->first();
         if (empty($wallet_details)) {
             return response(['msg' => __('wallet not found')], 404);
         }
-        
-        $wallet_history = WalletHistory::where([$user_column => $buyer_id,'id' => $request->wallet_history_id ])->first();
+
+        $wallet_history = WalletHistory::where([$user_column => $buyer_id, 'id' => $request->wallet_history_id])->first();
         if (empty($wallet_history)) {
             return response(['msg' => __('deposit history not found')], 404);
         }
@@ -123,28 +127,29 @@ class UserController extends Controller
 
         $wallet_history->payment_status = 'complete';
         $wallet_history->save();
-        
+
         $wallet_details->balance += $wallet_history->amount;
         $wallet_details->save();
 
-        return response(['msg' => __('wallet deposit success')],200);
+        return response(['msg' => __('wallet deposit success')], 200);
     }
 
-    
 
-    public function walletDeposit(Request $request){
+
+    public function walletDeposit(Request $request)
+    {
 
         $request->validate([
-           'amount' => 'required',
-           'payment_gateway' => 'required',
+            'amount' => 'required',
+            'payment_gateway' => 'required',
         ]);
 
         $buyer_id = auth('sanctum')->id();
         $user_info = auth('sanctum')->user();
 
-        $user_column =  'buyer_id';
-        $buyer = Wallet::where($user_column,$buyer_id)->first();
-        if(empty($buyer)){
+        $user_column = 'buyer_id';
+        $buyer = Wallet::where($user_column, $buyer_id)->first();
+        if (empty($buyer)) {
             Wallet::create([
                 $user_column => $buyer_id,
                 'balance' => 0,
@@ -162,12 +167,12 @@ class UserController extends Controller
 
         //if anual payment gateway it will add a image
 
-        if($request->hasFile('manual_payment_image')){
+        if ($request->hasFile('manual_payment_image')) {
             $manual_payment_image = $request->manual_payment_image;
             $img_ext = $manual_payment_image->extension();
 
-            $manual_payment_image_name = 'manual_attachment_'.time().'.'.$img_ext;
-            if(in_array($img_ext,['jpg','jpeg','png','webp','svg','pdf'])){
+            $manual_payment_image_name = 'manual_attachment_' . time() . '.' . $img_ext;
+            if (in_array($img_ext, ['jpg', 'jpeg', 'png', 'webp', 'svg', 'pdf'])) {
                 $manual_image_path = 'assets/uploads/manual-payment/';
 
                 // file scan start
@@ -182,37 +187,39 @@ class UserController extends Controller
                         $constraint->aspectRatio();
                     });
                     $processed_image->save($manual_image_path . $manual_payment_image_name);
-                }else{
-                    $manual_payment_image->move($manual_image_path,$manual_payment_image_name);
+                } else {
+                    $manual_payment_image->move($manual_image_path, $manual_payment_image_name);
                 } // file scan end
-                
-                WalletHistory::where('id',$deposit_history->id)->update([
-                    'manual_payment_image'=>$manual_payment_image_name
+
+                WalletHistory::where('id', $deposit_history->id)->update([
+                    'manual_payment_image' => $manual_payment_image_name
                 ]);
-            }else{
-                return response(['msg' => __('image type not supported')],422);
+            } else {
+                return response(['msg' => __('image type not supported')], 422);
             }
         }
 
         try {
-            $message_body = __('Hello a deposit request for user wallet. Please check and confirm').'</br>'.'<span class="verify-code">'.__('Deposit ID: ').$deposit_history->id.'</span>';
+            $message_body = __('Hello a deposit request for user wallet. Please check and confirm') . '</br>' . '<span class="verify-code">' . __('Deposit ID: ') . $deposit_history->id . '</span>';
             Mail::to(get_static_option('site_global_email'))->send(new BasicMail([
                 'subject' => __('Deposit Confirmation'),
                 'message' => $message_body
             ]));
             Mail::to($email)->send(new BasicMail([
                 'subject' => __('Deposit Confirmation'),
-                'message' => __('Manual deposit success. Your wallet will credited after admin approval #').$deposit_history->id
+                'message' => __('Manual deposit success. Your wallet will credited after admin approval #') . $deposit_history->id
             ]));
         } catch (\Exception $e) {
             //
         }
 
-        return response(['deposit_info' => [
-            'amount' => $deposit_history->amount,
-            'payment_gateway' => $deposit_history->payment_gateway,
-            'wallet_history_id' => $deposit_history->id
-        ]],200);
+        return response([
+            'deposit_info' => [
+                'amount' => $deposit_history->amount,
+                'payment_gateway' => $deposit_history->payment_gateway,
+                'wallet_history_id' => $deposit_history->id
+            ]
+        ], 200);
     }
 
     public function login(Request $request)
@@ -228,30 +235,49 @@ class UserController extends Controller
             $login_type = 'username';
         }
 
-        $user = User::select('id', 'name', 'email', 'user_type', 'password', 'country_id', 'state', 'username', 'email_verified')
+        $user = User::select('id', 'name', 'email', 'user_type', 'password', 'country_id', 'state', 'username', 'email_verified', 'user_status', 'seller_type')
             ->where($login_type, $request->email)
             ->first();
 
-            //check user account deleted or not
-            if (!is_null($user) && $user->account_status?->status === 1){
-                return response()->error([
-                    'message' => __('Your account has been deleted'),
-                    'status' => 'account-delete'
-                ]);
-            }
-
+        //check user account deleted or not
+        if (!is_null($user) && $user->account_status?->status === 1) {
+            return response()->error([
+                'message' => __('Your account has been deleted'),
+                'status' => 'account-delete'
+            ]);
+        }
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->error([
-                'message' => sprintf(__('Invalid or Password').'%s',ucFirst($login_type))
-            ]);
-        } else {
-            $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
-            return response()->success([
-                'users' => $user,
-                'token' => $token
+                'message' => sprintf(__('Invalid or Password') . '%s', ucFirst($login_type))
             ]);
         }
+
+        // ENFORCE EMAIL VERIFICATION GATE
+        if ((int) $user->email_verified !== 1) {
+            return response()->json([
+                'status' => 'failed',
+                'message' => __('Your email address is not verified. Please verify your email before logging in.'),
+                'requires_verification' => true,
+                'email' => $user->email,
+                'email_verified' => false,
+            ], 403);
+        }
+
+        // ENFORCE ACCOUNT STATUS GATE
+        if ($user->user_status !== null && (int) $user->user_status === 0) {
+            return response()->json([
+                'status' => 'failed',
+                'message' => __('Your account has been deactivated or suspended. Please contact support.'),
+                'account_status' => 'suspended',
+            ], 403);
+        }
+
+        $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
+        return response()->success([
+            'users' => $user,
+            'token' => $token
+        ]);
     }
 
     //social login
@@ -348,9 +374,7 @@ class UserController extends Controller
                         $counter++;
                     }
 
-                    $user = DB::transaction(function () use (
-                        $request, $username, $candidateEmail, $providerId, $termsService, $termsVersion
-                    ) {
+                    $user = DB::transaction(function () use ($request, $username, $candidateEmail, $providerId, $termsService, $termsVersion) {
                         $user = User::create([
                             'name' => $request->displayName ?: $username,
                             'email' => $candidateEmail,
@@ -440,9 +464,7 @@ class UserController extends Controller
                     $counter++;
                 }
 
-                $user = DB::transaction(function () use (
-                    $request, $username, $isGoogle, $providerId, $termsService, $termsVersion
-                ) {
+                $user = DB::transaction(function () use ($request, $username, $isGoogle, $providerId, $termsService, $termsVersion) {
                     $user = User::create([
                         'name' => $request->displayName ?: $username,
                         'email' => $request->email,
@@ -480,7 +502,7 @@ class UserController extends Controller
         $perPage = min(max(request()->integer('per_page', 20), 1), 500);
         $countries_query = Country::query()->select('id', 'country')->where('status', 1);
 
-        $countries = $countries_query->orderBy('country','asc')->paginate($perPage)->withQueryString();
+        $countries = $countries_query->orderBy('country', 'asc')->paginate($perPage)->withQueryString();
         if ($countries && $countries->total() >= 1) {
             return response()->success([
                 'countries' => $countries,
@@ -494,27 +516,27 @@ class UserController extends Controller
     }
 
 
-     // get city under country api
-     public function serviceCity($id)
-     {
-         $perPage = min(max(request()->integer('per_page', 20), 1), 500);
-         $service_cities_query = ServiceCity::query()->select('id', 'service_city')
-             ->where('country_id', $id)
-             ->where('status', 1);
+    // get city under country api
+    public function serviceCity($id)
+    {
+        $perPage = min(max(request()->integer('per_page', 20), 1), 500);
+        $service_cities_query = ServiceCity::query()->select('id', 'service_city')
+            ->where('country_id', $id)
+            ->where('status', 1);
 
-         $service_cities = $service_cities_query->orderBy('service_city','asc')->paginate($perPage)->withQueryString();
-         
-         if ($service_cities->total() >= 1) {
-             return response()->json([
-                 'service_cities' => $service_cities,
-             ]);
-         } else {
-             return response()->error([
-                 'message' => __('No Cities Available On The Selected Country'),
-             ]);
-         }
- 
-     } 
+        $service_cities = $service_cities_query->orderBy('service_city', 'asc')->paginate($perPage)->withQueryString();
+
+        if ($service_cities->total() >= 1) {
+            return response()->json([
+                'service_cities' => $service_cities,
+            ]);
+        } else {
+            return response()->error([
+                'message' => __('No Cities Available On The Selected Country'),
+            ]);
+        }
+
+    }
 
     // get area under city and country api
     public function serviceArea($country_id, $city_id)
@@ -525,7 +547,7 @@ class UserController extends Controller
             ->where('service_city_id', $city_id)
             ->where('status', 1);
 
-        $service_areas = $service_areas_query->orderBy('service_area','asc')->paginate($perPage)->withQueryString();
+        $service_areas = $service_areas_query->orderBy('service_area', 'asc')->paginate($perPage)->withQueryString();
 
         if ($service_areas->total() >= 1) {
             return response()->json([
@@ -552,10 +574,28 @@ class UserController extends Controller
             return $this->registerProvider($request);
         }
 
-        $request->validate([
+        // Check for existing account with this email
+        $normalizedEmail = strtolower(trim((string) $request->email));
+        $existingUser = User::where('email', $normalizedEmail)->orWhere('email', (string) $request->email)->first();
+
+        if ($existingUser) {
+            if ((int) $existingUser->email_verified === 1) {
+                // Verified accounts can NEVER be overwritten by registration retry
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'email' => [__('The email has already been taken.')],
+                ]);
+            }
+
+            // Unverified pending account: allow recovery retry ONLY if password matches
+            if (!Hash::check($request->password, $existingUser->password)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'email' => [__('This email is already registered and pending verification. Please verify your email or request a new code.')],
+                ]);
+            }
+        }
+
+        $validationRules = [
             'name' => 'required|max:191',
-            'email' => 'required|email|unique:users|max:191',
-            'username' => 'required|unique:users|max:191',
             'phone' => 'required|max:191',
             'password' => 'required|min:8|max:191',
             'service_city' => 'required',
@@ -564,7 +604,18 @@ class UserController extends Controller
             'terms_conditions' => 'required',
             'terms_version_id' => 'required',
             'terms_language' => 'required|string|in:ar,en',
-        ]);
+        ];
+
+        if ($existingUser) {
+            $validationRules['email'] = ['required', 'email', 'max:191', \Illuminate\Validation\Rule::unique('users')->ignore($existingUser->id)];
+            $validationRules['username'] = ['required', 'max:191', \Illuminate\Validation\Rule::unique('users')->ignore($existingUser->id)];
+        } else {
+            $validationRules['email'] = 'required|email|unique:users|max:191';
+            $validationRules['username'] = 'required|unique:users|max:191';
+        }
+
+        $request->validate($validationRules);
+
         if (!filter_var($request->email, FILTER_VALIDATE_EMAIL)) {
             return response()->error([
                 'message' => __('invalid Email'),
@@ -578,8 +629,8 @@ class UserController extends Controller
             $request->input('terms_language')
         );
 
-        $user = DB::transaction(function () use ($request, $termsService, $termsVersion) {
-            $user = User::create([
+        $user = DB::transaction(function () use ($request, $termsService, $termsVersion, $existingUser) {
+            $userData = [
                 'name' => $request->name,
                 'email' => $request->email,
                 'username' => $request->username,
@@ -593,10 +644,18 @@ class UserController extends Controller
                 'user_type' => 1,
                 'seller_type' => User::SELLER_TYPE_NOT_APPLICABLE,
                 'user_status' => 1,
+                'email_verified' => 0, // EXPLICIT PENDING UNVERIFIED
                 'terms_condition' => 1,
                 'address' => $request->address,
                 'post_code' => $request->post_code,
-            ]);
+            ];
+
+            if ($existingUser) {
+                $existingUser->update($userData);
+                $user = $existingUser;
+            } else {
+                $user = User::create($userData);
+            }
 
             $termsService->recordAcceptance(
                 $user,
@@ -609,12 +668,35 @@ class UserController extends Controller
         });
 
         if (!is_null($user)) {
-            $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
-            return response()->success([
-                'users' => $user,
-                'token' => $token,
-                'status' => 'ok',
-            ]);
+            // Trigger OTP generation and dispatch using 'email_verify'
+            $otpService = app(OtpVerificationService::class);
+            $otpResult = $otpService->generateAndSendOtp((string) $user->email, OtpVerificationService::PURPOSE_EMAIL_VERIFY, $user->name);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $otpResult['success']
+                    ? __('Registration successful. A verification code has been sent to your email.')
+                    : __('Registration successful, but we could not deliver the verification email right now. Please tap Resend Code on the verification screen.'),
+                'requires_verification' => true,
+                'otp_sent' => (bool) ($otpResult['success'] ?? false),
+                'otp_error' => !$otpResult['success'] ? ($otpResult['message'] ?? null) : null,
+                'token' => null, // NO FULL SANCTUM TOKEN ISSUED BEFORE EMAIL VERIFICATION
+                'users' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'username' => $user->username,
+                    'phone' => $user->phone,
+                    'user_type' => (int) $user->user_type,
+                    'user_status' => (int) $user->user_status,
+                    'email_verified' => 0,
+                    'country_id' => $user->country_id,
+                    'service_city' => $user->service_city,
+                    'service_area' => $user->service_area,
+                    'state' => $user->state,
+                    'seller_type' => (int) $user->seller_type,
+                ],
+            ], 201);
         }
         return response()->error([
             'message' => __('Something Went Wrong, Please try again'),
@@ -632,10 +714,27 @@ class UserController extends Controller
      */
     public function registerProvider(Request $request)
     {
+        $normalizedEmail = strtolower(trim((string) $request->email));
+        $existingUser = User::where('email', $normalizedEmail)->orWhere('email', (string) $request->email)->first();
+
+        if ($existingUser) {
+            if ((int) $existingUser->email_verified === 1) {
+                // Verified accounts can NEVER be overwritten by registration retry
+                throw ValidationException::withMessages([
+                    'email' => [__('The email has already been taken.')],
+                ]);
+            }
+
+            // Unverified pending account: allow recovery retry ONLY if password matches
+            if (!Hash::check($request->password, $existingUser->password)) {
+                throw ValidationException::withMessages([
+                    'email' => [__('This email is already registered and pending verification. Please verify your email or request a new code.')],
+                ]);
+            }
+        }
+
         $baseRules = [
             'name' => 'required|string|max:191',
-            'email' => 'required|email|unique:users,email|max:191',
-            'username' => 'required|string|unique:users,username|max:191',
             'phone' => 'required|string|max:191',
             'password' => 'required|string|min:8|max:191',
             'service_city' => 'required',
@@ -647,6 +746,14 @@ class UserController extends Controller
             'seller_type' => 'required|in:1,2',
             'category_ids' => 'required',
         ];
+
+        if ($existingUser) {
+            $baseRules['email'] = ['required', 'email', 'max:191', \Illuminate\Validation\Rule::unique('users', 'email')->ignore($existingUser->id)];
+            $baseRules['username'] = ['required', 'string', 'max:191', \Illuminate\Validation\Rule::unique('users', 'username')->ignore($existingUser->id)];
+        } else {
+            $baseRules['email'] = 'required|email|unique:users,email|max:191';
+            $baseRules['username'] = 'required|string|unique:users,username|max:191';
+        }
 
         $sellerType = (int) $request->input('seller_type');
 
@@ -663,7 +770,11 @@ class UserController extends Controller
             }
         } elseif ($sellerType === User::SELLER_TYPE_COMPANY) {
             $baseRules['company_name'] = 'required|string|max:191';
-            $baseRules['cr_number'] = 'required|string|max:50|unique:users,business_registration';
+            if ($existingUser) {
+                $baseRules['cr_number'] = ['required', 'string', 'max:50', \Illuminate\Validation\Rule::unique('users', 'business_registration')->ignore($existingUser->id)];
+            } else {
+                $baseRules['cr_number'] = 'required|string|max:50|unique:users,business_registration';
+            }
             $baseRules['cr_document'] = 'required|file';
             $baseRules['contact_person_name'] = 'required|string|max:191';
             $baseRules['contact_person_email'] = 'required|email|max:191';
@@ -723,9 +834,7 @@ class UserController extends Controller
             }
 
             // 2. Atomic Database Transaction
-            $user = DB::transaction(function () use (
-                $request, $sellerType, $nationalIdDocName, $licenseDocName, $crDocName, $validCategoryIds
-            ) {
+            $user = DB::transaction(function () use ($request, $sellerType, $nationalIdDocName, $licenseDocName, $crDocName, $validCategoryIds, $existingUser) {
                 $termsService = app(LegalTermsAcceptanceService::class);
                 $termsVersion = $termsService->validatePublishedTerms(
                     LegalTerm::ROLE_SELLER,
@@ -746,7 +855,8 @@ class UserController extends Controller
                     'country_id' => $request->country_id,
                     'user_type' => User::USER_TYPE_SELLER,
                     'seller_type' => $sellerType,
-                    'user_status' => 1, // active for login and authentication
+                    'user_status' => 1, // active account status
+                    'email_verified' => 0, // EXPLICIT PENDING UNVERIFIED
                     'terms_condition' => 1,
                     'address' => $request->address,
                     'seller_address' => $request->address,
@@ -757,7 +867,12 @@ class UserController extends Controller
                     $userData['business_registration'] = $request->cr_number;
                 }
 
-                $user = User::create($userData);
+                if ($existingUser) {
+                    $existingUser->update($userData);
+                    $user = $existingUser;
+                } else {
+                    $user = User::create($userData);
+                }
 
                 $termsService->recordAcceptance(
                     $user,
@@ -790,8 +905,12 @@ class UserController extends Controller
                     $verifyData['contact_person_phone'] = $request->contact_person_phone;
                 }
 
-                SellerVerify::create($verifyData);
+                SellerVerify::updateOrCreate(
+                    ['seller_id' => $user->id],
+                    $verifyData
+                );
 
+                ProviderCategory::where('provider_id', $user->id)->delete();
                 if (!empty($validCategoryIds)) {
                     foreach ($validCategoryIds as $catId) {
                         ProviderCategory::create([
@@ -812,19 +931,27 @@ class UserController extends Controller
                 \Log::warning('Post-registration relation eager-load warning: ' . $loadEx->getMessage());
             }
 
-            $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
+            // Trigger OTP generation and dispatch using 'email_verify'
+            $otpService = app(OtpVerificationService::class);
+            $otpResult = $otpService->generateAndSendOtp((string) $user->email, OtpVerificationService::PURPOSE_EMAIL_VERIFY, $user->name);
 
-            return response()->success([
+            return response()->json([
+                'status' => 'success',
+                'message' => $otpResult['success']
+                    ? __('Registration successful. A verification code has been sent to your email.')
+                    : __('Registration successful, but we could not deliver the verification email right now. Please tap Resend Code on the verification screen.'),
+                'requires_verification' => true,
+                'otp_sent' => (bool) ($otpResult['success'] ?? false),
+                'otp_error' => !$otpResult['success'] ? ($otpResult['message'] ?? null) : null,
+                'token' => null, // NO FULL SANCTUM TOKEN ISSUED BEFORE EMAIL VERIFICATION
                 'users' => $user,
-                'token' => $token,
-                'status' => 'ok',
                 'provider_verification' => [
                     'status' => SellerVerify::STATUS_PENDING,
                     'status_label' => 'Pending',
                     'seller_type' => (int) $user->seller_type,
                     'seller_type_label' => (int) $user->seller_type === User::SELLER_TYPE_INDIVIDUAL ? 'Individual' : 'Company',
                 ],
-            ]);
+            ], 201);
 
         } catch (\Throwable $e) {
             // Clean up files written to private storage ONLY IF database transaction failed to commit
@@ -949,9 +1076,29 @@ class UserController extends Controller
             ], $result['status_code'] ?? 422);
         }
 
+        $normalizedEmail = strtolower(trim((string) $request->email));
+        $user = User::where('email', $normalizedEmail)
+            ->orWhere('email', (string) $request->email)
+            ->first();
+
+        $token = null;
+        if ($user) {
+            $token = $user->createToken(Str::slug(get_static_option('site_title', 'qixer')) . 'api_keys')->plainTextToken;
+            try {
+                if ((int) $user->user_type === User::USER_TYPE_SELLER) {
+                    $user->load(['sellerVerify', 'registeredCategories']);
+                }
+            } catch (\Throwable $e) {
+                // ignore relation load failure
+            }
+        }
+
         return response()->success([
             'message' => $result['message'],
-        ]);
+            'status' => 'success',
+            'token' => $token,
+            'users' => $user,
+        ], 200);
     }
 
     public function verifyResetOtp(Request $request)
@@ -1026,7 +1173,8 @@ class UserController extends Controller
     }
 
     //logout
-    public function logout(){
+    public function logout()
+    {
         auth()->user()->tokens()->delete();
         return response()->success([
             'message' => __('Logout Success'),
@@ -1034,25 +1182,26 @@ class UserController extends Controller
     }
 
     //User Profile
-    public function profile(){
+    public function profile()
+    {
 
         $user_id = auth('sanctum')->id();
 
-        $user = User::with('country','city','area')->where('id',$user_id)->first();
+        $user = User::with('country', 'city', 'area')->where('id', $user_id)->first();
 
-        $pending_orders = Order::where('status',0)
-            ->where('buyer_id',$user_id)
+        $pending_orders = Order::where('status', 0)
+            ->where('buyer_id', $user_id)
             ->count();
-        $active_orders = Order::where('status',1)
-            ->where('buyer_id',$user_id)
+        $active_orders = Order::where('status', 1)
+            ->where('buyer_id', $user_id)
             ->count();
-        $complete_orders = Order::where('status',2)
-            ->where('buyer_id',$user_id)
+        $complete_orders = Order::where('status', 2)
+            ->where('buyer_id', $user_id)
             ->count();
-        $total_orders = Order::where('buyer_id',$user_id)
+        $total_orders = Order::where('buyer_id', $user_id)
             ->count();
 
-        $profile_image =  get_attachment_image_by_id($user->image);
+        $profile_image = get_attachment_image_by_id($user->image);
 
         return response()->success([
             'user_details' => $user,
@@ -1065,19 +1214,20 @@ class UserController extends Controller
     }
 
     // change password after login
-    public function changePassword(Request $request){
+    public function changePassword(Request $request)
+    {
         $request->validate([
             'current_password' => 'required|min:6',
             'new_password' => 'required|min:6',
         ]);
 
-        $user = User::select('id','password')->where('id', auth('sanctum')->user()->id)->first();
+        $user = User::select('id', 'password')->where('id', auth('sanctum')->user()->id)->first();
         if (!Hash::check($request->current_password, $user->password)) {
             return response()->error([
                 'message' => __('Current Password is Wrong'),
             ]);
         }
-        User::where('id',auth('sanctum')->user()->id)->update([
+        User::where('id', auth('sanctum')->user()->id)->update([
             'password' => Hash::make($request->new_password),
         ]);
         return response()->success([
@@ -1092,18 +1242,18 @@ class UserController extends Controller
         $user_id = auth('sanctum')->user()->id;
         $request->validate([
             'name' => 'required|max:191',
-            'email' => 'required|max:191|email|unique:users,email,'.$user_id,
+            'email' => 'required|max:191|email|unique:users,email,' . $user_id,
             'phone' => 'required|max:191',
             'service_area' => 'required|max:191',
             'address' => 'required|max:191',
         ]);
 
-        if($request->file('file')){
-            MediaHelper::insert_media_image($request,'web');
+        if ($request->file('file')) {
+            MediaHelper::insert_media_image($request, 'web');
             $last_image_id = DB::getPdo()->lastInsertId();
         }
-        $old_image = User::select('image')->where('id',$user_id)->first();
-        $user_update = User::where('id',$user_id)
+        $old_image = User::select('image')->where('id', $user_id)->first();
+        $user_update = User::where('id', $user_id)
             ->update([
                 'name' => $request->name,
                 'email' => $request->email,
@@ -1119,18 +1269,18 @@ class UserController extends Controller
                 'state' => $request->service_city,
             ]);
 
-        if($user_update){
+        if ($user_update) {
             return response()->success([
-                'message' =>__('Profile Updated Success'),
+                'message' => __('Profile Updated Success'),
             ]);
         }
     }
 
-    public function myOrders($id=null)
+    public function myOrders($id = null)
     {
-       $uesr_info = auth('sanctum')->user()->id;
+        $uesr_info = auth('sanctum')->user()->id;
         $my_orders = Order::query();
-        
+
 
         if (isset(request()->payment_status) && in_array((string) request()->payment_status, ["0", "1"])) {
             //0=pending, 1=complete
@@ -1144,7 +1294,7 @@ class UserController extends Controller
         // Quarantine: Online orders must have complete payment; COD allowed pending delivery
         $my_orders->where(function ($q) {
             $q->where('payment_status', 'complete')
-              ->orWhere('payment_gateway', 'cash_on_delivery');
+                ->orWhere('payment_gateway', 'cash_on_delivery');
         });
 
         $my_orders_all = $my_orders->where('buyer_id', $uesr_info)
@@ -1172,34 +1322,34 @@ class UserController extends Controller
 
     public function allTickets()
     {
-        $all_tickets = SupportTicket::select('id','title','description','subject','priority','status')
-            ->where('buyer_id',auth('sanctum')->id())->orderBy('id','Desc')
+        $all_tickets = SupportTicket::select('id', 'title', 'description', 'subject', 'priority', 'status')
+            ->where('buyer_id', auth('sanctum')->id())->orderBy('id', 'Desc')
             ->paginate(10)
             ->withQueryString();
 
         return response()->success([
-            'buyer_id'=> auth('sanctum')->id(),
-            'tickets' =>$all_tickets,
+            'buyer_id' => auth('sanctum')->id(),
+            'tickets' => $all_tickets,
         ]);
     }
 
-    public function viewTickets(Request $request,$id= null)
+    public function viewTickets(Request $request, $id = null)
     {
-        $all_messages = SupportTicketMessage::where(['support_ticket_id'=>$id])->get()->transform(function($item){
-            $item->attachment = !empty($item->attachment) ? asset('assets/uploads/ticket/'.$item->attachment) : null;
+        $all_messages = SupportTicketMessage::where(['support_ticket_id' => $id])->get()->transform(function ($item) {
+            $item->attachment = !empty($item->attachment) ? asset('assets/uploads/ticket/' . $item->attachment) : null;
             return $item;
         });
         $q = $request->q ?? '';
         return response()->success([
-            'ticket_id'=>$id,
-            'all_messages' =>$all_messages,
-            'q' =>$q,
+            'ticket_id' => $id,
+            'all_messages' => $all_messages,
+            'q' => $q,
         ]);
     }
 
     public function sendMessage(Request $request)
     {
-        $this->validate($request,[
+        $this->validate($request, [
             'ticket_id' => 'required',
             'user_type' => 'required|string|max:191',
             'message' => 'required',
@@ -1212,10 +1362,10 @@ class UserController extends Controller
             'message' => $request->message,
         ]);
 
-        if ($request->hasFile('file')){
+        if ($request->hasFile('file')) {
             $uploaded_file = $request->file;
             $file_extension = $uploaded_file->extension();
-            $file_name =  pathinfo($uploaded_file->getClientOriginalName(),PATHINFO_FILENAME).time().'.'.$file_extension;
+            $file_name = pathinfo($uploaded_file->getClientOriginalName(), PATHINFO_FILENAME) . time() . '.' . $file_extension;
             // file scan start
             $file_extension = $uploaded_file->getClientOriginalExtension();
             if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
@@ -1227,8 +1377,8 @@ class UserController extends Controller
                     $constraint->aspectRatio();
                 });
                 $processed_image->save('assets/uploads/ticket/' . $file_name);
-            }else{
-                $uploaded_file->move('assets/uploads/ticket',$file_name);
+            } else {
+                $uploaded_file->move('assets/uploads/ticket', $file_name);
             } // file scan end
 
             $ticket_info->attachment = $file_name;
@@ -1236,33 +1386,34 @@ class UserController extends Controller
         }
 
         return response()->success([
-            'message'=>__('Message Send Success'),
-            'ticket_id'=>$request->ticket_id,
-            'user_type' =>$request->user_type,
+            'message' => __('Message Send Success'),
+            'ticket_id' => $request->ticket_id,
+            'user_type' => $request->user_type,
             'ticket_info' => $ticket_info,
         ]);
     }
 
-    public function createTicket(Request $request){
-        $this->validate($request,[
+    public function createTicket(Request $request)
+    {
+        $this->validate($request, [
             'subject' => 'required|string|max:191',
             'priority' => 'required|string|max:191',
             'description' => 'required|string',
             'order_id' => 'required|integer',
-        ],[
-            'subject.required' =>  __('subject required'),
-            'priority.required' =>  __('priority required'),
+        ], [
+            'subject.required' => __('subject required'),
+            'priority.required' => __('priority required'),
             'description.required' => __('description required'),
         ]);
 
-        $orderInfo = Order::select('seller_id','service_id')->where('id',$request->order_id)->first();
-        if(is_null($orderInfo)){
+        $orderInfo = Order::select('seller_id', 'service_id')->where('id', $request->order_id)->first();
+        if (is_null($orderInfo)) {
             return response()->success([
-                'message'=>__('Order Not Found')
+                'message' => __('Order Not Found')
             ]);
         }
         $support = SupportTicket::create([
-            'title' => sprintf(__('TIcket Created By').'%s',auth('sanctum')->user()->name),
+            'title' => sprintf(__('TIcket Created By') . '%s', auth('sanctum')->user()->name),
             'description' => $request->description,
             'subject' => $request->subject,
             'status' => 'open',
@@ -1274,29 +1425,30 @@ class UserController extends Controller
         ]);
 
         // send order ticket notification to seller
-        $seller = User::where('id',$orderInfo->seller_id)->first();
-        if($seller){
+        $seller = User::where('id', $orderInfo->seller_id)->first();
+        if ($seller) {
             $order_ticcket_message = __('You have a new order ticket');
-            $seller ->notify(new TicketNotificationSeller($support->id , $support->seller_id, $support->seller_id,$order_ticcket_message ));
+            $seller->notify(new TicketNotificationSeller($support->id, $support->seller_id, $support->seller_id, $order_ticcket_message));
         }
 
         return response()->success([
-            'message'=>__('Support Ticket Created Success'),
-            'ticket_info' =>$support
+            'message' => __('Support Ticket Created Success'),
+            'ticket_info' => $support
         ]);
     }
 
-    public function singleOrder(Request $request, $id = null){
+    public function singleOrder(Request $request, $id = null)
+    {
         $order_id = $id ?? $request->id;
-        if(empty($order_id)){
+        if (empty($order_id)) {
             return response()->error(['message' => __('no order found')]);
         }
 
         $buyer_id = auth('sanctum')->id();
         $orderInfo = Order::where('id', $order_id)->where('buyer_id', $buyer_id)->first();
-        if(is_null($orderInfo)){
+        if (is_null($orderInfo)) {
             return response()->error([
-                'message'=>__('Order Not Found')
+                'message' => __('Order Not Found')
             ]);
         }
 
@@ -1306,7 +1458,7 @@ class UserController extends Controller
         $orderInfo->sub_total = amount_with_currency_symbol($orderInfo->sub_total);
         $orderInfo->extra_service = amount_with_currency_symbol($orderInfo->extra_service);
         $orderInfo->package_fee = amount_with_currency_symbol($orderInfo->package_fee);
-        
+
         if (!empty($orderInfo->date) && $orderInfo->date !== "No Date Created") {
             try {
                 $orderInfo->date = \Carbon\Carbon::parse($orderInfo->date);
@@ -1317,12 +1469,12 @@ class UserController extends Controller
         //append seller infomation
         $orderInfo->seller_details = $orderInfo->seller ?? null;
         $report_order_id = $order_id ?? $request->order_id;
-        $is_report_exist = Report::where(['order_id'=> $report_order_id , 'report_from'=>'buyer'])->first();
+        $is_report_exist = Report::where(['order_id' => $report_order_id, 'report_from' => 'buyer'])->first();
 
         $orderInfo->has_report = is_null($is_report_exist) ? 1 : 0;
 
         return response()->success([
-            'orderInfo'=> $orderInfo
+            'orderInfo' => $orderInfo
         ]);
     }
 
@@ -1421,27 +1573,28 @@ class UserController extends Controller
     /* Extra Service list */
     public function extraServiceList($id)
     {
-        $extra_service_list = ExtraService::where('order_id',$id)->get(['id','order_id','title','quantity','price','tax','sub_total','total','status']);
+        $extra_service_list = ExtraService::where('order_id', $id)->get(['id', 'order_id', 'title', 'quantity', 'price', 'tax', 'sub_total', 'total', 'status']);
         return response()->success([
             'extra_service_list' => $extra_service_list,
         ]);
     }
 
     /* Extra Service Decline */
-    public function extraServiceDelete(Request $request){
+    public function extraServiceDelete(Request $request)
+    {
         $request->validate([
             'id' => 'required|integer',
             'order_id' => 'required|integer',
         ]);
 
         $extra_id = ExtraService::find($request->id);
-        if(!empty($extra_id)){
-            ExtraService::where(['order_id' => $request->order_id,'id' => $request->id])->update([
+        if (!empty($extra_id)) {
+            ExtraService::where(['order_id' => $request->order_id, 'id' => $request->id])->update([
                 'payment_status' => 'decline',
                 'status' => 2,
             ]);
 
-            $extra_service_details = ExtraService::with("order")->where(['order_id' => $request->order_id,'id' => $request->id])->first();
+            $extra_service_details = ExtraService::with("order")->where(['order_id' => $request->order_id, 'id' => $request->id])->first();
             $extra_service_details->update([
                 'payment_status' => 'decline',
                 'status' => 2,
@@ -1451,28 +1604,28 @@ class UserController extends Controller
             //todo send mail to seller and buyer
             try {
                 //send mail to seller
-                $seller_details = User::select('name','email')->find(optional($extra_service_details->order)->seller_id);
+                $seller_details = User::select('name', 'email')->find(optional($extra_service_details->order)->seller_id);
                 $message = '<p>';
-                $message .= __('Hello').' '.$seller_details->name.','."<br>";
-                $message .= __('your extra service request has been declined for order #').$extra_service_details->order_id;
+                $message .= __('Hello') . ' ' . $seller_details->name . ',' . "<br>";
+                $message .= __('your extra service request has been declined for order #') . $extra_service_details->order_id;
                 $message .= '</p>';
 
 
 
                 Mail::to($seller_details->email)->send(new BasicMail([
-                    'subject' => __('extra service request declined in your order #').$extra_service_details->order_id,
+                    'subject' => __('extra service request declined in your order #') . $extra_service_details->order_id,
                     'message' => $message
                 ]));
 
 
-            }catch (\Exception $e){
+            } catch (\Exception $e) {
                 //handle error
             }
 
             return response()->success([
                 'message' => __('Decline Success'),
             ]);
-        }else{
+        } else {
             return response()->error([
                 'message' => __('Extra Service Not Found'),
             ]);
@@ -1489,21 +1642,21 @@ class UserController extends Controller
         ]);
         $extra_service_details = ExtraService::with('order')->find($request->id);
 
-        if(is_null($extra_service_details)){
+        if (is_null($extra_service_details)) {
             return response([
                 'msg' => __('extra service not found')
-            ],500);
+            ], 500);
         }
 
         //Manual Payment
         //return response([$request->all(),$extra_service_details]);
 
-        if($request->selected_payment_gateway === 'manual_payment') {
+        if ($request->selected_payment_gateway === 'manual_payment') {
 
-            if($request->hasFile('manual_payment_image')){
+            if ($request->hasFile('manual_payment_image')) {
                 $manual_payment_image = $request->manual_payment_image;
                 $img_ext = $manual_payment_image->extension();
-                $manual_payment_image_name = 'manual_attachment_'.time().'.'.$img_ext;
+                $manual_payment_image_name = 'manual_attachment_' . time() . '.' . $img_ext;
                 $manual_image_path = 'assets/uploads/manual-payment/';
 
                 // file scan start
@@ -1518,172 +1671,172 @@ class UserController extends Controller
                         $constraint->aspectRatio();
                     });
                     $processed_image->save($manual_image_path . $manual_payment_image_name);
-                }else{
-                    $manual_payment_image->move($manual_image_path,$manual_payment_image_name);
+                } else {
+                    $manual_payment_image->move($manual_image_path, $manual_payment_image_name);
                 } // file scan end
 
-                ExtraService::where('id',$extra_service_details->id)->update([
-                    'manual_payment_gateway_image'=>$manual_payment_image_name,
-                    'payment_gateway'=>'Manual Payment'
+                ExtraService::where('id', $extra_service_details->id)->update([
+                    'manual_payment_gateway_image' => $manual_payment_image_name,
+                    'payment_gateway' => 'Manual Payment'
                 ]);
             }
         }
-        
+
         $extra_service_details->status = 1;
         $extra_service_details->save();
-            
+
         //todo send mail to seller and buyer
         try {
             //send mail to seller
-            $seller_details = User::select('name','email')->find(optional($extra_service_details->order)->seller_id);
+            $seller_details = User::select('name', 'email')->find(optional($extra_service_details->order)->seller_id);
             $message = '<p>';
-            $message .= __('Hello').' '.$seller_details->name.','."<br>";
-            $message .= __('your have added extra service in your order #').$extra_service_details->order_id;
+            $message .= __('Hello') . ' ' . $seller_details->name . ',' . "<br>";
+            $message .= __('your have added extra service in your order #') . $extra_service_details->order_id;
             $message .= '</p>';
 
             Mail::to($seller_details->email)->send(new BasicMail([
-                'subject' => __('Extra service added in your order #').$extra_service_details->order_id,
+                'subject' => __('Extra service added in your order #') . $extra_service_details->order_id,
                 'message' => $message
             ]));
 
-            $buyer_details = User::select('name','email')->find(optional($extra_service_details->order)->buyer_id);
+            $buyer_details = User::select('name', 'email')->find(optional($extra_service_details->order)->buyer_id);
             //send mail to buyer
             $message = '<p>';
-            $message .= __('Hello').' '.$buyer_details->name.','."<br>";
-            $message .= __('seller added extra service in your order #').$extra_service_details->order_id;
+            $message .= __('Hello') . ' ' . $buyer_details->name . ',' . "<br>";
+            $message .= __('seller added extra service in your order #') . $extra_service_details->order_id;
             $message .= '</p>';
 
             Mail::to($buyer_details->email)->send(new BasicMail([
-                'subject' => __('Extra service added in your order #').$extra_service_details->order_id,
+                'subject' => __('Extra service added in your order #') . $extra_service_details->order_id,
                 'message' => $message
             ]));
 
-        }catch (\Exception $e){
+        } catch (\Exception $e) {
             //handle error
         }
-        
+
         return response([
-            'id'=> $request->id,
-            'order_id'=> $request->order_id,
-            'quantity'=> $extra_service_details?->quantity,
-            'price'=> $extra_service_details?->price,
-            'sub_total'=>float_amount_with_currency_symbol($extra_service_details?->sub_total),
-            'tax'=>float_amount_with_currency_symbol($extra_service_details?->tax),
-            'total'=>float_amount_with_currency_symbol($extra_service_details?->total),
+            'id' => $request->id,
+            'order_id' => $request->order_id,
+            'quantity' => $extra_service_details?->quantity,
+            'price' => $extra_service_details?->price,
+            'sub_total' => float_amount_with_currency_symbol($extra_service_details?->sub_total),
+            'tax' => float_amount_with_currency_symbol($extra_service_details?->tax),
+            'total' => float_amount_with_currency_symbol($extra_service_details?->total),
         ]);
     }
-    
+
     //order request complete approve
     public function orderCompleteRequestApprove(Request $request)
     {
         $buyer_id = auth('sanctum')->id();
         $order_id = $request->order_id ?? $request->id;
         $find_order = Order::where('id', $order_id)->where('buyer_id', $buyer_id)->first();
-        if(!empty($find_order)){
+        if (!empty($find_order)) {
             if ($find_order->status == 4) {
                 return response()->error(['msg' => __('Cancelled orders cannot be completed.')]);
             }
             if ($find_order->status == 2) {
                 return response()->success(['msg' => __('Order is already completed.')]);
             }
-            $find_order->update(['order_complete_request'=>2,'status'=>2]);
+            $find_order->update(['order_complete_request' => 2, 'status' => 2]);
             return response()->success([
-                'msg'=>__('Order complete request successfully approved.'),
+                'msg' => __('Order complete request successfully approved.'),
             ]);
-        }else{
+        } else {
             return response()->error([
-                'msg'=>__('Order id does not exist or unauthorized.'),
+                'msg' => __('Order id does not exist or unauthorized.'),
             ]);
         }
     }
-    
+
     //order request complete decline
     public function orderCompleteRequestDecline(Request $request)
     {
-        if(empty($request->decline_reason)){
+        if (empty($request->decline_reason)) {
             return response()->error([
-                'msg'=>__('You must write a short description to decline the request.'),
+                'msg' => __('You must write a short description to decline the request.'),
             ]);
         }
         $request->validate([
-            'decline_reason'=>'min:20|max:1000'
+            'decline_reason' => 'min:20|max:1000'
         ]);
 
         $buyer_id = auth('sanctum')->id();
         $order_id = $request->order_id ?? $request->id;
         $find_order = Order::where('id', $order_id)->where('buyer_id', $buyer_id)->first();
-        if(empty($find_order)){
+        if (empty($find_order)) {
             return response()->error([
-                'msg'=>__('Order id does not exist or unauthorized.'),
+                'msg' => __('Order id does not exist or unauthorized.'),
             ]);
         }
 
-        OrderCompleteDecline::where('order_id',$order_id)->update([
-            'decline_reason'=>$request->decline_reason,
+        OrderCompleteDecline::where('order_id', $order_id)->update([
+            'decline_reason' => $request->decline_reason,
         ]);
-        $find_order->update(['order_complete_request'=>3]);
-        $seller_email = User::select(['id','email'])->where('id',$find_order->seller_id)->first();
+        $find_order->update(['order_complete_request' => 3]);
+        $seller_email = User::select(['id', 'email'])->where('id', $find_order->seller_id)->first();
 
         //Send decline mail to seller and admin
         try {
-            $message_body_admin = __('A buyer has been decline a request to complete an order. Order ID #'). $request->order_id.'</br>';
-            $message_body_seller = __('Your request to complete an order has been decline by the buyer. Order ID #'). $request->order_id.'</br>';
+            $message_body_admin = __('A buyer has been decline a request to complete an order. Order ID #') . $request->order_id . '</br>';
+            $message_body_seller = __('Your request to complete an order has been decline by the buyer. Order ID #') . $request->order_id . '</br>';
             $message = get_static_option('buyer_to_admin_extra_service_message');
-            $message = str_replace(["@order_id"],[$request->order_id],$message);
+            $message = str_replace(["@order_id"], [$request->order_id], $message);
             Mail::to(get_static_option('site_global_email'))->send(new BasicMail([
-                'subject' =>get_static_option('buyer_order_decline_subject') ?? __('Order Complete Decline'),
+                'subject' => get_static_option('buyer_order_decline_subject') ?? __('Order Complete Decline'),
                 'message' => $message
             ]));
 
             $message = get_static_option('buyer_order_decline_message');
-            $message = str_replace(["@order_id"],[$request->order_id],$message);
+            $message = str_replace(["@order_id"], [$request->order_id], $message);
             Mail::to($seller_email->email)->send(new BasicMail([
-                'subject' =>get_static_option('buyer_order_decline_subject') ?? __('Order Complete Decline'),
+                'subject' => get_static_option('buyer_order_decline_subject') ?? __('Order Complete Decline'),
                 'message' => $message
             ]));
         } catch (\Exception $e) {
             //
         }
         return response()->success([
-            'msg'=>__('Order complete request decline successfully'),
+            'msg' => __('Order complete request decline successfully'),
         ]);
     }
-    
-    
+
+
     //order request complete decline history
     public function orderCompleteRequestDeclineHistory(Request $request)
     {
-        $find_order_id = OrderCompleteDecline::where('order_id',$request->order_id)->first();
-        if(!empty($find_order_id)){
-            $decline_histories = OrderCompleteDecline::latest()->where('order_id',$request->order_id)->get();
-            $seller_details = User::select(['name','email','phone'])->where('id',$find_order_id->seller_id)->get();
-            foreach($decline_histories as $history){
+        $find_order_id = OrderCompleteDecline::where('order_id', $request->order_id)->first();
+        if (!empty($find_order_id)) {
+            $decline_histories = OrderCompleteDecline::latest()->where('order_id', $request->order_id)->get();
+            $seller_details = User::select(['name', 'email', 'phone'])->where('id', $find_order_id->seller_id)->get();
+            foreach ($decline_histories as $history) {
                 $history_image[] = get_attachment_image_by_id($history->image);
             }
             return response()->success([
-                'decline_histories'=> $decline_histories,
-                'seller_details'=> $seller_details,
-                'history_image'=> $history_image,
+                'decline_histories' => $decline_histories,
+                'seller_details' => $seller_details,
+                'history_image' => $history_image,
             ]);
-        }else{
+        } else {
             return response()->error([
-                'msg'=>__('Order id does not exists.'),
+                'msg' => __('Order id does not exists.'),
             ]);
         }
     }
-    
-  // get city under country api
+
+    // get city under country api
     public function citySearch(Request $request)
     {
         $service_cities_query = ServiceCity::query()
             ->select('id', 'service_city')
-            ->where('service_city','LIKE','%'.trim(strip_tags($request->q)).'%');
+            ->where('service_city', 'LIKE', '%' . trim(strip_tags($request->q)) . '%');
 
-         $service_cities = $service_cities_query
-             ->orderBy('service_city','asc')
-             ->paginate(20)
-             ->withQueryString();
-            
+        $service_cities = $service_cities_query
+            ->orderBy('service_city', 'asc')
+            ->paginate(20)
+            ->withQueryString();
+
         if ($service_cities->count() >= 1) {
             return response()->json([
                 'service_cities' => $service_cities,
@@ -1701,9 +1854,9 @@ class UserController extends Controller
     {
         $service_areas_query = ServiceArea::query()
             ->select('id', 'service_area')
-            ->where('service_area','LIKE','%'.trim(strip_tags($request->q)).'%');
-            
-       $service_areas = $service_areas_query->orderBy('service_area','asc')->paginate(20)->withQueryString();
+            ->where('service_area', 'LIKE', '%' . trim(strip_tags($request->q)) . '%');
+
+        $service_areas = $service_areas_query->orderBy('service_area', 'asc')->paginate(20)->withQueryString();
 
         if ($service_areas->count() >= 1) {
             return response()->json([
@@ -1717,15 +1870,15 @@ class UserController extends Controller
 
 
     }
-    
-   // get country api
+
+    // get country api
     public function countrySearch(Request $request)
     {
         $countries_query = Country::query()
-        ->select('id', 'country')
-        ->where('country','LIKE','%'.trim(strip_tags($request->q)).'%');
+            ->select('id', 'country')
+            ->where('country', 'LIKE', '%' . trim(strip_tags($request->q)) . '%');
 
-        $countries = $countries_query->orderBy('country','asc')->paginate(20)->withQueryString();
+        $countries = $countries_query->orderBy('country', 'asc')->paginate(20)->withQueryString();
 
         if ($countries) {
             return response()->success([
@@ -1739,8 +1892,9 @@ class UserController extends Controller
 
     }
 
-    public function cashfreePayment(Request $request){
-        try{
+    public function cashfreePayment(Request $request)
+    {
+        try {
             $cashfree_env = getenv('CASHFREE_TEST_MODE') === 'true';
             $cashfree_app_id = getenv('CASHFREE_APP_ID');
             $cashfree_secret_key = getenv('CASHFREE_SECRET_KEY');
@@ -1754,7 +1908,7 @@ class UserController extends Controller
             $cashfree->setEnv($cashfree_env); //true means sandbox, false means live , //env must set as boolean, string will not work
             $cashfree->setExchangeRate($inr_exchange_rate); // if INR not set as currency
 
-            if(auth('sanctum')->user()){
+            if (auth('sanctum')->user()) {
                 $user_name = auth('sanctum')->user()->name;
                 $user_email = auth('sanctum')->user()->email;
             }
@@ -1769,7 +1923,7 @@ class UserController extends Controller
                 'cancel_url' => $request->cancel_url,
                 'success_url' => $request->success_url,
                 'email' => $user_email,
-                'name' =>  $user_name,
+                'name' => $user_name,
                 'payment_type' => $request->payment_type,
             ]);
 
@@ -1780,9 +1934,9 @@ class UserController extends Controller
                 return response()->json(['msg' => 'Payment data not available', 'type' => 'danger']);
             }
 
-        }catch(\Exception $e){
+        } catch (\Exception $e) {
             return response()->json(['msg' => $e->getMessage(), 'type' => 'danger']);
         }
     }
-    
+
 }

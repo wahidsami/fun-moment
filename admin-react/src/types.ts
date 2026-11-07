@@ -58,6 +58,8 @@ export interface User {
   email: string;
   role: 'buyer' | 'seller' | 'admin';
   status: 'active' | 'suspended' | 'pending';
+  lifecycle_status?: string;
+  email_verified?: boolean;
   avatar?: string;
   phone?: string;
   country: string;

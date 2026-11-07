@@ -346,7 +346,7 @@ class ProviderRegistrationService with ChangeNotifier {
 
       if (response.statusCode == 201) {
         final responseData = jsonDecode(response.body);
-        final token = responseData['token']?.toString() ?? '';
+        final String? token = responseData['token']?.toString();
         final userId = int.tryParse(responseData['users']?['id']?.toString() ?? '') ?? 0;
         final state = responseData['users']?['state']?.toString() ?? '';
         final countryId = responseData['users']?['country_id']?.toString() ?? '';
@@ -360,8 +360,7 @@ class ProviderRegistrationService with ChangeNotifier {
           debugPrint('Error caching sellerType: $e');
         }
 
-        // 1. REGISTRATION PERMANENT SUCCESS:
-        // Immediately terminate registration button loading state and in-flight lock
+        // 1. REGISTRATION PENDING SUCCESS:
         _isSubmitting = false;
         isLoading = false;
         isRegistered = true;
@@ -370,43 +369,44 @@ class ProviderRegistrationService with ChangeNotifier {
         registeredUserId = userId;
         registeredState = state;
         registeredCountryId = countryId;
-        debugPrint('[ProviderRegistration] registration marked successful #$seq');
+        debugPrint('[ProviderRegistration] registration submitted #$seq');
         notifyListeners();
 
         OthersHelper().showToast(
-          'Registration successful. Please verify your email.',
+          'Registration submitted. Please verify your email.',
           ConstantColors().successColor,
         );
 
-        // 2. SEPARATE OTP DISPATCH:
-        isOtpSending = true;
-        debugPrint('[ProviderRegistration] OTP dispatch started #$seq');
-        notifyListeners();
-
-        bool isOtpSent = false;
-        try {
-          final emailVerifyService = Provider.of<EmailVerifyService>(context, listen: false);
-          isOtpSent = await emailVerifyService.sendOtpForEmailValidation(
-            model.email.trim(),
-            context,
-            token,
-            client: client,
-          );
-        } catch (otpErr) {
-          debugPrint('[ProviderRegistration] Suppressed OTP dispatch exception: $otpErr');
-          isOtpSent = false;
-        } finally {
-          isOtpSending = false;
-          debugPrint('[ProviderRegistration] OTP dispatch completed #$seq (sent=$isOtpSent)');
+        // 2. OTP DISPATCH CHECK:
+        bool isOtpSent = responseData['otp_sent'] == true;
+        if (!isOtpSent) {
+          isOtpSending = true;
+          debugPrint('[ProviderRegistration] OTP dispatch started #$seq');
           notifyListeners();
+
+          try {
+            final emailVerifyService = Provider.of<EmailVerifyService>(context, listen: false);
+            isOtpSent = await emailVerifyService.sendOtpForEmailValidation(
+              model.email.trim(),
+              context,
+              token,
+              purpose: 'email_verify',
+              client: client,
+            );
+          } catch (otpErr) {
+            debugPrint('[ProviderRegistration] Suppressed OTP dispatch exception: $otpErr');
+            isOtpSent = false;
+          } finally {
+            isOtpSending = false;
+            debugPrint('[ProviderRegistration] OTP dispatch completed #$seq (sent=$isOtpSent)');
+            notifyListeners();
+          }
         }
 
         if (context.mounted) {
           if (!isOtpSent) {
-            // OTP failed or timed out:
-            // Provider registration REMAINS SUCCESSFUL!
             OthersHelper().showToast(
-              "Registration successful. We couldn't send the verification code right now. Please try Resend.",
+              "Registration submitted. We couldn't send the verification code automatically. Please tap Send again on the verification screen.",
               Colors.black,
             );
           }
@@ -422,6 +422,7 @@ class ProviderRegistrationService with ChangeNotifier {
                 state: state,
                 countryId: countryId,
                 userType: 0, // Provider
+                initialOtpFailed: !isOtpSent,
               ),
             ),
           );

@@ -28,7 +28,7 @@ enum OtpSendStatus {
 
 class EmailVerifyService with ChangeNotifier {
   bool isloading = false;
-
+  bool isSendingOtp = false;
   bool verifyOtpLoading = false;
 
   OtpSendStatus lastOtpStatus = OtpSendStatus.none;
@@ -56,12 +56,20 @@ class EmailVerifyService with ChangeNotifier {
     dynamic email,
     BuildContext? context,
     dynamic token, {
+    String purpose = 'email_verify',
     http.Client? client,
     Duration timeoutDuration = const Duration(seconds: 15),
   }) async {
+    if (isSendingOtp) {
+      debugPrint('[OtpVerification] sendOtp ignored: already in flight');
+      return false;
+    }
+
+    isSendingOtp = true;
     lastOtpStatus = OtpSendStatus.none;
     lastOtpMessage = '';
     lastOtpCode = null;
+    notifyListeners();
 
     try {
       final connectivityResult = await (Connectivity().checkConnectivity());
@@ -69,7 +77,6 @@ class EmailVerifyService with ChangeNotifier {
         lastOtpStatus = OtpSendStatus.networkError;
         lastOtpMessage = "Please turn on your internet connection";
         OthersHelper().showToast(lastOtpMessage, Colors.black);
-        notifyListeners();
         return false;
       }
     } catch (e) {
@@ -83,6 +90,7 @@ class EmailVerifyService with ChangeNotifier {
     };
     final data = jsonEncode({
       'email': email,
+      'purpose': purpose,
     });
 
     final httpClient = client ?? http.Client();
@@ -159,6 +167,8 @@ class EmailVerifyService with ChangeNotifier {
       notifyListeners();
       return false;
     } finally {
+      isSendingOtp = false;
+      notifyListeners();
       if (shouldCloseClient) {
         httpClient.close();
       }
@@ -269,16 +279,30 @@ class EmailVerifyService with ChangeNotifier {
         debugPrint('[OtpVerification] verification succeeded');
 
         debugPrint('[OtpVerification] session persistence started');
+        String effectiveToken = token?.toString() ?? '';
+        int effectiveUserId = userId is int ? userId : (int.tryParse(userId?.toString() ?? '') ?? 0);
+        try {
+          final resBody = jsonDecode(response.body);
+          if (resBody is Map) {
+            if (resBody['token'] != null && resBody['token'].toString().isNotEmpty) {
+              effectiveToken = resBody['token'].toString();
+            }
+            if (resBody['users'] is Map && resBody['users']['id'] != null) {
+              effectiveUserId = int.tryParse(resBody['users']['id'].toString()) ?? effectiveUserId;
+            }
+          }
+        } catch (_) {}
+
         try {
           await LoginService().saveDetails(
             email,
-            token,
-            userId,
+            effectiveToken,
+            effectiveUserId,
             state,
             countryId,
             userType: userType,
           );
-          debugPrint('[OtpVerification] session persistence completed (userType: $userType)');
+          debugPrint('[OtpVerification] session persistence completed with authenticated token (userType: $userType)');
         } catch (saveErr) {
           debugPrint('[OtpVerification] session persistence note: $saveErr');
         }
@@ -362,6 +386,8 @@ class EmailVerifyService with ChangeNotifier {
       OthersHelper().showToast('Verification failed: $e', Colors.black);
       return false;
     } finally {
+      isSendingOtp = false;
+      notifyListeners();
       if (shouldCloseClient) {
         httpClient.close();
       }
